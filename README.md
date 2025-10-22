@@ -83,10 +83,10 @@ apt install git curl -y
 ```
 # Clone repository
 ```
-git clone https://github.com/alijayanet/gembok-bill
+git clone https://github.com/enosrotua/cvlintasmultimedia.git
 ```
 ```bash
-cd gembok-bill
+cd cvlintasmultimedia
 ```
 
 ### 2. Install Dependencies
@@ -233,7 +233,7 @@ npm install -g pm2
 ```
 # Start aplikasi
 ```bash
-pm2 start app.js --name gembok-bill
+pm2 start app.js --name cvlintasmultimedia
 ```
 
 # Monitor aplikasi
@@ -242,7 +242,7 @@ pm2 monit
 ```
 # View logs
 ```bash
-pm2 logs gembok-bill
+pm2 logs cvlintasmultimedia
 ```
 
 ### 6. Setup WhatsApp Bot
@@ -832,11 +832,6 @@ Distributed under the ISC License. See `LICENSE` for more information.
 ---
 
 ## 🆘 Support
-
-- **📱 Telegram Group**: [https://t.me/alijayaNetAcs](https://t.me/alijayaNetAcs)
-- **📢 Telegram Channel**: [https://t.me/alijayaNetwork](https://t.me/alijayaNetwork)
-- **📺 YouTube**: [https://www.youtube.com/shorts/qYJFQY7egFw](https://www.youtube.com/shorts/qYJFQY7egFw)
-- **💬 Issues**: [GitHub Issues](https://github.com/alijayanet/gembok-bill/issues)
 - **📞 WhatsApp Support**: 0813-6888-8498
 
 ---
@@ -844,9 +839,9 @@ Distributed under the ISC License. See `LICENSE` for more information.
 ## 🙏 Donasi
 
 Rekening Donasi Untuk Pengembangan:
-- **Bank**: BRI
-- **No. Rekening**: 4206 01 003953 531
-- **Atas Nama**: WARJAYA
+- **Bank**: BCA
+- **No. Rekening**: 058-1998-138
+- **Atas Nama**: LINTAS MULTIMEDIA .CV
 - **Info**: 0813-6888-8498 JINOM-HOMENET
 
 ---
@@ -859,4 +854,4 @@ Aplikasi ini dikembangkan untuk keperluan ISP dan membutuhkan konfigurasi yang t
 
 ---
 
-**Made with ❤️ by [GEMBOK Team](https://github.com/alijayanet)**
+**Made with ❤️ by [BILLING-SYSTEM Team](https://github.com/enosrotua)**
