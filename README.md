@@ -1,4 +1,4 @@
-# Gembok Bill - Sistem Manajemen ISP Terintegrasi
+# Billing-System - Sistem Manajemen ISP Terintegrasi
 
 [![GitHub stars](https://img.shields.io/github/stars/alijayanet/gembok-bill)](https://github.com/alijayanet/gembok-bill/stargazers)
 [![GitHub forks](https://img.shields.io/github/forks/alijayanet/gembok-bill)](https://github.com/alijayanet/gembok-bill/network)
@@ -7,7 +7,7 @@
 
 ## 📋 Deskripsi Aplikasi
 
-**Gembok Bill** adalah sistem manajemen RTRWNet terintegrasi yang menggabungkan WhatsApp Gateway dengan portal admin web untuk mengelola layanan internet secara komprehensif. Aplikasi ini dirancang khusus untuk RTRWNet yang membutuhkan solusi all-in-one untuk manajemen pelanggan, billing, monitoring, dan notifikasi.
+**Billing-System** adalah sistem manajemen RTRWNet terintegrasi yang menggabungkan WhatsApp Gateway dengan portal admin web untuk mengelola layanan internet secara komprehensif. Aplikasi ini dirancang khusus untuk RTRWNet yang membutuhkan solusi all-in-one untuk manajemen pelanggan, billing, monitoring, dan notifikasi.
 
 ### 🎯 Fitur Utama
 
