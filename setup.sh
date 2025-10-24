@@ -73,6 +73,14 @@ else
     echo "⚠️  Technician tables setup script tidak ditemukan"
 fi
 
+# Run SQL migrations
+if [ -f "scripts/run-migrations.js" ]; then
+    node scripts/run-migrations.js
+    echo "✅ SQL migrations completed"
+else
+    echo "⚠️  SQL migrations script tidak ditemukan"
+fi
+
 # Setup default data
 if [ -f "scripts/setup-default-data.js" ]; then
     node scripts/setup-default-data.js
