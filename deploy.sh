@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# 🚀 Gembok Bill Auto Deployment Script
+# 🚀 Billing-System Auto Deployment Script
 # Mengotomatisasi proses deployment dari GitHub ke server production
 # Updated: 2025-01-27
 
 set -e  # Exit on any error
 
-echo "🚀 Starting Gembok Bill deployment..."
+echo "🚀 Starting Billing-System deployment..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -94,9 +94,9 @@ fi
 
 # 11. Setup PM2 untuk production
 log_info "Setting up PM2 for production..."
-pm2 stop gembok-bill || true
-pm2 delete gembok-bill || true
-pm2 start app.js --name gembok-bill
+pm2 stop billing-system || true
+pm2 delete billing-system || true
+pm2 start app.js --name billing-system
 
 # 12. Setup PM2 startup script
 log_info "Setting up PM2 startup script..."
@@ -111,10 +111,10 @@ echo "  - Admin Portal: http://$(curl -s ifconfig.me || echo 'SERVER_IP'):3002/a
 echo "  - Customer Portal: http://$(curl -s ifconfig.me || echo 'SERVER_IP'):3002"
 echo ""
 echo "🔧 Management Commands:"
-echo "  - Check status: pm2 status gembok-bill"
-echo "  - View logs: pm2 logs gembok-bill"
-echo "  - Restart: pm2 restart gembok-bill"
-echo "  - Stop: pm2 stop gembok-bill"
+echo "  - Check status: pm2 status billing-system"
+echo "  - View logs: pm2 logs billing-system"
+echo "  - Restart: pm2 restart billing-system"
+echo "  - Stop: pm2 stop billing-system"
 echo ""
 echo "🔍 Troubleshooting:"
 echo "  - SQLite3 errors: npm rebuild"
@@ -126,12 +126,12 @@ echo "  1. Configure settings.json with your credentials"
 echo "  2. Setup WhatsApp bot by scanning QR code"
 echo "  3. Test all features"
 echo ""
-echo "🎯 Gembok Bill is now running on port 3002!"
+echo "🎯 Billing-System is now running on port 3002!"
 echo "   Check: $(curl -s ifconfig.me || echo 'SERVER_IP'):3002"
 
 # 14. Verifikasi
 log_info "Verifying deployment..."
-pm2 status gembok-bill
+pm2 status billing-system
 
 echo ""
 log_success "🎉 Deploy selesai! Aplikasi siap digunakan."

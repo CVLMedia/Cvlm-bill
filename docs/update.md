@@ -2,7 +2,7 @@
 
 Tanggal: 2025-08-11
 
-Repo: https://github.com/alijayanet/gembok-bill
+Repo: https://github.com/enosrotua/billing-system
 
 ## Changelog (v1.2.0)
 - feat(packages): ganti input profil PPPoE jadi dropdown dan load dari Mikrotik

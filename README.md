@@ -1,9 +1,9 @@
 # Billing-System - Sistem Manajemen ISP Terintegrasi
 
-[![GitHub stars](https://img.shields.io/github/stars/alijayanet/gembok-bill)](https://github.com/alijayanet/gembok-bill/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/alijayanet/gembok-bill)](https://github.com/alijayanet/gembok-bill/network)
-[![GitHub issues](https://img.shields.io/github/issues/alijayanet/gembok-bill)](https://github.com/alijayanet/gembok-bill/issues)
-[![GitHub license](https://img.shields.io/github/license/alijayanet/gembok-bill)](https://github.com/alijayanet/gembok-bill/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/enosrotua/cvlintamultimedia)](https://github.com/enosrotua/cvlintamultimedia/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/enosrotua/cvlintamultimedia)](https://github.com/enosrotua/cvlintamultimedia/network)
+[![GitHub issues](https://img.shields.io/github/issues/enosrotua/cvlintamultimedia)](https://github.com/enosrotua/cvlintamultimedia/issues)
+[![GitHub license](https://img.shields.io/github/license/enosrotua/cvlintamultimedia)](https://github.com/enosrotua/cvlintamultimedia/blob/main/LICENSE)
 
 ## 📋 Deskripsi Aplikasi
 
@@ -116,8 +116,8 @@ Edit file `settings.json` dengan pengaturan yang sesuai:
   "version_date": "2025-01-27",
   "version_notes": "Added technician role, trouble report & PPPoE WhatsApp commands",
   "build_number": "20250127.001",
-  "app_name": "GEMBOK",
-  "company_header": "GEMBOK",
+  "app_name": "CVLMEDIA",
+  "company_header": "CVLMEDIA",
   "footer_info": "Info Hubungi : 0813-6888-8498",
   
   "admins.0": "6281368888498",
@@ -125,18 +125,18 @@ Edit file `settings.json` dengan pengaturan yang sesuai:
   "admin_username": "admin",
   "admin_password": "admin",
   
-  "technician_numbers.0": "6283807665111",
-  "technician_numbers.1": "6282218094111",
+  "technician_numbers.0": "6285678665111",
+  "technician_numbers.1": "6281234094111",
   "technician_group_id": "120363029715729111@g.us",
   
-  "genieacs_url": "http://192.168.8.89:7557",
+  "genieacs_url": "http://172.17.28.192:7557",
   "genieacs_username": "admin",
   "genieacs_password": "admin",
   
-  "mikrotik_host": "192.168.8.1",
-  "mikrotik_port": "8728",
-  "mikrotik_user": "admin",
-  "mikrotik_password": "admin",
+  "mikrotik_host": "103.19.57.69",
+  "mikrotik_port": "8730",
+  "mikrotik_user": "systemAPI",
+  "mikrotik_password": "220208",
   "main_interface": "ether1-ISP",
   "pppoe_monitor_enable": "true",
   
@@ -164,7 +164,7 @@ Edit file `settings.json` dengan pengaturan yang sesuai:
   
   "server_port": "3003",
   "server_host": "localhost",
-  "secret_key": "gembok-digital-network",
+  "secret_key": "CVLMEDIA-digital-network",
   "reconnect_interval": "5000",
   "log_level": "info",
   "logo_filename": "logo.png",
@@ -193,9 +193,9 @@ Edit file `settings.json` dengan pengaturan yang sesuai:
   },
   "payment_accounts": {
     "bank_transfer": {
-      "bank_name": "Bank BRI",
-      "account_number": "1234-5678-9012-3456",
-      "account_name": "GEMBOK"
+      "bank_name": "BCA",
+      "account_number": "058-1998-138",
+      "account_name": "LINTAS MULTIMEDIA .CV"
     },
     "cash": {
       "office_address": "Jl. Contoh No. 123, Kota, Provinsi",
@@ -408,7 +408,7 @@ Aplikasi mendukung 3 payment gateway populer di Indonesia:
 Jika ada error seperti:
 ```
 Error sending message: Error: item-not-found
-warn: Skipping invalid WhatsApp number: 6283807665111
+warn: Skipping invalid WhatsApp number: 6281234665111
 ```
 
 **Solusi:**
@@ -517,8 +517,8 @@ warn: Skipping invalid WhatsApp number: 6283807665111
   - Informational alerts untuk field yang disembunyikan
 
 ##### 🏢 **Application Branding Update**
-- **Company Name:** Diubah dari "CV Lintas Multimedia" ke "GEMBOK"
-- **App Name:** "GEMBOK" (dari settings.json)
+- **Company Name:** Diubah dari "CV Lintas Multimedia" ke "CVLMEDIA"
+- **App Name:** "CVLMEDIA" (dari settings.json)
 - **Consistent branding** di semua interface
 
 #### 🔧 **Technical Improvements:**
@@ -559,8 +559,8 @@ config/
   "version_date": "2025-01-27",
   "version_notes": "Added technician role, trouble report & PPPoE WhatsApp commands",
   "build_number": "20250127.001",
-  "app_name": "GEMBOK",
-  "company_header": "GEMBOK",
+  "app_name": "CVLMEDIA",
+  "company_header": "CVLMEDIA",
   "technician_numbers.0": "6283807665111",
   "technician_numbers.1": "6282218094111"
 }
@@ -690,7 +690,7 @@ config/
 ## 📁 Struktur Aplikasi
 
 ```
-gembok-bill/
+billing-system/
 ├── app.js                 # File utama aplikasi
 ├── package.json           # Dependencies dan scripts
 ├── settings.json          # Konfigurasi aplikasi
@@ -799,7 +799,7 @@ gembok-bill/
 - **Icon Integration:** Bootstrap Icons untuk visual appeal
 
 #### **Branding Consistency**
-- **Company Name:** "GEMBOK" branding
+- **Company Name:** "CVLMEDIA" branding
 - **Color Scheme:** Consistent color palette
 - **Typography:** Readable font choices
 - **Layout:** Clean dan organized interface

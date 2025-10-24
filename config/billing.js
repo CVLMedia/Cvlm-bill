@@ -1578,14 +1578,6 @@ class BillingManager {
 
     async getInvoicesWithFilters(filters = {}, limit = null, offset = null) {
         return new Promise((resolve, reject) => {
-            const currentDate = new Date();
-            const currentMonth = currentDate.getMonth();
-            const currentYear = currentDate.getFullYear();
-            
-            // Hitung tanggal awal bulan berjalan saja (tidak termasuk bulan sebelumnya)
-            const currentMonthStart = new Date(currentYear, currentMonth, 1);
-            const currentMonthStartStr = currentMonthStart.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-            
             let sql = `
                 SELECT i.*, c.username, c.name as customer_name, c.phone as customer_phone,
                        c.renewal_type, c.fix_date,
@@ -1593,10 +1585,16 @@ class BillingManager {
                 FROM invoices i
                 JOIN customers c ON i.customer_id = c.id
                 JOIN packages p ON i.package_id = p.id
-                WHERE DATE(i.created_at) >= ?
+                WHERE 1=1
             `;
             
-            const params = [currentMonthStartStr];
+            const params = [];
+            
+            // Filter by month if provided (format: YYYY-MM)
+            if (filters.month) {
+                sql += ` AND strftime('%Y-%m', i.created_at) = ?`;
+                params.push(filters.month);
+            }
             
             // Filter by customer username
             if (filters.customer_username) {
@@ -1745,14 +1743,6 @@ class BillingManager {
 
     async getInvoices(customerUsername = null, limit = null, offset = null) {
         return new Promise((resolve, reject) => {
-            const currentDate = new Date();
-            const currentMonth = currentDate.getMonth();
-            const currentYear = currentDate.getFullYear();
-            
-            // Hitung tanggal awal bulan berjalan saja (tidak termasuk bulan sebelumnya)
-            const currentMonthStart = new Date(currentYear, currentMonth, 1);
-            const currentMonthStartStr = currentMonthStart.toISOString().split('T')[0]; // Format: YYYY-MM-DD
-            
             let sql = `
                 SELECT i.*, c.username, c.name as customer_name, c.phone as customer_phone,
                        c.renewal_type, c.fix_date,
@@ -1760,10 +1750,10 @@ class BillingManager {
                 FROM invoices i
                 JOIN customers c ON i.customer_id = c.id
                 JOIN packages p ON i.package_id = p.id
-                WHERE DATE(i.created_at) >= ?
+                WHERE 1=1
             `;
             
-            const params = [currentMonthStartStr];
+            const params = [];
             
             if (customerUsername) {
                 sql += ` AND c.username = ?`;
@@ -2127,13 +2117,54 @@ class BillingManager {
         return new Promise((resolve, reject) => {
             // First get the invoice details before deleting
             this.getInvoiceById(id).then(invoice => {
-                const sql = `DELETE FROM invoices WHERE id = ?`;
-                this.db.run(sql, [id], function(err) {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve(invoice);
-                    }
+                if (!invoice) {
+                    reject(new Error('Invoice not found'));
+                    return;
+                }
+
+                // Start a transaction to ensure all deletions succeed or fail together
+                this.db.serialize(() => {
+                    this.db.run('BEGIN TRANSACTION');
+                    
+                    // Delete related records first to avoid foreign key constraint violations
+                    const deleteQueries = [
+                        'DELETE FROM payments WHERE invoice_id = ?',
+                        'DELETE FROM payment_gateway_transactions WHERE invoice_id = ?',
+                        'DELETE FROM technician_activities WHERE invoice_id = ?',
+                        'DELETE FROM agent_monthly_payments WHERE invoice_id = ?',
+                        'DELETE FROM agent_payments WHERE invoice_id = ?'
+                    ];
+                    
+                    let completedQueries = 0;
+                    let hasError = false;
+                    
+                    deleteQueries.forEach((query, index) => {
+                        this.db.run(query, [id], function(err) {
+                            if (err && !err.message.includes('no such table')) {
+                                console.error(`Error deleting from related table (query ${index + 1}):`, err.message);
+                                hasError = true;
+                            }
+                            
+                            completedQueries++;
+                            if (completedQueries === deleteQueries.length) {
+                                if (hasError) {
+                                    this.db.run('ROLLBACK');
+                                    reject(new Error('Failed to delete related records'));
+                                } else {
+                                    // Now delete the invoice itself
+                                    this.db.run('DELETE FROM invoices WHERE id = ?', [id], function(err) {
+                                        if (err) {
+                                            this.db.run('ROLLBACK');
+                                            reject(err);
+                                        } else {
+                                            this.db.run('COMMIT');
+                                            resolve(invoice);
+                                        }
+                                    }.bind(this));
+                                }
+                            }
+                        }.bind(this));
+                    });
                 });
             }).catch(reject);
         });

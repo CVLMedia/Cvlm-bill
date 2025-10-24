@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Gembok Bill - Quick Setup Script
-# Script untuk setup awal aplikasi Gembok Bill
+# Billing-System - Quick Setup Script
+# Script untuk setup awal aplikasi Billing-System
 
-echo "🚀 Gembok Bill - Quick Setup Script"
+echo "🚀 Billing-System - Quick Setup Script"
 echo "=================================="
 
 # Check if Node.js is installed

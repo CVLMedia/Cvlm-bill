@@ -1,6 +1,6 @@
-# Dockerfile untuk Gembok Bill
-# Build dengan: docker build -t gembok-bill .
-# Run dengan: docker run -d -p 3002:3002 --name gembok-bill gembok-bill
+# Dockerfile untuk Billing-System
+# Build dengan: docker build -t billing-system .
+# Run dengan: docker run -d -p 3002:3002 --name billing-system billing-system
 
 FROM node:20-bullseye-slim
 

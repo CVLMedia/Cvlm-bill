@@ -1,4 +1,4 @@
-# 🚀 Panduan Instalasi Cepat - Gembok Bill
+# 🚀 Panduan Instalasi Cepat - Billing-System
 
 ## 📋 Prerequisites
 
@@ -17,8 +17,8 @@
 sudo apt update && sudo apt install git curl -y
 
 # Clone repository
-git clone https://github.com/alijayanet/gembok-bill.git
-cd gembok-bill
+git clone https://github.com/enosrotua/cvlintasmultimedia.git
+cd billing-system
 ```
 
 ### 2. Install Dependencies
@@ -86,7 +86,7 @@ npm start
 npm install -g pm2
 
 # Start aplikasi
-pm2 start app.js --name gembok-bill
+pm2 start app.js --name cvlintasmultimedia
 
 # Auto start on boot
 pm2 startup
@@ -146,10 +146,10 @@ npm install sqlite3 --build-from-source
 
 ## 🆘 Support
 
-- **GitHub Issues**: [https://github.com/alijayanet/gembok-bill/issues](https://github.com/alijayanet/gembok-bill/issues)
+- **GitHub Issues**: [https://github.com/enosrotua/cvlintasmultimedia/issues](https://github.com/enosroua/cvlintasmultimedia/issues)
 - **WhatsApp Support**: 0813-6888-8498
-- **Telegram Group**: [https://t.me/alijayaNetAcs](https://t.me/alijayaNetAcs)
+
 
 ---
 
-**Made with ❤️ by GEMBOK Team**
+**Made with ❤️ by CVLMEDIA Team**
