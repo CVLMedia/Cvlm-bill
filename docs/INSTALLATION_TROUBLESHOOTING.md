@@ -189,4 +189,244 @@ Jika masih mengalami masalah:
 
 ---
 
+## ❌ Error: `SQLITE_ERROR: no such column: invoice_type`
+
+### 🎯 **Masalah yang Ditemukan**
+
+Setelah `git clone` dan `setup.sh`, billing dashboard error dengan pesan:
+```
+SQLITE_ERROR: no such column: invoice_type
+```
+
+### 🔍 **Penyebab Masalah**
+
+1. **Database kosong di server baru** - tidak ada data invoice untuk testing query
+2. **Query billing dashboard** menggunakan kolom `invoice_type` yang memerlukan data untuk testing
+3. **Tidak ada data default** yang dibuat saat fresh install
+
+### ✅ **Solusi yang Diterapkan**
+
+#### 🆕 **Script Baru: `setup-default-data.js`**
+
+Script ini akan membuat data default yang diperlukan:
+
+```javascript
+// Script akan mengecek dan membuat:
+- Default packages (jika belum ada)
+- Default technicians (jika belum ada)  
+- Default voucher pricing (jika belum ada)
+- Default agents (jika belum ada)
+- Default collectors (jika belum ada)
+- Sample invoice untuk testing kolom invoice_type
+```
+
+#### 🔧 **Update `setup.sh`**
+
+Script `setup.sh` sekarang otomatis menjalankan:
+```bash
+# Setup default data
+if [ -f "scripts/setup-default-data.js" ]; then
+    node scripts/setup-default-data.js
+    echo "✅ Default data setup completed"
+fi
+```
+
+### 🚀 **Cara Menggunakan**
+
+#### **1. Setup Otomatis (Recommended)**
+```bash
+# Clone repository
+git clone https://github.com/enosrotua/cvlintasmultimedia.git
+cd cvlintasmultimedia
+
+# Install dependencies
+npm install
+
+# Jalankan setup script lengkap
+bash setup.sh
+```
+
+#### **2. Manual Setup**
+```bash
+# Jika sudah ada aplikasi yang error
+node scripts/setup-default-data.js
+pm2 restart cvlintasmultimedia
+```
+
+### 📋 **Output yang Diharapkan**
+
+```
+🚀 Setting up default data for new server...
+
+📦 Step 1: Checking packages...
+   ✅ Found 16 existing packages
+
+👨‍💼 Step 2: Checking technicians...
+   ✅ Found 1 existing technicians
+
+🎫 Step 3: Checking voucher pricing...
+   ✅ Found 9 existing voucher pricing
+
+👤 Step 4: Checking agents...
+   👤 No agents found, creating default agent...
+   ✅ Default agent created (ID: 1)
+   ✅ Agent balance created: Rp 100,000
+
+💰 Step 5: Checking collectors...
+   💰 No collectors found, creating default collector...
+   ✅ Default collector created (ID: 7)
+
+📄 Step 6: Creating sample invoice for testing...
+   📄 No invoices found, creating sample invoice...
+   ✅ Sample invoice created (ID: 80)
+
+🎉 Default data setup completed successfully!
+```
+
+### 🛡️ **Prevention**
+
+- **Script `setup.sh` sudah diupdate** untuk otomatis menjalankan `setup-default-data.js`
+- **Database kosong** akan otomatis terisi dengan data default
+- **Billing dashboard** akan berfungsi normal setelah setup
+
+---
+
+## ❌ Error: `SQLITE_ERROR: no such table: technicians`
+
+### 🎯 **Masalah yang Ditemukan**
+
+Aplikasi error saat startup karena tabel `technicians` tidak ada.
+
+### 🔍 **Penyebab Masalah**
+
+Script `add-technician-tables.js` tidak dijalankan saat setup.
+
+### ✅ **Solusi yang Diterapkan**
+
+Script `setup.sh` sudah diupdate untuk otomatis menjalankan:
+```bash
+# Setup technician tables
+if [ -f "scripts/add-technician-tables.js" ]; then
+    node scripts/add-technician-tables.js
+    echo "✅ Technician tables setup completed"
+fi
+```
+
+### 🚀 **Manual Fix**
+
+```bash
+node scripts/add-technician-tables.js
+pm2 restart cvlintasmultimedia
+```
+
+---
+
+## ❌ Error: `Cannot find module './settings'`
+
+### 🎯 **Masalah yang Ditemukan**
+
+Aplikasi error saat startup karena import module salah.
+
+### 🔍 **Penyebab Masalah**
+
+File `config/billing.js` memiliki import yang salah di baris 3102 dan 3212.
+
+### ✅ **Solusi yang Diterapkan**
+
+Import sudah diperbaiki di kode - tidak akan terjadi lagi.
+
+### 🚀 **Manual Fix**
+
+```bash
+pm2 restart cvlintasmultimedia
+```
+
+---
+
+## 🔄 **Setup Script Lengkap untuk Server Baru**
+
+### **Proses Setup yang Benar**
+
+```bash
+# 1. Clone repository
+git clone https://github.com/enosrotua/cvlintasmultimedia.git
+cd cvlintasmultimedia
+
+# 2. Install dependencies
+npm install
+
+# 3. Jalankan setup script lengkap
+bash setup.sh
+
+# 4. Start aplikasi
+pm2 start app.js --name cvlintasmultimedia
+pm2 save
+pm2 startup
+```
+
+### **Script `setup.sh` Sekarang Akan Otomatis:**
+
+- ✅ Setup payment gateway tables
+- ✅ Setup technician tables  
+- ✅ Setup default data (packages, technicians, voucher pricing, agents, collectors, sample invoice)
+- ✅ Membuat logs directory
+- ✅ Install PM2
+- ✅ Start aplikasi
+
+### **Verifikasi Setup Berhasil**
+
+```bash
+# 1. Cek status aplikasi
+pm2 status
+
+# 2. Cek logs aplikasi
+pm2 logs cvlintasmultimedia --lines 20
+
+# 3. Cek database
+sqlite3 data/billing.db "SELECT COUNT(*) as packages FROM packages;"
+sqlite3 data/billing.db "SELECT COUNT(*) as technicians FROM technicians;"
+sqlite3 data/billing.db "SELECT COUNT(*) as invoices FROM invoices;"
+
+# 4. Akses web interface
+# Buka browser ke http://server-ip:3003
+# Login dengan kredensial admin
+# Cek billing dashboard tidak error
+```
+
+---
+
+## 🆘 **Troubleshooting Lanjutan**
+
+### **Jika Masih Ada Masalah:**
+
+```bash
+# 1. Cek semua logs
+pm2 logs cvlintasmultimedia --lines 50
+
+# 2. Cek database schema
+sqlite3 data/billing.db ".schema invoices"
+sqlite3 data/billing.db ".schema technicians"
+
+# 3. Reset database (HATI-HATI - akan menghapus semua data)
+rm data/billing.db
+bash setup.sh
+
+# 4. Manual setup step by step
+node scripts/add-payment-gateway-tables.js
+node scripts/add-technician-tables.js
+node scripts/setup-default-data.js
+pm2 restart cvlintasmultimedia
+```
+
+---
+
+## 📞 **Contact Support**
+
+Jika masalah masih berlanjut, hubungi:
+- **Email:** info@alijaya.com
+- **Phone:** 0813-6888-8498
+- **GitHub:** https://github.com/enosrotua/cvlintasmultimedia/issues
+
+---
+
 **Dokumentasi ini dibuat untuk membantu troubleshooting instalasi CV Lintas Multimedia.**
