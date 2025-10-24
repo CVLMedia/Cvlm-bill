@@ -343,6 +343,87 @@ pm2 restart cvlintasmultimedia
 
 ---
 
+## ❌ Error: `SQLITE_ERROR: no such column: whatsapp_group_id`
+
+### 🎯 **Masalah yang Ditemukan**
+
+Aplikasi error saat mengirim pesan ke technician group:
+```
+Error: SQLITE_ERROR: no such column: whatsapp_group_id
+```
+
+### 🔍 **Penyebab Masalah**
+
+Kolom `whatsapp_group_id` belum ditambahkan ke tabel `technicians`. Migration SQL belum dijalankan.
+
+### ✅ **Solusi yang Diterapkan**
+
+#### 🆕 **Script Baru: `run-migrations.js`**
+
+Script ini akan menjalankan semua SQL migrations dari folder `migrations/`:
+
+```javascript
+// Script features:
+- Menjalankan semua SQL migrations secara berurutan
+- Tracking migrations yang sudah diapply
+- Handle triggers, transactions, dan edge cases
+- Idempotent (aman dijalankan berulang kali)
+- Skip error yang tidak relevan
+```
+
+#### 🔧 **Update `setup.sh`**
+
+Script `setup.sh` sekarang otomatis menjalankan:
+```bash
+# Run SQL migrations
+if [ -f "scripts/run-migrations.js" ]; then
+    node scripts/run-migrations.js
+    echo "✅ SQL migrations completed"
+fi
+```
+
+### 🚀 **Cara Menggunakan**
+
+#### **1. Setup Otomatis (Recommended)**
+```bash
+# Clone dan setup
+git clone https://github.com/enosrotua/cvlintasmultimedia.git
+cd cvlintasmultimedia
+npm install
+bash setup.sh
+```
+
+#### **2. Manual Fix**
+```bash
+# Jika sudah ada aplikasi yang error
+node scripts/run-migrations.js
+pm2 restart cvlintasmultimedia
+```
+
+### 📋 **Output yang Diharapkan**
+
+```
+🚀 Running database migrations...
+
+📋 Found 26 migration files
+✅ Already applied: 0 migrations
+
+🔄 Applying add_whatsapp_group_to_technicians.sql...
+   ✅ add_whatsapp_group_to_technicians.sql applied successfully
+
+🎉 Migrations completed!
+   📊 Applied 26 new migrations
+   ✅ Total migrations: 26
+```
+
+### 🛡️ **Prevention**
+
+- **Script `setup.sh` sudah diupdate** untuk otomatis menjalankan migrations
+- **Kolom `whatsapp_group_id`** akan otomatis ditambahkan
+- **Semua SQL migrations** akan diapply secara otomatis
+
+---
+
 ## 🔄 **Setup Script Lengkap untuk Server Baru**
 
 ### **Proses Setup yang Benar**
@@ -368,6 +449,7 @@ pm2 startup
 
 - ✅ Setup payment gateway tables
 - ✅ Setup technician tables  
+- ✅ Run SQL migrations (26 migrations)
 - ✅ Setup default data (packages, technicians, voucher pricing, agents, collectors, sample invoice)
 - ✅ Membuat logs directory
 - ✅ Install PM2
@@ -414,6 +496,7 @@ bash setup.sh
 # 4. Manual setup step by step
 node scripts/add-payment-gateway-tables.js
 node scripts/add-technician-tables.js
+node scripts/run-migrations.js
 node scripts/setup-default-data.js
 pm2 restart cvlintasmultimedia
 ```
