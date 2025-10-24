@@ -60,10 +60,20 @@ fi
 echo "🗄️  Setting up database..."
 if [ -f "scripts/add-payment-gateway-tables.js" ]; then
     node scripts/add-payment-gateway-tables.js
-    echo "✅ Database setup completed"
+    echo "✅ Payment gateway tables setup completed"
 else
-    echo "⚠️  Database setup script tidak ditemukan"
+    echo "⚠️  Payment gateway setup script tidak ditemukan"
 fi
+
+# Setup technician tables
+if [ -f "scripts/add-technician-tables.js" ]; then
+    node scripts/add-technician-tables.js
+    echo "✅ Technician tables setup completed"
+else
+    echo "⚠️  Technician tables setup script tidak ditemukan"
+fi
+
+echo "✅ Database setup completed"
 
 # Create logs directory if not exists
 if [ ! -d "logs" ]; then
