@@ -1039,14 +1039,6 @@ $(function() {
             'technician_numbers.2': 'Nomor Teknisi 3',
             'admin_username': 'Username Admin',
             'admin_password': 'Password Admin',
-            'genieacs_url': 'URL GenieACS',
-            'genieacs_username': 'Username GenieACS',
-            'genieacs_password': 'Password GenieACS',
-            'mikrotik_host': 'Host/IP Mikrotik',
-            'mikrotik_port': 'Port API Mikrotik',
-            'mikrotik_user': 'Username Mikrotik',
-            'mikrotik_password': 'Password Mikrotik',
-            'main_interface': 'Interface Utama',
             'pppoe_monitor_enable': 'Monitor PPPoE',
             'pppoe_monitor_interval_minutes': 'Interval Monitor PPPoE (Menit)',
             'whatsapp_keep_alive': 'WhatsApp Keep Alive',
@@ -1090,7 +1082,13 @@ $(function() {
         // Duplicate/Alternative Fields
         'pppoe_notifications.enabled', 'pppoe_notifications.loginNotifications', 
         'pppoe_notifications.logoutNotifications', 'pppoe_notifications.includeOfflineList',
-        'pppoe_notifications.maxOfflineListCount'
+        'pppoe_notifications.maxOfflineListCount',
+        
+        // GenieACS Settings - Dikelola via /admin/genieacs-servers dan /admin/routers
+        'genieacs_url', 'genieacs_username', 'genieacs_password',
+        
+        // Mikrotik Settings - Dikelola via /admin/routers
+        'mikrotik_host', 'mikrotik_port', 'mikrotik_user', 'mikrotik_password', 'main_interface'
     ];
 
     // Keterangan bahasa Indonesia untuk setiap pengaturan
@@ -1106,14 +1104,6 @@ $(function() {
             'admins.1': 'Nomor WhatsApp admin tambahan (opsional)',
             'admin_username': 'Username untuk login ke admin panel',
             'admin_password': 'Password untuk login ke admin panel',
-            'genieacs_url': 'URL server GenieACS untuk monitoring perangkat',
-            'genieacs_username': 'Username untuk koneksi ke GenieACS',
-            'genieacs_password': 'Password untuk koneksi ke GenieACS',
-            'mikrotik_host': 'Alamat IP atau hostname router MikroTik',
-            'mikrotik_port': 'Port API MikroTik (default: 8728)',
-            'mikrotik_user': 'Username untuk koneksi ke MikroTik API',
-            'mikrotik_password': 'Password untuk koneksi ke MikroTik API',
-            'main_interface': 'Interface utama MikroTik untuk monitoring PPPoE',
             'pppoe_monitor_enable': 'Aktifkan monitoring koneksi PPPoE secara real-time',
             'technician_numbers.0': 'Nomor WhatsApp teknisi pertama',
             'technician_numbers.1': 'Nomor WhatsApp teknisi kedua',

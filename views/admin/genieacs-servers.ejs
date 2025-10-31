@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>GenieACS Servers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/responsive-admin.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid">
+  <div class="row">
+    <%- include('../partials/admin-responsive-sidebar', { page: 'genieacs-servers', settings: settings || {} }) %>
+    <main class="col-md-10 ms-sm-auto main-content">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0"><i class="bi bi-server me-2"></i>GenieACS Servers</h4>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addServerModal"><i class="bi bi-plus"></i> Tambah Server</button>
+      </div>
+      <div class="card p-3">
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nama</th>
+                <th>URL</th>
+                <th>Username</th>
+                <th>Password</th>
+                <th>Description</th>
+                <th>Router Count</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% (servers||[]).forEach(function(s,i){ %>
+                <tr>
+                  <td><%= i+1 %></td>
+                  <td><strong><%= s.name %></strong></td>
+                  <td><code><%= s.url %></code></td>
+                  <td><%= s.username %></td>
+                  <td><%= s.password ? '***' : '' %></td>
+                  <td><%= s.description || '-' %></td>
+                  <td>
+                    <% if (s.router_count > 0) { %>
+                      <span class="badge bg-info"><%= s.router_count %> router(s)</span>
+                    <% } else { %>
+                      <span class="text-muted">0</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-secondary" onclick='openEdit(<%- JSON.stringify(s) %>)'><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-info" onclick='testServer(<%= s.id %>)'><i class="bi bi-activity"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick='deleteServer(<%= s.id %>)'><i class="bi bi-trash"></i></button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Add Modal -->
+      <div class="modal fade" id="addServerModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Tambah GenieACS Server</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <div class="mb-3"><label class="form-label">Nama</label><input class="form-control" id="s_name" placeholder="GenieACS Server A"></div>
+              <div class="mb-3"><label class="form-label">URL</label><input class="form-control" id="s_url" placeholder="http://10.201.39.23:7557"></div>
+              <div class="mb-3"><label class="form-label">Username</label><input class="form-control" id="s_username" placeholder="admin"></div>
+              <div class="mb-3"><label class="form-label">Password</label><input class="form-control" id="s_password" type="password"></div>
+              <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" id="s_description" rows="2" placeholder="Server untuk Router A"></textarea></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" onclick="saveServer()">Simpan</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Modal -->
+      <div class="modal fade" id="editServerModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Edit GenieACS Server</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <input type="hidden" id="e_id">
+              <div class="mb-3"><label class="form-label">Nama</label><input class="form-control" id="e_name"></div>
+              <div class="mb-3"><label class="form-label">URL</label><input class="form-control" id="e_url"></div>
+              <div class="mb-3"><label class="form-label">Username</label><input class="form-control" id="e_username"></div>
+              <div class="mb-3"><label class="form-label">Password</label><input class="form-control" id="e_password" type="password" placeholder="Kosongkan jika tidak ingin mengubah"></div>
+              <div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" id="e_description" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" onclick="updateServer()">Update</button></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+async function saveServer(){
+  const body = { name: $('#s_name').val().trim(), url: $('#s_url').val().trim(), username: $('#s_username').val().trim(), password: $('#s_password').val(), description: $('#s_description').val().trim() };
+  const res = await fetch('/admin/genieacs-servers', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r=>r.json());
+  if(res.success){ location.reload(); } else { alert(res.message||'Gagal simpan'); }
+}
+function openEdit(s){ 
+  $('#e_id').val(s.id); 
+  $('#e_name').val(s.name); 
+  $('#e_url').val(s.url); 
+  $('#e_username').val(s.username); 
+  $('#e_password').val(''); 
+  $('#e_description').val(s.description||''); 
+  new bootstrap.Modal(document.getElementById('editServerModal')).show(); 
+}
+async function updateServer(){
+  const id=$('#e_id').val(); 
+  const password = $('#e_password').val();
+  const body={ name:$('#e_name').val().trim(), url:$('#e_url').val().trim(), username:$('#e_username').val().trim(), password: password || undefined, description: $('#e_description').val().trim() };
+  const res = await fetch('/admin/genieacs-servers/'+id, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r=>r.json());
+  if(res.success){ location.reload(); } else { alert(res.message||'Gagal update'); }
+}
+async function deleteServer(id){ 
+  if(!confirm('Hapus GenieACS server ini? Pastikan tidak ada router yang menggunakan server ini.')) return; 
+  const res=await fetch('/admin/genieacs-servers/'+id+'/delete',{method:'POST'}).then(r=>r.json()); 
+  if(res.success){ location.reload(); } else { alert(res.message||'Gagal hapus'); } 
+}
+async function testServer(id){
+  const btn = event.currentTarget; 
+  const old = btn.innerHTML; 
+  btn.disabled = true; 
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try { 
+    const res = await fetch('/admin/genieacs-servers/'+id+'/test',{method:'POST'}).then(r=>r.json()); 
+    if(res.success){ 
+      alert('Koneksi berhasil!\n' + (res.details||'')); 
+    } else { 
+      alert('Gagal koneksi:\n' + (res.message||'Unknown') + '\n' + (res.details||'')); 
+    } 
+  }
+  catch(e){ alert('Error: '+e.message); }
+  finally { btn.disabled=false; btn.innerHTML = old; }
+}
+</script>
+</body>
+</html>
+

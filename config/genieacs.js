@@ -4,12 +4,106 @@ const mikrotik = require('./mikrotik');
 const { getMikrotikConnection } = require('./mikrotik');
 const { getSetting } = require('./settingsManager');
 const cacheManager = require('./cacheManager');
+const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
 
-// Helper untuk membuat axios instance dinamis
-function getAxiosInstance() {
-    const GENIEACS_URL = getSetting('genieacs_url', 'http://localhost:7557');
-    const GENIEACS_USERNAME = getSetting('genieacs_username', 'acs');
-    const GENIEACS_PASSWORD = getSetting('genieacs_password', '');
+// Helper untuk mendapatkan GenieACS server berdasarkan customer router
+async function getGenieacsServerForCustomer(customer) {
+    return new Promise((resolve, reject) => {
+        try {
+            const dbPath = path.join(__dirname, '../data/billing.db');
+            const db = new sqlite3.Database(dbPath);
+            
+            // Customer harus punya id untuk lookup mapping
+            if (!customer || !customer.id) {
+                db.close();
+                console.log('⚠️ Customer tidak punya id untuk lookup router mapping');
+                resolve(null);
+                return;
+            }
+            
+            // Cek router_id langsung di customer (jika ada) atau dari customer_router_map
+            let routerId = customer.router_id;
+            
+            // Jika tidak ada router_id langsung, ambil dari customer_router_map
+            if (!routerId) {
+                db.get(`SELECT router_id FROM customer_router_map WHERE customer_id = ?`, [customer.id], (err, mapRow) => {
+                    if (err) {
+                        console.error('Error getting router mapping for customer:', err);
+                        db.close();
+                        resolve(null);
+                        return;
+                    }
+                    
+                    routerId = mapRow ? mapRow.router_id : null;
+                    
+                    if (!routerId) {
+                        db.close();
+                        console.log(`⚠️ Customer ${customer.id} tidak memiliki router mapping`);
+                        resolve(null);
+                        return;
+                    }
+                    
+                    // Ambil GenieACS server dari router
+                    db.get(`
+                        SELECT g.* FROM genieacs_servers g
+                        INNER JOIN routers r ON r.genieacs_server_id = g.id
+                        WHERE r.id = ?
+                    `, [routerId], (err2, row) => {
+                        db.close();
+                        if (err2) {
+                            console.error('Error getting GenieACS server for router:', err2);
+                            resolve(null);
+                        } else {
+                            if (row) {
+                                console.log(`✅ GenieACS server found for customer ${customer.id}: ${row.name} (${row.url})`);
+                            }
+                            resolve(row || null);
+                        }
+                    });
+                });
+            } else {
+                // Jika router_id sudah ada di customer object, langsung query
+                db.get(`
+                    SELECT g.* FROM genieacs_servers g
+                    INNER JOIN routers r ON r.genieacs_server_id = g.id
+                    WHERE r.id = ?
+                `, [routerId], (err, row) => {
+                    db.close();
+                    if (err) {
+                        console.error('Error getting GenieACS server for router:', err);
+                        resolve(null);
+                    } else {
+                        if (row) {
+                            console.log(`✅ GenieACS server found for customer ${customer.id}: ${row.name} (${row.url})`);
+                        }
+                        resolve(row || null);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error in getGenieacsServerForCustomer:', error);
+            resolve(null);
+        }
+    });
+}
+
+// Helper untuk membuat axios instance dinamis dengan server tertentu
+function getAxiosInstance(genieacsServer = null) {
+    let GENIEACS_URL, GENIEACS_USERNAME, GENIEACS_PASSWORD;
+    
+    if (genieacsServer) {
+        // Gunakan server yang spesifik
+        GENIEACS_URL = genieacsServer.url;
+        GENIEACS_USERNAME = genieacsServer.username;
+        GENIEACS_PASSWORD = genieacsServer.password;
+    } else {
+        // Fallback ke settings.json (untuk backward compatibility sementara)
+        GENIEACS_URL = getSetting('genieacs_url', 'http://localhost:7557');
+        GENIEACS_USERNAME = getSetting('genieacs_username', 'acs');
+        GENIEACS_PASSWORD = getSetting('genieacs_password', '');
+    }
+    
     return axios.create({
         baseURL: GENIEACS_URL,
         auth: {
@@ -56,7 +150,19 @@ const genieacsApi = {
 
     async findDeviceByPhoneNumber(phoneNumber) {
         try {
-            const axiosInstance = getAxiosInstance();
+            // Cari customer untuk mendapatkan GenieACS server yang tepat
+            let genieacsServer = null;
+            try {
+                const { billingManager } = require('./billing');
+                const customer = await billingManager.getCustomerByPhone(phoneNumber);
+                if (customer) {
+                    genieacsServer = await getGenieacsServerForCustomer(customer);
+                }
+            } catch (billingError) {
+                console.error(`Error finding customer for phone ${phoneNumber}:`, billingError.message);
+            }
+            
+            const axiosInstance = getAxiosInstance(genieacsServer);
             // Mencari device berdasarkan tag yang berisi nomor telepon
             const response = await axiosInstance.get('/devices', {
                 params: {
@@ -76,7 +182,7 @@ const genieacsApi = {
                 const customer = await billingManager.getCustomerByPhone(phoneNumber);
                 if (customer && customer.pppoe_username) {
                     console.log(`Device not found by phone tag, trying PPPoE username: ${customer.pppoe_username}`);
-                    return await this.findDeviceByPPPoE(customer.pppoe_username);
+                    return await this.findDeviceByPPPoE(customer.pppoe_username, customer);
                 }
             } catch (billingError) {
                 console.error(`Error finding customer in billing for phone ${phoneNumber}:`, billingError.message);
@@ -89,9 +195,25 @@ const genieacsApi = {
         }
     },
 
-    async findDeviceByPPPoE(pppoeUsername) {
+    async findDeviceByPPPoE(pppoeUsername, customer = null) {
         try {
-            const axiosInstance = getAxiosInstance();
+            // Jika customer tidak diberikan, cari dari billing
+            if (!customer) {
+                try {
+                    const { billingManager } = require('./billing');
+                    customer = await billingManager.getCustomerByPPPoE(pppoeUsername);
+                } catch (e) {
+                    console.log(`Customer not found for PPPoE ${pppoeUsername}, using default server`);
+                }
+            }
+            
+            // Dapatkan GenieACS server dari customer router
+            let genieacsServer = null;
+            if (customer) {
+                genieacsServer = await getGenieacsServerForCustomer(customer);
+            }
+            
+            const axiosInstance = getAxiosInstance(genieacsServer);
             
             // Parameter paths untuk PPPoE Username
             const pppUsernamePaths = [
@@ -787,12 +909,82 @@ function getCacheStats() {
     return cacheManager.getStats();
 }
 
+// Get all GenieACS servers from database
+async function getAllGenieacsServers() {
+    return new Promise((resolve, reject) => {
+        try {
+            const dbPath = path.join(__dirname, '../data/billing.db');
+            const db = new sqlite3.Database(dbPath);
+            db.all(`SELECT id, name, url, username, password FROM genieacs_servers ORDER BY name`, (err, rows) => {
+                db.close();
+                if (err) {
+                    console.error('Error getting GenieACS servers:', err);
+                    resolve([]);
+                } else {
+                    resolve(rows || []);
+                }
+            });
+        } catch (error) {
+            console.error('Error in getAllGenieacsServers:', error);
+            resolve([]);
+        }
+    });
+}
+
+// Get devices from all GenieACS servers
+async function getAllDevicesFromAllServers() {
+    try {
+        const servers = await getAllGenieacsServers();
+        if (servers.length === 0) {
+            // Fallback ke default jika tidak ada server
+            const defaultDevices = await genieacsApi.getDevices();
+            return defaultDevices.map(device => ({ ...device, _genieacs_server_id: null, _genieacs_server_name: 'Default' }));
+        }
+        
+        const allDevices = [];
+        for (const server of servers) {
+            try {
+                const axiosInstance = getAxiosInstance(server);
+                const response = await axiosInstance.get('/devices', { timeout: 5000 });
+                const devices = (response.data || []).map(device => ({
+                    ...device,
+                    _genieacs_server_id: server.id,
+                    _genieacs_server_name: server.name,
+                    _genieacs_server_url: server.url
+                }));
+                allDevices.push(...devices);
+                console.log(`✅ Found ${devices.length} devices from server: ${server.name}`);
+            } catch (error) {
+                console.error(`❌ Error fetching devices from server ${server.name}:`, error.message);
+                // Continue to next server
+            }
+        }
+        
+        console.log(`✅ Total devices from all servers: ${allDevices.length}`);
+        return allDevices;
+    } catch (error) {
+        console.error('Error in getAllDevicesFromAllServers:', error);
+        // Fallback ke default
+        try {
+            const defaultDevices = await genieacsApi.getDevices();
+            return defaultDevices.map(device => ({ ...device, _genieacs_server_id: null, _genieacs_server_name: 'Default' }));
+        } catch (e) {
+            return [];
+        }
+    }
+}
+
 module.exports = {
-    // Original functions (tidak berubah)
+    // Original functions
     getDevices: genieacsApi.getDevices,
     getDeviceInfo: genieacsApi.getDeviceInfo,
     findDeviceByPhoneNumber: genieacsApi.findDeviceByPhoneNumber,
     findDeviceByPPPoE: genieacsApi.findDeviceByPPPoE,
+    // Helper functions for multi-server support
+    getGenieacsServerForCustomer,
+    getAxiosInstance,
+    getAllGenieacsServers,
+    getAllDevicesFromAllServers,
     getDeviceByPhoneNumber: genieacsApi.getDeviceByPhoneNumber,
     setParameterValues: genieacsApi.setParameterValues,
     reboot: genieacsApi.reboot,

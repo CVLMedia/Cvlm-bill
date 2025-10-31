@@ -212,9 +212,9 @@ async function getCustomerDeviceData(phone) {
             }
           }
           
-          // Jika test tidak berhasil, coba search normal
+          // Jika test tidak berhasil, coba search normal (dengan customer untuk multi-server)
           if (!device) {
-            device = await findDeviceByPPPoE(pppoeToSearch);
+            device = await findDeviceByPPPoE(pppoeToSearch, customer);
             if (device) {
               console.log(`✅ [BILLING] Device found by PPPoE username: ${pppoeToSearch}`);
               console.log(`📱 [BILLING] Device details:`, {
@@ -472,13 +472,90 @@ async function updateSSIDOptimized(phone, newSSID) {
   try {
     console.log(`🔄 Optimized SSID update for phone: ${phone} to: ${newSSID}`);
     
-    // Cari device berdasarkan nomor pelanggan dengan multiple format
+    // STEP 1: Ambil customer terlebih dahulu untuk mendapatkan GenieACS server yang tepat
+    let customer = null;
+    try {
+      const phoneVariants = generatePhoneVariants(phone);
+      for (const variant of phoneVariants) {
+        try {
+          customer = await billingManager.getCustomerByPhone(variant);
+          if (customer) {
+            console.log(`✅ Customer found in billing: ${customer.name} (${variant})`);
+            
+            // Ambil router_id dari customer_router_map jika belum ada di customer object
+            if (!customer.router_id && customer.id) {
+              try {
+                const sqlite3 = require('sqlite3').verbose();
+                const dbPath = require('path').join(__dirname, '../data/billing.db');
+                const db = new sqlite3.Database(dbPath);
+                const mapRow = await new Promise((resolve) => {
+                  db.get(`SELECT router_id FROM customer_router_map WHERE customer_id = ?`, [customer.id], (err, row) => {
+                    db.close();
+                    resolve(row || null);
+                  });
+                });
+                if (mapRow) {
+                  customer.router_id = mapRow.router_id;
+                  console.log(`✅ Router mapping found for customer: router_id = ${mapRow.router_id}`);
+                } else {
+                  console.log(`⚠️ Customer ${customer.id} tidak memiliki router mapping`);
+                }
+              } catch (mapError) {
+                console.error('Error getting router mapping:', mapError);
+              }
+            }
+            
+            break;
+          }
+        } catch (e) {
+          // Continue to next variant
+        }
+      }
+    } catch (error) {
+      console.error('Error getting customer:', error);
+    }
+    
+    // STEP 2: Get GenieACS server dari customer router (multi-server support)
+    let genieacsServer = null;
+    if (customer) {
+      try {
+        const { getGenieacsServerForCustomer } = require('../config/genieacs');
+        genieacsServer = await getGenieacsServerForCustomer(customer);
+        if (genieacsServer) {
+          console.log(`✅ GenieACS server found for customer: ${genieacsServer.name} (${genieacsServer.url})`);
+        } else {
+          console.log(`⚠️ No GenieACS server mapped to customer router, using default`);
+        }
+      } catch (e) {
+        console.error('Error getting GenieACS server for customer:', e);
+      }
+    }
+    
+    // STEP 3: Cari device berdasarkan nomor pelanggan dengan multiple format
     let device = null;
     
-    // Method 1: Coba dengan format asli
-    device = await findDeviceByTag(phone);
+    // Method 1: Jika ada customer dengan PPPoE username, coba cari device dengan itu (lebih akurat)
+    if (customer && customer.pppoe_username) {
+      try {
+        const { findDeviceByPPPoE } = require('../config/genieacs');
+        device = await findDeviceByPPPoE(customer.pppoe_username, customer);
+        if (device) {
+          console.log(`✅ Device found by PPPoE username: ${customer.pppoe_username}`);
+        }
+      } catch (error) {
+        console.error('Error finding device by PPPoE username:', error);
+      }
+    }
     
-    // Method 2: Jika gagal, coba dengan format alternatif
+    // Method 2: Jika belum ditemukan, coba dengan format tag
+    if (!device) {
+      device = await findDeviceByTag(phone);
+      if (device) {
+        console.log(`✅ Device found by tag: ${phone}`);
+      }
+    }
+    
+    // Method 3: Jika masih gagal, coba dengan format alternatif tag
     if (!device) {
       const phoneVariants = [];
       
@@ -507,33 +584,22 @@ async function updateSSIDOptimized(phone, newSSID) {
       }
     }
     
-    // Method 3: Jika masih gagal, coba dengan PPPoE username
-    if (!device) {
-      try {
-        const customer = await billingManager.getCustomerByPhone(phone);
-        if (customer && customer.pppoe_username) {
-          const { findDeviceByPPPoE } = require('../config/genieacs');
-          device = await findDeviceByPPPoE(customer.pppoe_username);
-          if (device) {
-            console.log(`✅ Device found by PPPoE username: ${customer.pppoe_username}`);
-          }
-        }
-      } catch (error) {
-        console.error('Error finding device by PPPoE username:', error);
-      }
-    }
-    
     if (!device) {
       console.log(`❌ SSID update failed for ${phone}: Device tidak ditemukan`);
       return { success: false, message: 'Device tidak ditemukan' };
     }
     
+    // STEP 4: Gunakan server dari customer jika ada, fallback ke settings.json
+    const settings = getSettingsWithCache();
+    const genieacsUrl = genieacsServer ? genieacsServer.url : (settings.genieacs_url || 'http://localhost:7557');
+    const username = genieacsServer ? genieacsServer.username : (settings.genieacs_username || '');
+    const password = genieacsServer ? genieacsServer.password : (settings.genieacs_password || '');
+    
+    console.log(`🌐 Using GenieACS server: ${genieacsUrl} (${genieacsServer ? genieacsServer.name : 'Default'})`);
+    console.log(`📱 Device ID: ${device._id}`);
+    
     const deviceId = device._id;
     const encodedDeviceId = encodeURIComponent(deviceId);
-    const settings = getSettingsWithCache();
-    const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
-    const username = settings.genieacs_username || '';
-    const password = settings.genieacs_password || '';
     
     // Buat nama SSID 5G berdasarkan SSID 2.4G (seperti di WhatsApp)
     const newSSID5G = `${newSSID}-5G`;
@@ -548,9 +614,11 @@ async function updateSSIDOptimized(phone, newSSID) {
     const tasks = [];
     
     // Task 1: Update SSID 2.4GHz
+    const task1Url = `${genieacsUrl}/devices/${encodedDeviceId}/tasks`;
+    console.log(`📤 Task 1 URL: ${task1Url}`);
     tasks.push(
       axios.post(
-        `${genieacsUrl}/devices/${encodedDeviceId}/tasks`,
+        task1Url,
         {
           name: "setParameterValues",
           parameterValues: [
@@ -558,7 +626,10 @@ async function updateSSIDOptimized(phone, newSSID) {
           ]
         },
         axiosConfig
-      )
+      ).catch((err) => {
+        console.error(`❌ Task 1 error:`, err.response?.status, err.response?.data || err.message);
+        throw err;
+      })
     );
     
     // Task 2: Update SSID 5GHz (coba index 5 dulu, yang paling umum)
@@ -572,7 +643,10 @@ async function updateSSIDOptimized(phone, newSSID) {
           ]
         },
         axiosConfig
-      ).catch(() => null) // Ignore error jika index 5 tidak ada
+      ).catch((err) => {
+        console.log(`⚠️ Task 2 (5GHz) error (ignored):`, err.message);
+        return null; // Ignore error jika index 5 tidak ada
+      })
     );
     
     // Task 3: Refresh object
@@ -584,18 +658,28 @@ async function updateSSIDOptimized(phone, newSSID) {
           objectName: "InternetGatewayDevice.LANDevice.1.WLANConfiguration"
         },
         axiosConfig
-      ).catch(() => null) // Ignore error jika refresh gagal
+      ).catch((err) => {
+        console.log(`⚠️ Task 3 (refresh) error (ignored):`, err.message);
+        return null; // Ignore error jika refresh gagal
+      })
     );
     
     // Jalankan semua tasks secara concurrent
     const results = await Promise.allSettled(tasks);
     
-    // Check results
+    // Check results dengan logging detail
+    console.log(`📊 Task results:`, results.map((r, i) => ({
+      task: i + 1,
+      status: r.status,
+      error: r.status === 'rejected' ? (r.reason?.response?.data || r.reason?.message) : null
+    })));
+    
     const mainTaskSuccess = results[0].status === 'fulfilled';
     const wifi5GFound = results[1].status === 'fulfilled';
     
     if (mainTaskSuccess) {
       console.log(`✅ SSID update completed for ${phone}: ${newSSID}`);
+      console.log(`✅ WiFi 5GHz update: ${wifi5GFound ? 'Success' : 'Failed/Not found'}`);
       
       // Invalidate GenieACS cache after successful update
       try {
@@ -608,8 +692,10 @@ async function updateSSIDOptimized(phone, newSSID) {
       
       return { success: true, wifi5GFound };
     } else {
-      console.error(`❌ SSID update failed for ${phone}: ${results[0].reason?.message || 'Unknown error'}`);
-      return { success: false, message: 'Gagal update SSID' };
+      const errorMsg = results[0].reason?.response?.data || results[0].reason?.message || 'Unknown error';
+      console.error(`❌ SSID update failed for ${phone}:`, errorMsg);
+      console.error(`❌ Full error:`, results[0].reason);
+      return { success: false, message: `Gagal update SSID: ${errorMsg}` };
     }
     
   } catch (error) {
@@ -694,13 +780,90 @@ async function updatePasswordOptimized(phone, newPassword) {
   try {
     console.log(`🔄 Optimized password update for phone: ${phone}`);
     
-    // Cari device berdasarkan nomor pelanggan dengan multiple format
+    // STEP 1: Ambil customer terlebih dahulu untuk mendapatkan GenieACS server yang tepat
+    let customer = null;
+    try {
+      const phoneVariants = generatePhoneVariants(phone);
+      for (const variant of phoneVariants) {
+        try {
+          customer = await billingManager.getCustomerByPhone(variant);
+          if (customer) {
+            console.log(`✅ Customer found in billing: ${customer.name} (${variant})`);
+            
+            // Ambil router_id dari customer_router_map jika belum ada di customer object
+            if (!customer.router_id && customer.id) {
+              try {
+                const sqlite3 = require('sqlite3').verbose();
+                const dbPath = require('path').join(__dirname, '../data/billing.db');
+                const db = new sqlite3.Database(dbPath);
+                const mapRow = await new Promise((resolve) => {
+                  db.get(`SELECT router_id FROM customer_router_map WHERE customer_id = ?`, [customer.id], (err, row) => {
+                    db.close();
+                    resolve(row || null);
+                  });
+                });
+                if (mapRow) {
+                  customer.router_id = mapRow.router_id;
+                  console.log(`✅ Router mapping found for customer: router_id = ${mapRow.router_id}`);
+                } else {
+                  console.log(`⚠️ Customer ${customer.id} tidak memiliki router mapping`);
+                }
+              } catch (mapError) {
+                console.error('Error getting router mapping:', mapError);
+              }
+            }
+            
+            break;
+          }
+        } catch (e) {
+          // Continue to next variant
+        }
+      }
+    } catch (error) {
+      console.error('Error getting customer:', error);
+    }
+    
+    // STEP 2: Get GenieACS server dari customer router (multi-server support)
+    let genieacsServer = null;
+    if (customer) {
+      try {
+        const { getGenieacsServerForCustomer } = require('../config/genieacs');
+        genieacsServer = await getGenieacsServerForCustomer(customer);
+        if (genieacsServer) {
+          console.log(`✅ GenieACS server found for customer: ${genieacsServer.name} (${genieacsServer.url})`);
+        } else {
+          console.log(`⚠️ No GenieACS server mapped to customer router, using default`);
+        }
+      } catch (e) {
+        console.error('Error getting GenieACS server for customer:', e);
+      }
+    }
+    
+    // STEP 3: Cari device berdasarkan nomor pelanggan dengan multiple format
     let device = null;
     
-    // Method 1: Coba dengan format asli
-    device = await findDeviceByTag(phone);
+    // Method 1: Jika ada customer dengan PPPoE username, coba cari device dengan itu (lebih akurat)
+    if (customer && customer.pppoe_username) {
+      try {
+        const { findDeviceByPPPoE } = require('../config/genieacs');
+        device = await findDeviceByPPPoE(customer.pppoe_username, customer);
+        if (device) {
+          console.log(`✅ Device found by PPPoE username: ${customer.pppoe_username}`);
+        }
+      } catch (error) {
+        console.error('Error finding device by PPPoE username:', error);
+      }
+    }
     
-    // Method 2: Jika gagal, coba dengan format alternatif
+    // Method 2: Jika belum ditemukan, coba dengan format tag
+    if (!device) {
+      device = await findDeviceByTag(phone);
+      if (device) {
+        console.log(`✅ Device found by tag: ${phone}`);
+      }
+    }
+    
+    // Method 3: Jika masih gagal, coba dengan format alternatif tag
     if (!device) {
       const phoneVariants = [];
       
@@ -729,37 +892,26 @@ async function updatePasswordOptimized(phone, newPassword) {
       }
     }
     
-    // Method 3: Jika masih gagal, coba dengan PPPoE username
-    if (!device) {
-      try {
-        const customer = await billingManager.getCustomerByPhone(phone);
-        if (customer && customer.pppoe_username) {
-          const { findDeviceByPPPoE } = require('../config/genieacs');
-          device = await findDeviceByPPPoE(customer.pppoe_username);
-          if (device) {
-            console.log(`✅ Device found by PPPoE username: ${customer.pppoe_username}`);
-          }
-        }
-      } catch (error) {
-        console.error('Error finding device by PPPoE username:', error);
-      }
-    }
-    
     if (!device) {
       console.log(`❌ Password update failed for ${phone}: Device tidak ditemukan`);
       return { success: false, message: 'Device tidak ditemukan' };
     }
     
+    // STEP 4: Gunakan server dari customer jika ada, fallback ke settings.json
+    const settings = getSettingsWithCache();
+    const genieacsUrl = genieacsServer ? genieacsServer.url : (settings.genieacs_url || 'http://localhost:7557');
+    const username = genieacsServer ? genieacsServer.username : (settings.genieacs_username || '');
+    const passwordAuth = genieacsServer ? genieacsServer.password : (settings.genieacs_password || '');
+    
+    console.log(`🌐 Using GenieACS server: ${genieacsUrl} (${genieacsServer ? genieacsServer.name : 'Default'})`);
+    console.log(`📱 Device ID: ${device._id}`);
+    
     const deviceId = device._id;
     const encodedDeviceId = encodeURIComponent(deviceId);
-    const settings = getSettingsWithCache();
-    const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
-    const username = settings.genieacs_username || '';
-    const password = settings.genieacs_password || '';
     
     // Concurrent API calls untuk speed up
     const axiosConfig = {
-      auth: { username, password },
+      auth: { username, password: passwordAuth },
       timeout: 10000 // 10 second timeout
     };
     
@@ -767,9 +919,11 @@ async function updatePasswordOptimized(phone, newPassword) {
     const tasks = [];
     
     // Task 1: Update password 2.4GHz
+    const task1Url = `${genieacsUrl}/devices/${encodedDeviceId}/tasks`;
+    console.log(`📤 Task 1 URL: ${task1Url}`);
     tasks.push(
       axios.post(
-        `${genieacsUrl}/devices/${encodedDeviceId}/tasks`,
+        task1Url,
         {
           name: "setParameterValues",
           parameterValues: [
@@ -777,7 +931,10 @@ async function updatePasswordOptimized(phone, newPassword) {
           ]
         },
         axiosConfig
-      )
+      ).catch((err) => {
+        console.error(`❌ Task 1 error:`, err.response?.status, err.response?.data || err.message);
+        throw err;
+      })
     );
     
     // Task 2: Update password 5GHz (coba index 5 dulu)
@@ -791,7 +948,10 @@ async function updatePasswordOptimized(phone, newPassword) {
           ]
         },
         axiosConfig
-      ).catch(() => null) // Ignore error jika index 5 tidak ada
+      ).catch((err) => {
+        console.log(`⚠️ Task 2 (5GHz) error (ignored):`, err.message);
+        return null; // Ignore error jika index 5 tidak ada
+      })
     );
     
     // Task 3: Refresh object
@@ -803,21 +963,42 @@ async function updatePasswordOptimized(phone, newPassword) {
           objectName: "InternetGatewayDevice.LANDevice.1.WLANConfiguration"
         },
         axiosConfig
-      ).catch(() => null) // Ignore error jika refresh gagal
+      ).catch((err) => {
+        console.log(`⚠️ Task 3 (refresh) error (ignored):`, err.message);
+        return null; // Ignore error jika refresh gagal
+      })
     );
     
     // Jalankan semua tasks secara concurrent
     const results = await Promise.allSettled(tasks);
     
-    // Check results
+    // Check results dengan logging detail
+    console.log(`📊 Task results:`, results.map((r, i) => ({
+      task: i + 1,
+      status: r.status,
+      error: r.status === 'rejected' ? (r.reason?.response?.data || r.reason?.message) : null
+    })));
+    
     const mainTaskSuccess = results[0].status === 'fulfilled';
     
     if (mainTaskSuccess) {
       console.log(`✅ Password update completed for ${phone}`);
+      
+      // Invalidate GenieACS cache after successful update
+      try {
+        const cacheManager = require('../config/cacheManager');
+        cacheManager.invalidatePattern('genieacs:*');
+        console.log('🔄 GenieACS cache invalidated after password update');
+      } catch (cacheError) {
+        console.warn('⚠️ Failed to invalidate cache:', cacheError.message);
+      }
+      
       return { success: true };
     } else {
-      console.error(`❌ Password update failed for ${phone}: ${results[0].reason?.message || 'Unknown error'}`);
-      return { success: false, message: 'Gagal update password' };
+      const errorMsg = results[0].reason?.response?.data || results[0].reason?.message || 'Unknown error';
+      console.error(`❌ Password update failed for ${phone}:`, errorMsg);
+      console.error(`❌ Full error:`, results[0].reason);
+      return { success: false, message: `Gagal update password: ${errorMsg}` };
     }
     
   } catch (error) {

@@ -1,6 +1,6 @@
 const logger = require('./logger');
 const billingManager = require('./billing');
-const { getMikrotikConnection } = require('./mikrotik');
+const { getMikrotikConnectionForCustomer } = require('./mikrotik');
 const { findDeviceByPhoneNumber, findDeviceByPPPoE, setParameterValues } = require('./genieacs');
 const { getSetting } = require('./settingsManager');
 const staticIPSuspension = require('./staticIPSuspension');
@@ -14,9 +14,9 @@ class ServiceSuspensionManager {
      * Pastikan profile isolir (berdasarkan setting) tersedia di Mikrotik jika perlu
      * Hanya auto-create bila nama profil = 'isolir'
      */
-    async ensureIsolirProfile() {
+    async ensureIsolirProfile(customer) {
         try {
-            const mikrotik = await getMikrotikConnection();
+            const mikrotik = await getMikrotikConnectionForCustomer(customer);
             
             const selectedProfile = getSetting('isolir_profile', 'isolir');
             // Cek apakah profile isolir sudah ada
@@ -29,15 +29,9 @@ class ServiceSuspensionManager {
                 return profiles[0]['.id'];
             }
             
-            // Jika user memilih nama lain selain 'isolir', jangan auto-create, biarkan admin pilih profil yang sudah ada
-            if (selectedProfile !== 'isolir') {
-                logger.warn(`Isolir profile '${selectedProfile}' not found in Mikrotik. Please create it on Mikrotik or choose another profile.`);
-                return null;
-            }
-
-            // Buat profile 'isolir' jika belum ada
+            // Buat profile jika belum ada, menggunakan nama sesuai setting
             const newProfile = await mikrotik.write('/ppp/profile/add', [
-                '=name=isolir',
+                `=name=${selectedProfile}`,
                 '=local-address=0.0.0.0',
                 '=remote-address=0.0.0.0',
                 '=rate-limit=0/0',
@@ -71,7 +65,8 @@ class ServiceSuspensionManager {
             };
 
             // Tentukan tipe koneksi pelanggan
-            const hasPPPoE = customer.pppoe_username && customer.pppoe_username.trim();
+            const pppUser = (customer.pppoe_username && String(customer.pppoe_username).trim()) || (customer.username && String(customer.username).trim());
+            const hasPPPoE = !!pppUser;
             const hasStaticIP = customer.static_ip || customer.ip_address || customer.assigned_ip;
             const hasMacAddress = customer.mac_address;
 
@@ -79,18 +74,18 @@ class ServiceSuspensionManager {
             if (hasPPPoE) {
                 results.suspension_type = 'pppoe';
                 try {
-                    const mikrotik = await getMikrotikConnection();
+                    const mikrotik = await getMikrotikConnectionForCustomer(customer);
                     
                     // Tentukan profile isolir dari setting
                     const selectedProfile = getSetting('isolir_profile', 'isolir');
-                    // Pastikan profile isolir ada (auto-create hanya jika 'isolir')
-                    await this.ensureIsolirProfile();
+                    // Pastikan profile isolir ada pada NAS milik customer
+                    await this.ensureIsolirProfile(customer);
 
                     // Cari .id secret berdasarkan name terlebih dahulu
                     let secretId = null;
                     try {
                         const secrets = await mikrotik.write('/ppp/secret/print', [
-                            `?name=${customer.pppoe_username}`
+                            `?name=${pppUser}`
                         ]);
                         if (secrets && secrets.length > 0) {
                             secretId = secrets[0]['.id'];
@@ -102,14 +97,14 @@ class ServiceSuspensionManager {
                     // Update PPPoE user dengan profile isolir, gunakan .id bila tersedia, fallback ke =name=
                     const setParams = secretId
                         ? [`=.id=${secretId}`, `=profile=${selectedProfile}`, `=comment=SUSPENDED - ${reason}`]
-                        : [`=name=${customer.pppoe_username}`, `=profile=${selectedProfile}`, `=comment=SUSPENDED - ${reason}`];
+                        : [`=name=${pppUser}`, `=profile=${selectedProfile}`, `=comment=SUSPENDED - ${reason}`];
 
                     await mikrotik.write('/ppp/secret/set', setParams);
                     logger.info(`Mikrotik: Set profile to '${selectedProfile}' for ${customer.pppoe_username} (${secretId ? 'by .id' : 'by name'})`);
                     
                     // Disconnect active session jika ada
                     const activeSessions = await mikrotik.write('/ppp/active/print', [
-                        `?name=${customer.pppoe_username}`
+                        `?name=${pppUser}`
                     ]);
                     
                     if (activeSessions && activeSessions.length > 0) {
@@ -268,7 +263,8 @@ class ServiceSuspensionManager {
             };
 
             // Tentukan tipe koneksi pelanggan
-            const hasPPPoE = customer.pppoe_username && customer.pppoe_username.trim();
+            const pppUser = (customer.pppoe_username && String(customer.pppoe_username).trim()) || (customer.username && String(customer.username).trim());
+            const hasPPPoE = !!pppUser;
             const hasStaticIP = customer.static_ip || customer.ip_address || customer.assigned_ip;
             const hasMacAddress = customer.mac_address;
 
@@ -276,7 +272,7 @@ class ServiceSuspensionManager {
             if (hasPPPoE) {
                 results.restoration_type = 'pppoe';
                 try {
-                    const mikrotik = await getMikrotikConnection();
+                    const mikrotik = await getMikrotikConnectionForCustomer(customer);
                     
                     // Ambil profile dari customer atau package, fallback ke default
                     let profileToUse = customer.pppoe_profile;
@@ -290,7 +286,7 @@ class ServiceSuspensionManager {
                     let secretId = null;
                     try {
                         const secrets = await mikrotik.write('/ppp/secret/print', [
-                            `?name=${customer.pppoe_username}`
+                            `?name=${pppUser}`
                         ]);
                         if (secrets && secrets.length > 0) {
                             secretId = secrets[0]['.id'];
@@ -302,14 +298,14 @@ class ServiceSuspensionManager {
                     // Update PPPoE user dengan profile normal, gunakan .id bila tersedia, fallback ke =name=
                     const setParams = secretId
                         ? [`=.id=${secretId}`, `=profile=${profileToUse}`, `=comment=ACTIVE - ${reason}`]
-                        : [`=name=${customer.pppoe_username}`, `=profile=${profileToUse}`, `=comment=ACTIVE - ${reason}`];
+                        : [`=name=${pppUser}`, `=profile=${profileToUse}`, `=comment=ACTIVE - ${reason}`];
 
                     await mikrotik.write('/ppp/secret/set', setParams);
                     logger.info(`Mikrotik: Restored profile to '${profileToUse}' for ${customer.pppoe_username} (${secretId ? 'by .id' : 'by name'})`);
                     
                     // Disconnect active session agar client reconnect dengan profile baru
                     const activeSessions = await mikrotik.write('/ppp/active/print', [
-                        `?name=${customer.pppoe_username}`
+                        `?name=${pppUser}`
                     ]);
                     
                     if (activeSessions && activeSessions.length > 0) {

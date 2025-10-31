@@ -1,0 +1,31 @@
+<!-- Theme Switcher Button -->
+<!-- Usage: Include this in your header or navbar -->
+<a href="#" class="nav-link theme-toggle-btn" data-theme-toggle title="Toggle Dark/Light Mode" style="position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; transition: all 0.3s ease;">
+  <i id="theme-icon" class="bi bi-moon-fill" style="font-size: 1.2rem;"></i>
+</a>
+
+<style>
+  .theme-toggle-btn {
+    transition: all 0.3s ease;
+    opacity: 0.8;
+  }
+  
+  .theme-toggle-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+    background-color: rgba(0, 0, 0, 0.05);
+  }
+  
+  [data-theme="dark"] .theme-toggle-btn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  [data-theme="light"] .theme-toggle-btn {
+    color: #495057;
+  }
+  
+  [data-theme="dark"] .theme-toggle-btn {
+    color: #e5e7eb;
+  }
+</style>
+

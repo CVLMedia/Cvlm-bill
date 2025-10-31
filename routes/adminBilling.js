@@ -2614,9 +2614,21 @@ router.post('/whatsapp-settings/broadcast', async (req, res) => {
 router.get('/packages', getAppSettings, async (req, res) => {
     try {
         const packages = await billingManager.getPackages();
+        // Fetch routers for NAS selection
+        const sqlite3 = require('sqlite3').verbose();
+        const db = new sqlite3.Database('./data/billing.db');
+        const routers = await new Promise((resolve, reject) => {
+            db.all('SELECT * FROM routers ORDER BY id', (err, rows) => {
+                db.close();
+                if (err) reject(err);
+                else resolve(rows || []);
+            });
+        });
+        
         res.render('admin/billing/packages', {
             title: 'Kelola Paket',
             packages,
+            routers,
             appSettings: req.appSettings
         });
     } catch (error) {
@@ -2631,14 +2643,15 @@ router.get('/packages', getAppSettings, async (req, res) => {
 
 router.post('/packages', imageUpload.single('image'), async (req, res) => {
     try {
-        const { name, speed, price, tax_rate, description, pppoe_profile } = req.body;
+        const { name, speed, price, tax_rate, description, pppoe_profile, router_id } = req.body;
         const packageData = {
             name: name.trim(),
             speed: speed.trim(),
             price: parseFloat(price),
             tax_rate: parseFloat(tax_rate) >= 0 ? parseFloat(tax_rate) : 0,
             description: description.trim(),
-            pppoe_profile: pppoe_profile ? pppoe_profile.trim() : 'default'
+            pppoe_profile: pppoe_profile ? pppoe_profile.trim() : 'default',
+            router_id: router_id ? parseInt(router_id) : null
         };
 
         // Add image filename if uploaded
@@ -2654,12 +2667,61 @@ router.post('/packages', imageUpload.single('image'), async (req, res) => {
         }
 
         const newPackage = await billingManager.createPackage(packageData);
-        logger.info(`Package created: ${newPackage.name} with tax_rate: ${newPackage.tax_rate}`);
+        logger.info(`Package created: ${newPackage.name} with tax_rate: ${newPackage.tax_rate}, router_id: ${newPackage.router_id}`);
+        
+        // Optional: Create PPPoE profile in Mikrotik if router_id is set and profile doesn't exist
+        let profileCreated = false;
+        if (newPackage.router_id && newPackage.pppoe_profile) {
+            try {
+                const sqlite3 = require('sqlite3').verbose();
+                const db = new sqlite3.Database('./data/billing.db');
+                const routerObj = await new Promise((resolve, reject) => {
+                    db.get('SELECT * FROM routers WHERE id=?', [newPackage.router_id], (err, row) => {
+                        db.close();
+                        if (err) reject(err);
+                        else resolve(row || null);
+                    });
+                });
+                
+                if (routerObj) {
+                    const { getPPPoEProfiles, addPPPoEProfile } = require('../config/mikrotik');
+                    // Check if profile already exists
+                    const profilesResult = await getPPPoEProfiles(routerObj);
+                    const profileExists = profilesResult.success && profilesResult.data && 
+                        profilesResult.data.some(p => (p.name || p['name']) === newPackage.pppoe_profile);
+                    
+                    if (!profileExists) {
+                        // Create profile in Mikrotik
+                        // Determine rate limit from speed (e.g., "10Mbps" -> "10M/10M")
+                        const speedMatch = newPackage.speed.match(/(\d+)\s*Mbps/i);
+                        const rateLimit = speedMatch ? `${speedMatch[1]}M/${speedMatch[1]}M` : '10M/10M';
+                        
+                        const profileData = {
+                            name: newPackage.pppoe_profile,
+                            'remote-address': 'POOL-PPPOE-NEW', // Default pool, bisa disesuaikan
+                            'rate-limit': rateLimit
+                        };
+                        
+                        const createResult = await addPPPoEProfile(profileData, routerObj);
+                        if (createResult && createResult.success) {
+                            profileCreated = true;
+                            logger.info(`PPPoE profile ${newPackage.pppoe_profile} created in Mikrotik for router ${routerObj.name}`);
+                        }
+                    }
+                }
+            } catch (profileError) {
+                logger.warn(`Failed to auto-create PPPoE profile: ${profileError.message}`);
+                // Don't fail the package creation if profile creation fails
+            }
+        }
         
         res.json({
             success: true,
-            message: 'Paket berhasil ditambahkan',
-            package: newPackage
+            message: profileCreated 
+                ? `Paket berhasil ditambahkan dan profile PPPoE "${newPackage.pppoe_profile}" dibuat di Mikrotik`
+                : 'Paket berhasil ditambahkan',
+            package: newPackage,
+            profile_created: profileCreated
         });
     } catch (error) {
         logger.error('Error creating package:', error);
@@ -2674,14 +2736,15 @@ router.post('/packages', imageUpload.single('image'), async (req, res) => {
 router.put('/packages/:id', imageUpload.single('image'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, speed, price, tax_rate, description, pppoe_profile } = req.body;
+        const { name, speed, price, tax_rate, description, pppoe_profile, router_id } = req.body;
         const packageData = {
             name: name.trim(),
             speed: speed.trim(),
             price: parseFloat(price),
             tax_rate: parseFloat(tax_rate) >= 0 ? parseFloat(tax_rate) : 0,
             description: description.trim(),
-            pppoe_profile: pppoe_profile ? pppoe_profile.trim() : 'default'
+            pppoe_profile: pppoe_profile ? pppoe_profile.trim() : 'default',
+            router_id: router_id ? parseInt(router_id) : null
         };
 
         // Add image filename if uploaded
@@ -2697,7 +2760,7 @@ router.put('/packages/:id', imageUpload.single('image'), async (req, res) => {
         }
 
         const updatedPackage = await billingManager.updatePackage(id, packageData);
-        logger.info(`Package updated: ${updatedPackage.name} with tax_rate: ${updatedPackage.tax_rate}`);
+        logger.info(`Package updated: ${updatedPackage.name} with tax_rate: ${updatedPackage.tax_rate}, router_id: ${updatedPackage.router_id}`);
         
         res.json({
             success: true,
@@ -2796,8 +2859,58 @@ router.delete('/packages/:id', async (req, res) => {
 // Customer Management
 router.get('/customers', getAppSettings, async (req, res) => {
     try {
-        const customers = await billingManager.getCustomers();
         const packages = await billingManager.getPackages();
+        // Ensure routers table exists and load routers for dropdown & filter
+        const db = require('../config/billing').db;
+        await new Promise((resolve) => db.run(`CREATE TABLE IF NOT EXISTS routers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, nas_ip TEXT NOT NULL, nas_identifier TEXT, secret TEXT, location TEXT, pop TEXT, UNIQUE(nas_ip))`, () => resolve()));
+        const routers = await new Promise((resolve) => db.all(`SELECT id, name, nas_ip FROM routers ORDER BY id`, (err, rows) => resolve(rows || [])));
+        const routerFilter = req.query.router ? parseInt(req.query.router) : null;
+        let customers;
+        if (routerFilter) {
+            customers = await new Promise((resolve) => db.all(`
+                SELECT c.*, p.name as package_name, p.price as package_price, p.image as package_image, p.tax_rate,
+                       r.name as router_name,
+                       CASE 
+                           WHEN EXISTS (
+                               SELECT 1 FROM invoices i 
+                               WHERE i.customer_id = c.id 
+                               AND i.status = 'unpaid' 
+                               AND i.due_date < date('now')
+                           ) THEN 'overdue'
+                           WHEN EXISTS (
+                               SELECT 1 FROM invoices i 
+                               WHERE i.customer_id = c.id 
+                               AND i.status = 'unpaid'
+                           ) THEN 'unpaid'
+                           WHEN EXISTS (
+                               SELECT 1 FROM invoices i 
+                               WHERE i.customer_id = c.id 
+                               AND i.status = 'paid'
+                           ) THEN 'paid'
+                           ELSE 'no_invoice'
+                       END as payment_status
+                FROM customers c
+                LEFT JOIN packages p ON c.package_id = p.id
+                LEFT JOIN customer_router_map m ON m.customer_id = c.id
+                LEFT JOIN routers r ON r.id = m.router_id
+                WHERE m.router_id = ?
+                ORDER BY c.id DESC
+            `, [routerFilter], (err, rows) => {
+                if (err) resolve([]);
+                else {
+                    // Calculate price with tax for each customer
+                    const processedRows = rows.map(row => {
+                        if (row.package_price && row.tax_rate !== null) {
+                            row.package_price = row.package_price * (1 + (row.tax_rate || 0) / 100);
+                        }
+                        return row;
+                    });
+                    resolve(processedRows);
+                }
+            }));
+        } else {
+            customers = await billingManager.getCustomers();
+        }
         
         // Get ODPs for dropdown selection (termasuk sub ODP)
         const odps = await new Promise((resolve, reject) => {
@@ -2820,6 +2933,8 @@ router.get('/customers', getAppSettings, async (req, res) => {
             customers,
             packages,
             odps,
+            routers,
+            routerFilter,
             appSettings: req.appSettings
         });
     } catch (error) {
@@ -2834,7 +2949,7 @@ router.get('/customers', getAppSettings, async (req, res) => {
 
 router.post('/customers', async (req, res) => {
     try {
-        const { name, username, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, auto_suspension, billing_day, renewal_type, fix_date, create_pppoe_user, pppoe_password, static_ip, assigned_ip, mac_address, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes } = req.body;
+        const { name, username, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, auto_suspension, billing_day, renewal_type, fix_date, create_pppoe_user, pppoe_password, static_ip, assigned_ip, mac_address, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes, router_id } = req.body;
         
         // Validate required fields
         if (!name || !username || !phone || !package_id) {
@@ -2896,6 +3011,19 @@ router.post('/customers', async (req, res) => {
         };
 
         const result = await billingManager.createCustomer(customerData);
+        // Map customer ke router jika dipilih
+        let mappedRouterId = null;
+        try {
+            if (router_id) {
+                const db = require('../config/billing').db;
+                mappedRouterId = parseInt(router_id);
+                await new Promise((resolve, reject) => {
+                    db.run(`INSERT OR REPLACE INTO customer_router_map (customer_id, router_id) VALUES (?, ?)`, [result.id, mappedRouterId], (err) => err ? reject(err) : resolve());
+                });
+            }
+        } catch (e) {
+            logger.warn('Gagal menyimpan mapping customer_router_map: ' + e.message);
+        }
 
         // Optional: create PPPoE user in Mikrotik
         let pppoeCreate = { attempted: false, created: false, message: '' };
@@ -2909,7 +3037,8 @@ router.post('/customers', async (req, res) => {
                     : (Math.random().toString(36).slice(-8) + Math.floor(Math.random()*10));
 
                 const { addPPPoEUser } = require('../config/mikrotik');
-                const addRes = await addPPPoEUser({ username: pppoe_username, password: passwordToUse, profile: profileToUse });
+                // Pass customer object with id for per-router connection; mapping dilakukan di atas
+                const addRes = await addPPPoEUser({ username: pppoe_username, password: passwordToUse, profile: profileToUse, customer: { id: result.id } });
                 if (addRes && addRes.success) {
                     pppoeCreate.created = true;
                     pppoeCreate.message = 'User PPPoE berhasil dibuat di Mikrotik';
@@ -3028,6 +3157,12 @@ router.get('/api/customers/:phone', async (req, res) => {
         logger.info(`API: Loading customer data for editing phone: ${phone}`);
         
         const customer = await billingManager.getCustomerByPhone(phone);
+        // Ambil router mapping
+        let routerMapping = null;
+        try {
+            const db = require('../config/billing').db;
+            routerMapping = await new Promise((resolve) => db.get(`SELECT router_id FROM customer_router_map WHERE customer_id = ?`, [customer?.id || -1], (err, row) => resolve(row || null)));
+        } catch (_) {}
         
         if (!customer) {
             return res.status(404).json({
@@ -3038,7 +3173,7 @@ router.get('/api/customers/:phone', async (req, res) => {
 
         return res.json({
             success: true,
-            customer: customer,
+            customer: Object.assign({}, customer || {}, { router_id: routerMapping ? routerMapping.router_id : null }),
             message: 'Customer data loaded successfully'
         });
     } catch (error) {
@@ -3129,7 +3264,7 @@ router.get('/customers/:username/test', async (req, res) => {
 router.put('/customers/:phone', async (req, res) => {
     try {
         const { phone } = req.params;
-        const { name, username, pppoe_username, email, address, package_id, odp_id, pppoe_profile, status, auto_suspension, billing_day, renewal_type, fix_date, latitude, longitude, static_ip, assigned_ip, mac_address, cable_type, cable_length, port_number, cable_status, cable_notes } = req.body;
+        const { name, username, pppoe_username, email, address, package_id, odp_id, pppoe_profile, status, auto_suspension, billing_day, renewal_type, fix_date, latitude, longitude, static_ip, assigned_ip, mac_address, cable_type, cable_length, port_number, cable_status, cable_notes, router_id } = req.body;
         
         
         // Validate required fields
@@ -3207,6 +3342,21 @@ router.put('/customers/:phone', async (req, res) => {
 
         // Use current phone for lookup, allow phone to be updated in customerData
         const result = await billingManager.updateCustomerByPhone(phone, customerData);
+
+        // Update NAS mapping jika router_id diberikan
+        try {
+            if (router_id) {
+                const db = require('../config/billing').db;
+                const customerAfter = await billingManager.getCustomerByPhone(customerData.phone);
+                if (customerAfter && customerAfter.id) {
+                    await new Promise((resolve, reject) => {
+                        db.run(`INSERT OR REPLACE INTO customer_router_map (customer_id, router_id) VALUES (?, ?)`, [customerAfter.id, parseInt(router_id)], (err) => err ? reject(err) : resolve());
+                    });
+                }
+            }
+        } catch (e) {
+            logger.warn('Gagal update mapping customer_router_map: ' + e.message);
+        }
 
         // Jika update berhasil dan customer memiliki PPPoE, update profil di Mikrotik
         if (result && customerData.pppoe_username) {

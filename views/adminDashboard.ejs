@@ -10,6 +10,26 @@
     <style>
         body { background: #f5f6fa; }
         
+        /* Desktop: When sidebar collapsed, ensure main content is full width */
+        @media (min-width: 768px) {
+            body:has(.sidebar.collapsed) .main-content {
+                margin-left: 70px !important;
+                width: calc(100% - 70px) !important;
+                max-width: calc(100% - 70px) !important;
+            }
+            
+            body:has(.sidebar.collapsed) .main-content.col-md-10 {
+                flex: 0 0 calc(100% - 70px) !important;
+                max-width: calc(100% - 70px) !important;
+                width: calc(100% - 70px) !important;
+            }
+            
+            body:has(.sidebar.collapsed) .container-fluid {
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+        }
+        
         /* Mobile responsive fixes */
         @media (max-width: 767.98px) {
             .main-content {
@@ -328,10 +348,31 @@
                                         <% }); %>
                                     </ul>
                                 <% } %>
+                                <% if (configValidation.results.mikrotik.routerResults && configValidation.results.mikrotik.routerResults.length > 0) { %>
+                                    <div class="mt-2">
+                                        <strong>Detail Router:</strong>
+                                        <ul class="mb-0 mt-1">
+                                            <% configValidation.results.mikrotik.routerResults.forEach(function(router) { %>
+                                            <li>
+                                                <% if (router.success) { %>
+                                                    <i class="bi bi-check-circle text-success me-1"></i>
+                                                    <strong><%= router.router %></strong>: <%= router.message || 'Terhubung' %>
+                                                <% } else { %>
+                                                    <i class="bi bi-x-circle text-danger me-1"></i>
+                                                    <strong><%= router.router %></strong>: <%= router.error || 'Koneksi gagal' %>
+                                                    <% if (router.details) { %>
+                                                        <small class="text-muted d-block ms-4">(<%= router.details %>)</small>
+                                                    <% } %>
+                                                <% } %>
+                                            </li>
+                                            <% }); %>
+                                        </ul>
+                                    </div>
+                                <% } %>
                             </div>
-                            <div>
-                                <a href="/admin/settings" class="btn btn-outline-danger btn-sm">
-                                    <i class="bi bi-router me-1"></i>Perbaiki Konfigurasi Mikrotik
+                            <div class="mt-2">
+                                <a href="/admin/routers" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-router me-1"></i>Kelola Router Mikrotik
                                 </a>
                                 <button type="button" class="btn btn-outline-secondary btn-sm ms-2" onclick="clearConfigWarning()">
                                     <i class="bi bi-eye-slash me-1"></i>Sembunyikan
@@ -351,6 +392,19 @@
                             <strong>Sistem Siap Digunakan!</strong>
                             <div class="mt-1">
                                 <%= configValidation.summary.message %>
+                                <% if (configValidation.results && configValidation.results.mikrotik && configValidation.results.mikrotik.routerResults && configValidation.results.mikrotik.routerResults.length > 0) { %>
+                                    <div class="mt-2">
+                                        <strong>Router Mikrotik:</strong>
+                                        <ul class="mb-0 mt-1">
+                                            <% configValidation.results.mikrotik.routerResults.forEach(function(router) { %>
+                                            <li>
+                                                <i class="bi bi-check-circle text-success me-1"></i>
+                                                <strong><%= router.router %></strong>: <%= router.message || 'Terhubung' %>
+                                            </li>
+                                            <% }); %>
+                                        </ul>
+                                    </div>
+                                <% } %>
                             </div>
                         </div>
                     </div>
@@ -458,7 +512,45 @@
               </div>
             </div>
             <!-- GRAFIK INTERNET -->
+            <!-- NAS Monitoring Dashboard -->
             <div class="row mb-4">
+              <div class="col-md-12">
+                <div class="card">
+                  <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div class="fw-bold" style="font-size: 1.1rem;"><i class="bi bi-cpu"></i> Monitoring NAS</div>
+                      <div class="d-flex align-items-center gap-2">
+                        <div id="nasSelect1Container">
+                          <label for="nasSelect1" class="form-label mb-0" style="font-size: 0.9rem;">NAS 1:</label>
+                          <select id="nasSelect1" class="form-select form-select-sm" style="width: 200px; font-size: 0.9rem;">
+                            <option value="">-- Pilih NAS --</option>
+                          </select>
+                        </div>
+                        <div id="nasSelect2Container">
+                          <label for="nasSelect2" class="form-label mb-0" style="font-size: 0.9rem;">NAS 2:</label>
+                          <select id="nasSelect2" class="form-select form-select-sm" style="width: 200px; font-size: 0.9rem;">
+                            <option value="">-- Pilih NAS --</option>
+                          </select>
+                        </div>
+                        <button id="refreshMonitoring" class="btn btn-sm btn-light"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                        <span id="lastUpdate" class="text-light" style="font-size: 0.8rem;"></span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div id="monitoringContainer" class="row">
+                      <div class="col-12 text-center text-muted py-5">
+                        <i class="bi bi-router" style="font-size: 3rem;"></i>
+                        <p class="mt-3">Pilih NAS untuk memulai monitoring</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- OLD TRAFFIC CHART SECTION - HIDDEN FOR NOW -->
+            <div class="row mb-4 d-none">
               <div class="col-md-12">
                 <div class="card text-bg-info">
                   <div class="card-body">
@@ -560,7 +652,1137 @@
               </div>
             </div>
             <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-                        <script>
+            <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+            
+            <!-- Monitoring Dashboard Script -->
+            <script>
+            // ========== NAS MONITORING DASHBOARD ==========
+            let monitoringInterval = null;
+            let selectedNAS1 = null;
+            let selectedNAS2 = null;
+            
+            let allRouters = [];
+            
+            // Load routers list
+            async function loadRouters() {
+                try {
+                    const res = await fetch('/api/dashboard/routers');
+                    const data = await res.json();
+                    if (data.success && data.routers) {
+                        allRouters = data.routers;
+                        
+                        const select1 = document.getElementById('nasSelect1');
+                        const select2 = document.getElementById('nasSelect2');
+                        
+                        // Clear existing options (except first)
+                        while (select1.children.length > 1) select1.removeChild(select1.lastChild);
+                        while (select2.children.length > 1) select2.removeChild(select2.lastChild);
+                        
+                        data.routers.forEach(router => {
+                            const opt1 = document.createElement('option');
+                            opt1.value = router.id;
+                            opt1.textContent = `${router.name} (${router.nas_ip})`;
+                            select1.appendChild(opt1);
+                            
+                            const opt2 = document.createElement('option');
+                            opt2.value = router.id;
+                            opt2.textContent = `${router.name} (${router.nas_ip})`;
+                            select2.appendChild(opt2);
+                        });
+                        
+                        // Jika <= 2 NAS, auto-select semua dan sembunyikan dropdown
+                        // Jika > 2 NAS, tampilkan dropdown untuk pilihan manual
+                        if (data.routers.length <= 2) {
+                            // Hide dropdown containers
+                            document.getElementById('nasSelect1Container').style.display = 'none';
+                            document.getElementById('nasSelect2Container').style.display = 'none';
+                            
+                            // Auto-select semua NAS yang ada berdasarkan urutan
+                            if (data.routers.length >= 1) {
+                                selectedNAS1 = data.routers[0].id;
+                            }
+                            if (data.routers.length >= 2) {
+                                selectedNAS2 = data.routers[1].id;
+                            }
+                            
+                            // Update monitoring dengan auto-selected NAS
+                            updateMonitoring(true);
+                        } else {
+                            // Show dropdown containers untuk pilihan manual
+                            document.getElementById('nasSelect1Container').style.display = 'flex';
+                            document.getElementById('nasSelect2Container').style.display = 'flex';
+                            document.getElementById('nasSelect1Container').style.alignItems = 'center';
+                            document.getElementById('nasSelect2Container').style.alignItems = 'center';
+                            document.getElementById('nasSelect1Container').style.gap = '5px';
+                            document.getElementById('nasSelect2Container').style.gap = '5px';
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error loading routers:', e);
+                }
+            }
+            
+            // NAS Selection handlers
+            document.getElementById('nasSelect1').addEventListener('change', function() {
+                selectedNAS1 = this.value ? parseInt(this.value) : null;
+                if (selectedNAS1 && selectedNAS1 === selectedNAS2) {
+                    alert('NAS yang sama tidak bisa dipilih dua kali!');
+                    this.value = '';
+                    selectedNAS1 = null;
+                    return;
+                }
+                updateMonitoring(true); // Force recreate panels when selection changes
+            });
+            
+            document.getElementById('nasSelect2').addEventListener('change', function() {
+                selectedNAS2 = this.value ? parseInt(this.value) : null;
+                if (selectedNAS2 && selectedNAS1 === selectedNAS2) {
+                    alert('NAS yang sama tidak bisa dipilih dua kali!');
+                    this.value = '';
+                    selectedNAS2 = null;
+                    return;
+                }
+                updateMonitoring(true); // Force recreate panels when selection changes
+            });
+            
+            document.getElementById('refreshMonitoring').addEventListener('click', () => {
+                updateMonitoring(false); // Refresh without spinner, just update values
+            });
+            
+            // Format bytes
+            function formatBytes(bytes) {
+                if (bytes >= 1e12) return (bytes / 1e12).toFixed(2) + ' TB';
+                if (bytes >= 1e9) return (bytes / 1e9).toFixed(2) + ' GB';
+                if (bytes >= 1e6) return (bytes / 1e6).toFixed(2) + ' MB';
+                if (bytes >= 1e3) return (bytes / 1e3).toFixed(2) + ' KB';
+                return bytes.toFixed(0) + ' B';
+            }
+            
+            // Create monitoring panel for one NAS
+            function createMonitoringPanel(data, index) {
+                if (!data || !data.success || !data.data) {
+                        return `
+                        <div class="col-md-12 mb-3">
+                            <div class="card border-danger">
+                                <div class="card-header bg-danger text-white">
+                                    <strong>NAS ${index} - Error</strong>
+                                </div>
+                                <div class="card-body text-center text-muted">
+                                    <i class="bi bi-exclamation-triangle" style="font-size: 2rem;"></i>
+                                    <p class="mt-2">${data?.message || 'Gagal memuat data'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                const d = data.data;
+                const routerName = d.routerName || 'Unknown Router';
+                const routerIp = d.routerIp || 'N/A';
+                const routerId = d.routerId || index;
+                
+                return `
+                    <div class="col-md-12 mb-3" data-router-id="${routerId}">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong><i class="bi bi-router"></i> ${routerName}</strong>
+                                        ${d.identity && d.identity !== 'N/A' ? `<small class="ms-2">(${d.identity})</small>` : ''}
+                                    </div>
+                                    <small>${routerIp} | Uptime: ${d.uptimeFormatted || d.uptime || 'N/A'}</small>
+                                </div>
+                                <div class="mt-2" style="font-size: 0.85rem;">
+                                    ${d.boardName && d.boardName !== 'N/A' ? `<span class="badge bg-light text-dark me-1"><i class="bi bi-cpu"></i> ${d.boardName}</span>` : ''}
+                                    ${d.cpu && d.cpu !== 'N/A' ? `<span class="badge bg-light text-dark me-1"><i class="bi bi-motherboard"></i> ${d.cpu}</span>` : ''}
+                                    ${d.version && d.version !== 'N/A' ? `<span class="badge bg-light text-dark me-1"><i class="bi bi-code-square"></i> ${d.version}</span>` : ''}
+                                    ${d.voltage !== null && d.voltage > 0 ? `<span class="badge bg-light text-dark"><i class="bi bi-lightning"></i> ${d.voltage.toFixed(1)}V</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Row 1: RAM, CPU, HDD -->
+                                <div class="row mb-3">
+                                    <!-- RAM -->
+                                    <div class="col-md-4" data-metric="ram">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-2">
+                                                <small class="text-muted">Used RAM Memory</small>
+                                                <div class="progress mb-1" style="height: 20px;">
+                                                    <div class="progress-bar ${d.memoryUsedPercent > 80 ? 'bg-danger' : d.memoryUsedPercent > 60 ? 'bg-warning' : 'bg-success'}" 
+                                                         style="width: ${d.memoryUsedPercent}%">
+                                                        ${d.memoryUsedPercent}%
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">${d.memoryUsedMB.toFixed(1)} MB / ${d.totalMemoryMB.toFixed(1)} MB</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- CPU -->
+                                    <div class="col-md-4" data-metric="cpu">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-2">
+                                                <small class="text-muted">CPU Load</small>
+                                                <div class="progress mb-1" style="height: 20px;">
+                                                    <div class="progress-bar ${d.cpuLoad > 80 ? 'bg-danger' : d.cpuLoad > 60 ? 'bg-warning' : 'bg-info'}" 
+                                                         style="width: ${d.cpuLoad}%">
+                                                        ${d.cpuLoad}%
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">${d.cpuCount} Core(s) @ ${d.cpuFrequency} MHz</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- HDD -->
+                                    <div class="col-md-4" data-metric="hdd">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-2">
+                                                <small class="text-muted">HDD Utilization</small>
+                                                <div class="progress mb-1" style="height: 20px;">
+                                                    <div class="progress-bar ${d.diskUsedPercent > 80 ? 'bg-danger' : d.diskUsedPercent > 60 ? 'bg-warning' : 'bg-secondary'}" 
+                                                         style="width: ${d.diskUsedPercent}%">
+                                                        ${d.diskUsedPercent}%
+                                                    </div>
+                                                </div>
+                                                <small class="text-muted">${d.diskUsedMB.toFixed(1)} MB / ${d.totalDiskMB.toFixed(1)} MB</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Row 2: Temperature, Network In, Network Out - Gauge Charts -->
+                                <div class="row mb-3">
+                                    <!-- Temperature Gauge -->
+                                    <div class="col-md-4" data-metric="temperature">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-3 text-center" style="min-height: 280px;">
+                                                <small class="text-muted d-block mb-2 text-start" style="font-size: 0.9rem; font-weight: 500;">Temperature</small>
+                                                <div id="tempGauge${routerId}" style="height: 240px;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Network In Gauge -->
+                                    <div class="col-md-4" data-metric="network-in">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-3 text-center" style="min-height: 280px;">
+                                                <small class="text-muted d-block mb-2 text-start" style="font-size: 0.9rem; font-weight: 500;">Total Network Inbound</small>
+                                                <div id="networkInGauge${routerId}" style="height: 240px;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Network Out Gauge -->
+                                    <div class="col-md-4" data-metric="network-out">
+                                        <div class="card bg-light">
+                                            <div class="card-body p-3 text-center" style="min-height: 280px;">
+                                                <small class="text-muted d-block mb-2 text-start" style="font-size: 0.9rem; font-weight: 500;">Total Network Outbound</small>
+                                                <div id="networkOutGauge${routerId}" style="height: 240px;"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Row 3: Interface Traffic Chart (Per Interface dengan Dropdown) -->
+                                ${d.interfaces && d.interfaces.length > 0 ? `
+                                <div class="row">
+                                    <div class="col-12">
+                                        <div class="card bg-light">
+                                            <div class="card-header d-flex justify-content-between align-items-center">
+                                                <small class="fw-bold">Interface Traffic</small>
+                                                <select id="interfaceSelect${routerId}" class="form-select form-select-sm" style="width: 250px; font-size: 0.85rem;">
+                                                    <option value="">-- Pilih Interface --</option>
+                                                    ${d.interfaces.map(iface => `
+                                                        <option value="${iface.name}">${iface.name}</option>
+                                                    `).join('')}
+                                                </select>
+                                            </div>
+                                            <div class="card-body p-3" style="position: relative; height: 400px; background-color: #1a1a1a;">
+                                                <canvas id="rxBytesChart${routerId}" style="max-height: 380px;"></canvas>
+                                                <div id="noInterfaceSelected${routerId}" class="text-center text-muted py-5" style="display: none;">
+                                                    <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
+                                                    <p class="mt-2">Pilih interface untuk menampilkan grafik</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                ` : '<div class="text-center text-muted py-2"><small>No interface data available</small></div>'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Update monitoring display - tanpa menghilangkan tampilan
+            async function updateMonitoring(initialLoad = false) {
+                const container = document.getElementById('monitoringContainer');
+                
+                if (!selectedNAS1 && !selectedNAS2) {
+                    if (initialLoad) {
+                        container.innerHTML = `
+                            <div class="col-12 text-center text-muted py-5">
+                                <i class="bi bi-router" style="font-size: 3rem;"></i>
+                                <p class="mt-3">Pilih NAS untuk memulai monitoring</p>
+                            </div>
+                        `;
+                    }
+                    if (monitoringInterval) {
+                        clearInterval(monitoringInterval);
+                        monitoringInterval = null;
+                    }
+                    return;
+                }
+                
+                // Untuk initial load, tampilkan spinner. Untuk update berikutnya, langsung update data
+                if (initialLoad && container.children.length === 0 || container.querySelector('.spinner-border')) {
+                    container.innerHTML = '<div class="col-12 text-center py-3"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+                }
+                
+                try {
+                    const routerIds = [];
+                    if (selectedNAS1) routerIds.push(selectedNAS1);
+                    if (selectedNAS2) routerIds.push(selectedNAS2);
+                    
+                    const res = await fetch(`/api/dashboard/resources-multi?router_ids=${routerIds.join(',')}`);
+                    const result = await res.json();
+                    
+                    if (result.success && result.data) {
+                        // Check if panels already exist
+                        const existingPanels = container.querySelectorAll('[data-router-id]');
+                        
+                        if (existingPanels.length === 0 || initialLoad) {
+                            // First load or no panels exist - create new panels
+                            let html = '';
+                            result.data.forEach((data, idx) => {
+                                html += createMonitoringPanel(data, idx + 1);
+                            });
+                            container.innerHTML = html;
+                            
+                            // Create gauge charts after HTML is rendered
+                            result.data.forEach((data, idx) => {
+                                if (data.success && data.data) {
+                                    const routerId = data.data.routerId || (idx + 1);
+                                    // Delay lebih lama untuk memastikan DOM siap
+                                    setTimeout(() => {
+                                        createGaugeCharts(routerId, data.data);
+                                    }, 300);
+                                }
+                            });
+                            
+                            // Create bar charts for Rx Bytes - dengan delay untuk memastikan canvas sudah ada
+                            setTimeout(() => {
+                                result.data.forEach((data, idx) => {
+                                    if (data.success && data.data && data.data.interfaces && data.data.interfaces.length > 0) {
+                                        const routerId = data.data.routerId || (idx + 1);
+                                        const canvasId = `rxBytesChart${routerId}`;
+                                        
+                                        // Retry mechanism untuk memastikan canvas dan dropdown sudah ada
+                                        function tryCreateChart(attempts = 0) {
+                                            const canvas = document.getElementById(canvasId);
+                                            const selectEl = document.getElementById(`interfaceSelect${routerId}`);
+                                            if (canvas && selectEl) {
+                                                console.log(`Creating chart for ${canvasId}`);
+                                                createRxBytesChart(canvasId, data.data.interfaces);
+                                            } else if (attempts < 5) {
+                                                console.warn(`Canvas/Dropdown ${canvasId} not found, retrying... (attempt ${attempts + 1})`);
+                                                setTimeout(() => tryCreateChart(attempts + 1), 200);
+                                            } else {
+                                                console.error(`Failed to find canvas/dropdown ${canvasId} after 5 attempts`);
+                                            }
+                                        }
+                                        tryCreateChart();
+                                    } else {
+                                        console.warn(`No interfaces data for router ${data.data?.routerId || (idx + 1)}`);
+                                    }
+                                });
+                            }, 200);
+                        } else {
+                            // Update existing panels without recreating structure
+                            result.data.forEach((data, idx) => {
+                                if (data.success && data.data) {
+                                    updateMonitoringPanel(data.data, idx + 1);
+                                    
+                                    // Update interface chart
+                                    if (data.data.interfaces && data.data.interfaces.length > 0) {
+                                        const routerId = data.data.routerId || (idx + 1);
+                                        const canvasId = `rxBytesChart${routerId}`;
+                                        // Small delay to ensure DOM is ready
+                                        setTimeout(() => {
+                                            updateInterfaceChart(canvasId, routerId, data.data.interfaces);
+                                        }, 50);
+                                    }
+                                } else {
+                                    // Show error in existing panel
+                                    const panel = container.querySelector(`[data-router-id="${data.routerId || (idx + 1)}"]`);
+                                    if (panel) {
+                                        const cardBody = panel.querySelector('.card-body');
+                                        if (cardBody) {
+                                            cardBody.innerHTML = `
+                                                <div class="text-center text-danger py-3">
+                                                    <i class="bi bi-exclamation-triangle"></i> ${data.message || 'Gagal memuat data'}
+                                                </div>
+                                            `;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        
+                        // Update last update time
+                        document.getElementById('lastUpdate').textContent = `Updated: ${new Date().toLocaleTimeString()}`;
+                    } else {
+                        if (initialLoad) {
+                            container.innerHTML = `
+                                <div class="col-12 text-center text-danger py-3">
+                                    <i class="bi bi-exclamation-triangle"></i> ${result.message || 'Gagal memuat data'}
+                                </div>
+                            `;
+                        }
+                    }
+                } catch (e) {
+                    if (initialLoad) {
+                        container.innerHTML = `
+                            <div class="col-12 text-center text-danger py-3">
+                                <i class="bi bi-exclamation-triangle"></i> Error: ${e.message}
+                            </div>
+                        `;
+                    }
+                    console.error('Error updating monitoring:', e);
+                }
+            }
+            
+            // Gauge chart instances storage (Plotly)
+            const gaugeCharts = {};
+            
+            // Function to create Plotly gauge chart
+            function createGaugeChart(elementId, value, maxValue, colors, title, unit) {
+                const element = document.getElementById(elementId);
+                if (!element) return null;
+                
+                const isTemperature = Array.isArray(colors) && colors.length === 3;
+                
+                let gaugeConfig = {
+                    domain: { x: [0, 1], y: [0, 1] },
+                    value: value,
+                    title: { text: title, font: { size: 16, color: '#333' } },
+                    type: "indicator",
+                    mode: "gauge+number",
+                    gauge: {
+                        axis: { 
+                            range: [null, maxValue],
+                            tickwidth: 1,
+                            tickcolor: "#666",
+                            ticks: "outside",
+                            tickmode: "linear",
+                            tick0: 0,
+                            dtick: maxValue / 5
+                        },
+                        bar: { 
+                            color: isTemperature ? (value > 60 ? colors[2] : value > 50 ? colors[1] : colors[0]) : colors,
+                            line: { color: "rgba(255,255,255,0.3)", width: 1 }
+                        },
+                        bgcolor: "rgba(0,0,0,0)",
+                        borderwidth: 0,
+                        bordercolor: "rgba(0,0,0,0)",
+                        steps: [],
+                        threshold: {
+                            line: { color: "rgba(255,255,255,0.5)", width: 2 },
+                            thickness: 0.75,
+                            value: maxValue * 0.9
+                        }
+                    }
+                };
+                
+                // Add color steps for temperature gauge
+                if (isTemperature) {
+                    const stepSize = maxValue / 3;
+                    gaugeConfig.gauge.steps = [
+                        { range: [0, 50], color: colors[0] }, // green
+                        { range: [50, 60], color: colors[1] }, // yellow
+                        { range: [60, maxValue], color: colors[2] } // red
+                    ];
+                } else {
+                    // Single color with gradient effect
+                    gaugeConfig.gauge.steps = [
+                        { range: [0, maxValue * 0.7], color: "rgba(60,60,60,0.3)" },
+                        { range: [maxValue * 0.7, maxValue], color: "rgba(60,60,60,0.5)" }
+                    ];
+                }
+                
+                const layout = {
+                    width: element.offsetWidth || 300,
+                    height: 240,
+                    margin: { t: 40, r: 20, l: 20, b: 40 },
+                    paper_bgcolor: "rgba(0,0,0,0)",
+                    plot_bgcolor: "rgba(0,0,0,0)",
+                    font: { 
+                        color: "#333",
+                        family: "Arial, sans-serif",
+                        size: 14
+                    }
+                };
+                
+                // Update gauge bgcolor to transparent
+                gaugeConfig.gauge.bgcolor = "rgba(0,0,0,0)";
+                
+                const config = {
+                    responsive: true,
+                    displayModeBar: false,
+                    staticPlot: false,
+                    animate: true
+                };
+                
+                // Create or update Plotly gauge chart
+                const chartElement = document.getElementById(elementId);
+                if (!chartElement) {
+                    console.warn(`Element ${elementId} not found for gauge chart`);
+                    return null;
+                }
+                
+                // Check if Plotly chart already exists on this element
+                const hasPlotlyChart = chartElement.data && chartElement.data.length > 0;
+                
+                if (hasPlotlyChart && gaugeCharts[elementId]) {
+                    // Update existing chart using Plotly.update (jangan recreate)
+                    try {
+                        const barColor = isTemperature ? (value > 60 ? colors[2] : value > 50 ? colors[1] : colors[0]) : colors;
+                        
+                        Plotly.update(elementId, {
+                            value: value,
+                            'gauge.bar.color': barColor
+                        }, {
+                            // Empty layout update - keep existing layout
+                        }, {
+                            ...config,
+                            transition: {
+                                duration: 500,
+                                easing: 'cubic-in-out'
+                            }
+                        });
+                    } catch (e) {
+                        console.error(`Error updating Plotly chart ${elementId}:`, e);
+                        // Jika update gagal, coba recreate (tapi ini seharusnya jarang terjadi)
+                        try {
+                            Plotly.newPlot(elementId, [gaugeConfig], layout, config);
+                            gaugeCharts[elementId] = { elementId, maxValue, colors, isTemperature };
+                        } catch (e2) {
+                            console.error(`Error recreating Plotly chart ${elementId}:`, e2);
+                        }
+                    }
+                } else {
+                    // Create new chart - hanya jika belum ada
+                    try {
+                        Plotly.newPlot(elementId, [gaugeConfig], layout, config);
+                        gaugeCharts[elementId] = { elementId, maxValue, colors, isTemperature };
+                    } catch (e) {
+                        console.error(`Error creating Plotly chart ${elementId}:`, e);
+                        return null;
+                    }
+                }
+                
+                return gaugeCharts[elementId];
+            }
+            
+            // Function to create all gauge charts for a router
+            function createGaugeCharts(routerId, data) {
+                // Temperature gauge (0-80°C)
+                createGaugeChart(
+                    `tempGauge${routerId}`,
+                    data.temperature !== null && data.temperature > 0 ? data.temperature : 0,
+                    80,
+                    ['#22c55e', '#eab308', '#ef4444'], // green, yellow, red
+                    'Temperature',
+                    '°C'
+                );
+                
+                // Network In gauge (0-1000 Mbps)
+                createGaugeChart(
+                    `networkInGauge${routerId}`,
+                    data.totalNetworkInMbps || 0,
+                    1000,
+                    '#22c55e', // green
+                    'Total Network Inbound',
+                    'Mb/s'
+                );
+                
+                // Network Out gauge (0-1000 Mbps)
+                createGaugeChart(
+                    `networkOutGauge${routerId}`,
+                    data.totalNetworkOutMbps || 0,
+                    1000,
+                    '#f97316', // orange
+                    'Total Network Outbound',
+                    'Mb/s'
+                );
+            }
+            
+            // Function to update gauge charts
+            function updateGaugeCharts(routerId, data) {
+                // Check if elements exist before updating
+                const tempElement = document.getElementById(`tempGauge${routerId}`);
+                const networkInElement = document.getElementById(`networkInGauge${routerId}`);
+                const networkOutElement = document.getElementById(`networkOutGauge${routerId}`);
+                
+                // Update temperature gauge only if element exists
+                if (tempElement) {
+                    const tempValue = data.temperature !== null && data.temperature > 0 ? data.temperature : 0;
+                    createGaugeChart(
+                        `tempGauge${routerId}`,
+                        tempValue,
+                        80,
+                        ['#22c55e', '#eab308', '#ef4444'],
+                        'Temperature',
+                        '°C'
+                    );
+                }
+                
+                // Update network in gauge only if element exists
+                if (networkInElement) {
+                    const networkInValue = data.totalNetworkInMbps || 0;
+                    createGaugeChart(
+                        `networkInGauge${routerId}`,
+                        networkInValue,
+                        1000,
+                        '#22c55e',
+                        'Total Network Inbound',
+                        'Mb/s'
+                    );
+                }
+                
+                // Update network out gauge only if element exists
+                if (networkOutElement) {
+                    const networkOutValue = data.totalNetworkOutMbps || 0;
+                    createGaugeChart(
+                        `networkOutGauge${routerId}`,
+                        networkOutValue,
+                        1000,
+                        '#f97316',
+                        'Total Network Outbound',
+                        'Mb/s'
+                    );
+                }
+            }
+            
+            // Update existing monitoring panel without recreating HTML
+            function updateMonitoringPanel(data, index) {
+                const routerId = data.routerId || index;
+                const panel = document.querySelector(`[data-router-id="${routerId}"]`);
+                if (!panel) return;
+                
+                // Update router info badges di header (Identity, Board Name, CPU, Version, Voltage)
+                const cardHeader = panel.querySelector('.card-header');
+                if (cardHeader) {
+                    const titleDiv = cardHeader.querySelector('.d-flex > div:first-child');
+                    if (titleDiv) {
+                        // Always update identity jika data tersedia
+                        // Debug log untuk identity
+                        console.log(`[DEBUG] Update identity for router ${routerId}:`, data.identity);
+                        
+                        if (data.identity && data.identity !== 'N/A' && data.identity !== null && data.identity !== undefined) {
+                            let identitySpan = titleDiv.querySelector('small.ms-2');
+                            if (!identitySpan) {
+                                identitySpan = document.createElement('small');
+                                identitySpan.className = 'ms-2';
+                                titleDiv.appendChild(identitySpan);
+                            }
+                            // Hanya update jika berbeda untuk menghindari flicker
+                            const identityText = `(${data.identity})`;
+                            if (identitySpan.textContent !== identityText) {
+                                identitySpan.textContent = identityText;
+                            }
+                            identitySpan.style.display = 'inline';
+                            identitySpan.style.visibility = 'visible';
+                            identitySpan.style.opacity = '1';
+                        } else {
+                            // Hide identity jika tidak ada
+                            const identitySpan = titleDiv.querySelector('small.ms-2');
+                            if (identitySpan) {
+                                identitySpan.style.display = 'none';
+                            }
+                        }
+                    }
+                    
+                    // Update badges (Board Name, CPU, Version, Voltage) - hanya update jika infoDiv ada
+                    const infoDiv = cardHeader.querySelector('.mt-2');
+                    if (infoDiv) {
+                        let badgesHtml = '';
+                        if (data.boardName && data.boardName !== 'N/A') {
+                            badgesHtml += `<span class="badge bg-light text-dark me-1"><i class="bi bi-cpu"></i> ${data.boardName}</span>`;
+                        }
+                        if (data.cpu && data.cpu !== 'N/A') {
+                            badgesHtml += `<span class="badge bg-light text-dark me-1"><i class="bi bi-motherboard"></i> ${data.cpu}</span>`;
+                        }
+                        if (data.version && data.version !== 'N/A') {
+                            badgesHtml += `<span class="badge bg-light text-dark me-1"><i class="bi bi-code-square"></i> ${data.version}</span>`;
+                        }
+                        if (data.voltage !== null && data.voltage > 0) {
+                            badgesHtml += `<span class="badge bg-light text-dark"><i class="bi bi-lightning"></i> ${data.voltage.toFixed(1)}V</span>`;
+                        }
+                        // Hanya update jika ada perubahan untuk menghindari flicker
+                        if (infoDiv.innerHTML !== badgesHtml) {
+                            infoDiv.innerHTML = badgesHtml;
+                        }
+                    }
+                }
+                
+                // Update RAM progress bar
+                const ramBar = panel.querySelector('[data-metric="ram"] .progress-bar');
+                if (ramBar) {
+                    ramBar.style.width = `${data.memoryUsedPercent}%`;
+                    ramBar.textContent = `${data.memoryUsedPercent}%`;
+                    ramBar.className = `progress-bar ${data.memoryUsedPercent > 80 ? 'bg-danger' : data.memoryUsedPercent > 60 ? 'bg-warning' : 'bg-success'}`;
+                    const ramText = panel.querySelector('[data-metric="ram"] small.text-muted');
+                    if (ramText) ramText.textContent = `${data.memoryUsedMB.toFixed(1)} MB / ${data.totalMemoryMB.toFixed(1)} MB`;
+                }
+                
+                // Update CPU progress bar
+                const cpuBar = panel.querySelector('[data-metric="cpu"] .progress-bar');
+                if (cpuBar) {
+                    cpuBar.style.width = `${data.cpuLoad}%`;
+                    cpuBar.textContent = `${data.cpuLoad}%`;
+                    cpuBar.className = `progress-bar ${data.cpuLoad > 80 ? 'bg-danger' : data.cpuLoad > 60 ? 'bg-warning' : 'bg-info'}`;
+                    const cpuText = panel.querySelector('[data-metric="cpu"] small.text-muted');
+                    if (cpuText) cpuText.textContent = `${data.cpuCount} Core(s) @ ${data.cpuFrequency} MHz`;
+                }
+                
+                // Update HDD progress bar
+                const hddBar = panel.querySelector('[data-metric="hdd"] .progress-bar');
+                if (hddBar) {
+                    hddBar.style.width = `${data.diskUsedPercent}%`;
+                    hddBar.textContent = `${data.diskUsedPercent}%`;
+                    hddBar.className = `progress-bar ${data.diskUsedPercent > 80 ? 'bg-danger' : data.diskUsedPercent > 60 ? 'bg-warning' : 'bg-secondary'}`;
+                    const hddText = panel.querySelector('[data-metric="hdd"] small.text-muted');
+                    if (hddText) hddText.textContent = `${data.diskUsedMB.toFixed(1)} MB / ${data.totalDiskMB.toFixed(1)} MB`;
+                }
+                
+                // Update Gauge Charts
+                updateGaugeCharts(routerId, data);
+            }
+            
+            // Start real-time traffic update untuk interface
+            function startInterfaceTrafficUpdate(routerId, interfaceName, chartInstance) {
+                // Stop existing interval jika ada
+                if (interfaceUpdateIntervals[routerId] && interfaceUpdateIntervals[routerId][interfaceName]) {
+                    clearInterval(interfaceUpdateIntervals[routerId][interfaceName]);
+                }
+                
+                // Setup interval untuk update real-time setiap 5 detik
+                if (!interfaceUpdateIntervals[routerId]) {
+                    interfaceUpdateIntervals[routerId] = {};
+                }
+                
+                interfaceUpdateIntervals[routerId][interfaceName] = setInterval(async () => {
+                    try {
+                        const res = await fetch(`/api/dashboard/interface-traffic?router_id=${routerId}&interface=${encodeURIComponent(interfaceName)}`);
+                        const data = await res.json();
+                        
+                        if (data.success && data.data) {
+                            const tsData = interfaceTrafficData[routerId][interfaceName];
+                            if (!tsData) return;
+                            
+                            // Get chart instance from stored instances
+                            const chart = chartInstance || (interfaceChartInstances[routerId] && interfaceChartInstances[routerId][interfaceName]);
+                            if (!chart) return;
+                            
+                            const now = new Date();
+                            const currentSecond = now.getSeconds();
+                            
+                            // Buat label dengan format HH:MM:SS untuk internal
+                            const timeLabel = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                            const timeLabelShort = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                            
+                            // Tambahkan data baru
+                            tsData.labels.push(timeLabel);
+                            tsData.rxData.push(data.data.rxMbps);
+                            tsData.txData.push(data.data.txMbps);
+                            
+                            // Update display labels - tampilkan label setiap 5 detik (kelipatan 5 detik: 0, 5, 10, 15, 20, dst)
+                            if (currentSecond % 5 === 0 || currentSecond === 0) {
+                                tsData.displayLabels.push(timeLabelShort);
+                            } else {
+                                // Untuk data point lainnya, gunakan string kosong
+                                tsData.displayLabels.push('');
+                            }
+                            
+                            // Hapus data lama jika melebihi maxPoints
+                            if (tsData.labels.length > tsData.maxPoints) {
+                                tsData.labels.shift();
+                                tsData.rxData.shift();
+                                tsData.txData.shift();
+                                tsData.displayLabels.shift();
+                            }
+                            
+                            // Pastikan ada minimal 1 label yang tidak kosong untuk chart tetap readable
+                            const hasNonEmptyLabel = tsData.displayLabels.some(l => l !== '');
+                            if (!hasNonEmptyLabel && tsData.displayLabels.length > 0) {
+                                // Set label terakhir sebagai label yang terlihat dengan format HH:MM:SS
+                                const timeLabelWithSeconds = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                                tsData.displayLabels[tsData.displayLabels.length - 1] = timeLabelWithSeconds;
+                            }
+                            
+                            // Update chart dengan display labels - tanpa animasi
+                            chart.data.labels = tsData.displayLabels;
+                            chart.data.datasets[0].data = tsData.rxData;
+                            chart.data.datasets[1].data = tsData.txData;
+                            
+                            // Update tanpa animasi dan tanpa delay
+                            chart.options.animation = false;
+                            chart.update('none', { duration: 0 });
+                        }
+                    } catch (e) {
+                        console.error(`Error updating interface traffic for ${interfaceName}:`, e);
+                    }
+                }, 5000); // Update setiap 5 detik untuk real-time
+            }
+            
+            // Stop interface traffic update
+            function stopInterfaceTrafficUpdate(routerId, interfaceName) {
+                if (interfaceUpdateIntervals[routerId] && interfaceUpdateIntervals[routerId][interfaceName]) {
+                    clearInterval(interfaceUpdateIntervals[routerId][interfaceName]);
+                    delete interfaceUpdateIntervals[routerId][interfaceName];
+                }
+                // Clean up chart instance
+                if (interfaceChartInstances[routerId] && interfaceChartInstances[routerId][interfaceName]) {
+                    delete interfaceChartInstances[routerId][interfaceName];
+                }
+            }
+            
+            // Update interface chart - update data untuk interface yang sedang dipilih
+            function updateInterfaceChart(canvasId, routerId, interfaces) {
+                // Store interface data untuk dropdown
+                routerInterfaceData[routerId] = interfaces;
+                
+                // Get selected interface from dropdown
+                const selectEl = document.getElementById(`interfaceSelect${routerId}`);
+                if (selectEl && selectEl.value) {
+                    // Stop update untuk interface sebelumnya jika ada
+                    const previousInterface = selectEl.dataset.previousValue;
+                    if (previousInterface && previousInterface !== selectEl.value) {
+                        stopInterfaceTrafficUpdate(routerId, previousInterface);
+                    }
+                    selectEl.dataset.previousValue = selectEl.value;
+                    
+                    // Update chart dengan interface yang dipilih
+                    createInterfaceChart(canvasId, routerId, selectEl.value);
+                } else {
+                    // Jika belum ada pilihan, sembunyikan chart
+                    const canvas = document.getElementById(canvasId);
+                    const noSelectionEl = document.getElementById(`noInterfaceSelected${routerId}`);
+                    if (canvas) canvas.style.display = 'none';
+                    if (noSelectionEl) noSelectionEl.style.display = 'block';
+                }
+            }
+            
+            // Store interface data per router for chart updates
+            const routerInterfaceData = {};
+            
+            // Store time series data untuk setiap router dan interface
+            const interfaceTrafficData = {}; // { routerId: { interfaceName: { labels: [], rxData: [], txData: [] } } }
+            const interfaceUpdateIntervals = {}; // { routerId: { interfaceName: intervalId } }
+            const interfaceChartInstances = {}; // { routerId: { interfaceName: chartInstance } }
+            
+            // Create interface traffic line chart (per interface dengan dropdown) - Time series dengan area fill
+            function createInterfaceChart(canvasId, routerId, selectedInterfaceName = null) {
+                const ctx = document.getElementById(canvasId);
+                if (!ctx) {
+                    console.error(`Canvas element not found: ${canvasId}`);
+                    return;
+                }
+                
+                // Destroy existing chart if any
+                const existingChart = Chart.getChart(ctx);
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+                
+                // Stop update untuk interface sebelumnya jika ada
+                if (interfaceChartInstances[routerId]) {
+                    Object.keys(interfaceChartInstances[routerId]).forEach(ifaceName => {
+                        if (ifaceName !== selectedInterfaceName) {
+                            stopInterfaceTrafficUpdate(routerId, ifaceName);
+                        }
+                    });
+                }
+                
+                // Hide/show no selection message
+                const noSelectionEl = document.getElementById(`noInterfaceSelected${routerId}`);
+                
+                if (!selectedInterfaceName || !routerInterfaceData[routerId]) {
+                    if (noSelectionEl) noSelectionEl.style.display = 'block';
+                    ctx.style.display = 'none';
+                    return;
+                }
+                
+                if (noSelectionEl) noSelectionEl.style.display = 'none';
+                ctx.style.display = 'block';
+                
+                const interfaces = routerInterfaceData[routerId];
+                const selectedInterface = interfaces.find(i => i.name === selectedInterfaceName);
+                
+                if (!selectedInterface) {
+                    if (noSelectionEl) noSelectionEl.style.display = 'block';
+                    ctx.style.display = 'none';
+                    return;
+                }
+                
+                // Initialize time series data untuk interface ini jika belum ada
+                if (!interfaceTrafficData[routerId]) {
+                    interfaceTrafficData[routerId] = {};
+                }
+                if (!interfaceTrafficData[routerId][selectedInterfaceName]) {
+                    interfaceTrafficData[routerId][selectedInterfaceName] = {
+                        labels: [],
+                        rxData: [],
+                        txData: [],
+                        displayLabels: [], // Label untuk ditampilkan di X-axis (setiap 5 menit)
+                        maxPoints: 17280 // Simpan 17280 data points (24 jam * 60 menit * 12 update per menit = 17280 points untuk update setiap 5 detik)
+                    };
+                }
+                
+                const tsData = interfaceTrafficData[routerId][selectedInterfaceName];
+                
+                // Create time series line chart dengan area fill (seperti gambar)
+                try {
+                    // Get initial data point dari selectedInterface (convert bytes to Mbps)
+                    // selectedInterface memiliki rxBytesPerSec dan txBytesPerSec
+                    const initialRxMbps = (selectedInterface.rxBytesPerSec * 8) / 1000000; // bytes/sec * 8 = bits/sec, / 1e6 = Mbps
+                    const initialTxMbps = (selectedInterface.txBytesPerSec * 8) / 1000000;
+                    
+                    // Tambahkan beberapa data point awal untuk membuat grafik langsung terlihat
+                    if (tsData.labels.length === 0) {
+                        const now = new Date();
+                        // Buat 5 data point awal dengan nilai yang sama untuk grafik langsung muncul
+                        for (let i = 4; i >= 0; i--) {
+                            const timeLabel = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                            const timeLabelShort = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                            tsData.labels.push(timeLabel);
+                            tsData.rxData.push(initialRxMbps);
+                            tsData.txData.push(initialTxMbps);
+                            
+                            // Tampilkan label setiap 5 detik untuk data point awal
+                            const currentSecond = now.getSeconds();
+                            if (currentSecond % 5 === 0 || i === 0) {
+                                // Format dengan detik: HH:MM:SS
+                                const timeLabelWithSeconds = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                                tsData.displayLabels.push(timeLabelWithSeconds);
+                            } else {
+                                tsData.displayLabels.push('');
+                            }
+                        }
+                    }
+                    
+                    // Pastikan ada minimal 1 label yang tidak kosong untuk chart
+                    const hasNonEmptyLabel = tsData.displayLabels.some(l => l !== '');
+                    if (!hasNonEmptyLabel && tsData.displayLabels.length > 0) {
+                        // Set label terakhir sebagai label yang terlihat
+                        const now = new Date();
+                        const timeLabelShort = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        tsData.displayLabels[tsData.displayLabels.length - 1] = timeLabelShort;
+                    }
+                    
+                    // Pastikan data tidak kosong
+                    if (tsData.rxData.length === 0 || tsData.txData.length === 0) {
+                        console.error('Data kosong untuk chart:', { rx: tsData.rxData.length, tx: tsData.txData.length, labels: tsData.labels.length });
+                        return;
+                    }
+                    
+                    const chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: tsData.displayLabels.length > 0 ? tsData.displayLabels : tsData.labels,
+                            datasets: [
+                                {
+                                    label: 'rx',
+                                    data: tsData.rxData,
+                                    borderColor: 'rgb(59, 130, 246)', // Blue
+                                    backgroundColor: 'rgba(59, 130, 246, 0.3)', // Blue dengan opacity untuk fill
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointRadius: 0, // Hide points untuk line yang lebih smooth
+                                    pointHoverRadius: 4
+                                },
+                                {
+                                    label: 'tx',
+                                    data: tsData.txData,
+                                    borderColor: 'rgb(147, 51, 234)', // Purple
+                                    backgroundColor: 'rgba(147, 51, 234, 0.3)', // Purple dengan opacity untuk fill
+                                    borderWidth: 2,
+                                    fill: true,
+                                    tension: 0.4,
+                                    pointRadius: 0,
+                                    pointHoverRadius: 4
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: {
+                                duration: 0 // Nonaktifkan animasi untuk menghindari kedipan
+                            },
+                            transitions: {
+                                active: {
+                                    animation: {
+                                        duration: 0
+                                    }
+                                }
+                            },
+                            interaction: {
+                                intersect: false,
+                                mode: 'index'
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'bottom',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 15,
+                                        font: {
+                                            size: 12
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `${context.dataset.label}: ${context.parsed.y.toFixed(2)} Mb/s`;
+                                        }
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: selectedInterfaceName,
+                                    font: {
+                                        size: 14,
+                                        weight: 'bold'
+                                    },
+                                    padding: {
+                                        bottom: 10,
+                                        top: 0
+                                    },
+                                    align: 'start' // Align ke kiri seperti di gambar
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    grid: {
+                                        color: 'rgba(128, 128, 128, 0.2)',
+                                        drawBorder: false
+                                    },
+                                    ticks: {
+                                        maxTicksLimit: 20, // Maksimal 20 label untuk range waktu yang lebih detail
+                                        font: {
+                                            size: 9 // Sedikit lebih kecil karena lebih banyak label
+                                        },
+                                        callback: function(value, index) {
+                                            // Hanya tampilkan label yang tidak kosong (label setiap 5 detik)
+                                            const labels = this.chart.data.labels;
+                                            if (!labels || labels.length === 0) return '';
+                                            if (index >= labels.length) return '';
+                                            const label = labels[index];
+                                            // Tampilkan label jika tidak kosong
+                                            return label || '';
+                                        },
+                                        autoSkip: false, // Jangan skip label otomatis
+                                        maxRotation: 45,
+                                        minRotation: 45 // Rotate label untuk menghindari overlap
+                                    }
+                                },
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Mb/s',
+                                        font: {
+                                            size: 11
+                                        }
+                                    },
+                                    ticks: {
+                                        callback: function(value) {
+                                            // Format seperti di gambar: "0 b/s", "10 Mb/s", "20 Mb/s", dll
+                                            if (value === 0) {
+                                                return '0 b/s';
+                                            }
+                                            if (value >= 1000) {
+                                                return (value / 1000).toFixed(1) + ' Gb/s';
+                                            }
+                                            return value.toFixed(0) + ' Mb/s';
+                                        },
+                                        font: {
+                                            size: 10
+                                        },
+                                        stepSize: 10 // Step setiap 10 Mb/s untuk lebih rapi
+                                    },
+                                    grid: {
+                                        color: 'rgba(128, 128, 128, 0.2)',
+                                        drawBorder: false
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    // Store chart instance
+                    if (!interfaceChartInstances[routerId]) {
+                        interfaceChartInstances[routerId] = {};
+                    }
+                    interfaceChartInstances[routerId][selectedInterfaceName] = chart;
+                    
+                    // Start real-time update untuk interface ini
+                    startInterfaceTrafficUpdate(routerId, selectedInterfaceName, chart);
+                } catch (e) {
+                    console.error(`Error creating chart for ${canvasId}:`, e);
+                }
+            }
+            
+            // Legacy function untuk backward compatibility (tidak dipakai lagi)
+            function createRxBytesChart(canvasId, interfaces) {
+                // Store interface data
+                const routerId = canvasId.replace('rxBytesChart', '');
+                routerInterfaceData[routerId] = interfaces;
+                
+                // Setup dropdown handler
+                const selectEl = document.getElementById(`interfaceSelect${routerId}`);
+                if (selectEl) {
+                    // Remove existing handler
+                    const newSelect = selectEl.cloneNode(true);
+                    selectEl.parentNode.replaceChild(newSelect, selectEl);
+                    
+                    // Add new handler
+                    newSelect.addEventListener('change', function() {
+                        const selectedInterface = this.value;
+                        // Stop update untuk interface sebelumnya
+                        const previousInterface = this.dataset.previousValue;
+                        if (previousInterface && previousInterface !== selectedInterface) {
+                            stopInterfaceTrafficUpdate(routerId, previousInterface);
+                        }
+                        this.dataset.previousValue = selectedInterface;
+                        createInterfaceChart(`rxBytesChart${routerId}`, routerId, selectedInterface);
+                    });
+                    
+                    // Auto-select first interface jika belum ada pilihan
+                    if (!newSelect.value && interfaces.length > 0) {
+                        newSelect.value = interfaces[0].name;
+                        createInterfaceChart(`rxBytesChart${routerId}`, routerId, interfaces[0].name);
+                    }
+                }
+            }
+            
+            // Auto refresh every 5 seconds - calls updateMonitoring(false) to update without spinner
+            function startAutoRefresh() {
+                if (monitoringInterval) clearInterval(monitoringInterval);
+                monitoringInterval = setInterval(() => updateMonitoring(false), 5000);
+            }
+            
+            // Initialize
+            loadRouters().then(() => {
+                updateMonitoring(true); // Initial load with spinner
+                startAutoRefresh();
+            });
+            </script>
+            
+            <!-- OLD TRAFFIC CHART SCRIPT - KEEP FOR REFERENCE -->
+            <script>
             // Grafik bandwidth real-time dengan 3 chart terpisah
             const maxPoints = 30; // tampilkan 30 data terakhir
             let currentInterface = localStorage.getItem('selectedInterface') || '05-ether2-ISP';

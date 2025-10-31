@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { addHotspotUser, getActiveHotspotUsers, getHotspotProfiles, deleteHotspotUser, generateHotspotVouchers, getHotspotServers, disconnectHotspotUser } = require('../config/mikrotik');
+const { addHotspotUser, getActiveHotspotUsers, getHotspotProfiles, deleteHotspotUser, generateHotspotVouchers, getHotspotServers, disconnectHotspotUser, getMikrotikConnectionForRouter } = require('../config/mikrotik');
 const { getMikrotikConnection } = require('../config/mikrotik');
 const fs = require('fs');
 const path = require('path');
 const { getSettingsWithCache } = require('../config/settingsManager')
 const { getVersionInfo, getVersionBadge } = require('../config/version-utils');
+const sqlite3 = require('sqlite3').verbose();
 
 // Helper function untuk mengambil setting voucher online
 async function getVoucherOnlineSettings() {
@@ -168,40 +169,76 @@ async function getVoucherOnlineSettings() {
 // GET: Tampilkan form tambah user hotspot dan daftar user hotspot
 router.get('/', async (req, res) => {
     try {
-        const activeUsersResult = await getActiveHotspotUsers();
-        let users = [];
-        if (activeUsersResult.success && Array.isArray(activeUsersResult.data)) {
-            users = activeUsersResult.data;
-        }
-        
-        let profiles = [];
-        let allUsers = [];
-        try {
-            const profilesResult = await getHotspotProfiles();
-            if (profilesResult.success && Array.isArray(profilesResult.data)) {
-                profiles = profilesResult.data;
-            } else {
-                profiles = [];
+        // Fetch routers from database
+        const db = new sqlite3.Database('./data/billing.db');
+        const routers = await new Promise((resolve, reject) => {
+            db.all('SELECT * FROM routers ORDER BY id', (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            });
+        });
+
+        // Aggregate active users from all NAS
+        const activeUsersList = [];
+        for (const router of routers) {
+            try {
+                const result = await getActiveHotspotUsers(router);
+                if (result.success && Array.isArray(result.data)) {
+                    result.data.forEach(user => {
+                        activeUsersList.push({
+                            ...user,
+                            nas_name: router.name,
+                            nas_ip: router.nas_ip
+                        });
+                    });
+                }
+            } catch (e) {
+                console.error(`Error getting active users from ${router.name}:`, e.message);
             }
-            console.log('Hotspot profiles dari Mikrotik:', profiles);
-        } catch (e) {
-            console.error('Gagal ambil profile hotspot:', e.message);
-            profiles = [];
         }
-        try {
-            // Ambil semua user hotspot (bukan hanya yang aktif)
-            const conn = await getMikrotikConnection();
-            allUsers = await conn.write('/ip/hotspot/user/print');
-            // Mapping agar property selalu ada
-            allUsers = allUsers.map(u => ({
-                name: u.name || '',
-                password: u.password || '',
-                profile: u.profile || '',
-            }));
-        } catch (e) {
-            console.error('Gagal ambil semua user hotspot:', e.message);
-            allUsers = [];
+
+        // Aggregate profiles from all NAS
+        let profiles = [];
+        for (const router of routers) {
+            try {
+                const profilesResult = await getHotspotProfiles(router);
+                if (profilesResult.success && Array.isArray(profilesResult.data)) {
+                    profilesResult.data.forEach(prof => {
+                        const existing = profiles.find(p => p.name === prof.name && p.nas_id === router.id);
+                        if (!existing) {
+                            profiles.push({
+                                ...prof,
+                                nas_id: router.id,
+                                nas_name: router.name,
+                                nas_ip: router.nas_ip
+                            });
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error(`Error getting profiles from ${router.name}:`, e.message);
+            }
         }
+
+        // Aggregate all hotspot users from all NAS
+        let allUsers = [];
+        for (const router of routers) {
+            try {
+                const conn = await getMikrotikConnectionForRouter(router);
+                const users = await conn.write('/ip/hotspot/user/print');
+                allUsers = allUsers.concat(users.map(u => ({
+                    name: u.name || '',
+                    password: u.password || '',
+                    profile: u.profile || '',
+                    nas_id: router.id,
+                    nas_name: router.name,
+                    nas_ip: router.nas_ip
+                })));
+            } catch (e) {
+                console.error(`Error getting users from ${router.name}:`, e.message);
+            }
+        }
+
         const settings = getSettingsWithCache();
         const company_header = settings.company_header || 'Voucher Hotspot';
         const adminKontak = settings['admins.0'] || '-';
@@ -209,10 +246,13 @@ router.get('/', async (req, res) => {
         // Ambil setting voucher online
         const voucherOnlineSettings = await getVoucherOnlineSettings();
 
+        db.close();
+
         res.render('adminHotspot', {
-            users,
+            users: activeUsersList,
             profiles,
             allUsers,
+            routers,
             voucherOnlineSettings,
             success: req.query.success,
             error: req.query.error,
@@ -223,15 +263,34 @@ router.get('/', async (req, res) => {
             versionBadge: getVersionBadge()
         });
     } catch (error) {
-        res.render('adminHotspot', { users: [], profiles: [], allUsers: [], success: null, error: 'Gagal mengambil data user hotspot: ' + error.message });
+        console.error('Error in hotspot GET route:', error);
+        res.render('adminHotspot', { 
+            users: [], 
+            profiles: [], 
+            allUsers: [], 
+            routers: [],
+            success: null, 
+            error: 'Gagal mengambil data user hotspot: ' + error.message 
+        });
     }
 });
 
 // POST: Hapus user hotspot
 router.post('/delete', async (req, res) => {
-    const { username } = req.body;
+    const { username, router_id } = req.body;
     try {
-        await deleteHotspotUser(username);
+        let routerObj = null;
+        if (router_id) {
+            const db = new sqlite3.Database('./data/billing.db');
+            routerObj = await new Promise((resolve, reject) => {
+                db.get('SELECT * FROM routers WHERE id=?', [parseInt(router_id)], (err, row) => {
+                    db.close();
+                    if (err) reject(err);
+                    else resolve(row || null);
+                });
+            });
+        }
+        await deleteHotspotUser(username, routerObj);
         res.redirect('/admin/hotspot?success=User+Hotspot+berhasil+dihapus');
     } catch (error) {
         res.redirect('/admin/hotspot?error=Gagal+hapus+user:+' + encodeURIComponent(error.message));
@@ -240,9 +299,23 @@ router.post('/delete', async (req, res) => {
 
 // POST: Proses penambahan user hotspot
 router.post('/', async (req, res) => {
-    const { username, password, profile } = req.body;
+    const { username, password, profile, router_id } = req.body;
     try {
-        await addHotspotUser(username, password, profile);
+        if (!router_id) {
+            return res.redirect('/admin/hotspot?error=Pilih+NAS+(router)+terlebih+dahulu');
+        }
+        const db = new sqlite3.Database('./data/billing.db');
+        const routerObj = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM routers WHERE id=?', [parseInt(router_id)], (err, row) => {
+                db.close();
+                if (err) reject(err);
+                else resolve(row || null);
+            });
+        });
+        if (!routerObj) {
+            return res.redirect('/admin/hotspot?error=Router+tidak+ditemukan');
+        }
+        await addHotspotUser(username, password, profile, null, null, routerObj);
         // Redirect agar tidak double submit, tampilkan pesan sukses
         res.redirect('/admin/hotspot?success=User+Hotspot+berhasil+ditambahkan');
     } catch (error) {
@@ -252,9 +325,26 @@ router.post('/', async (req, res) => {
 
 // POST: Edit user hotspot
 router.post('/edit', async (req, res) => {
-    const { username, password, profile } = req.body;
+    const { username, password, profile, router_id, originalUsername } = req.body;
     try {
-        await require('../config/mikrotik').updateHotspotUser(username, password, profile);
+        if (!router_id) {
+            return res.redirect('/admin/hotspot?error=Pilih+NAS+(router)+terlebih+dahulu');
+        }
+        const db = new sqlite3.Database('./data/billing.db');
+        const routerObj = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM routers WHERE id=?', [parseInt(router_id)], (err, row) => {
+                db.close();
+                if (err) reject(err);
+                else resolve(row || null);
+            });
+        });
+        if (!routerObj) {
+            return res.redirect('/admin/hotspot?error=Router+tidak+ditemukan');
+        }
+        // Delete old user and add new one (Mikrotik doesn't have direct edit for hotspot user)
+        const { deleteHotspotUser, addHotspotUser } = require('../config/mikrotik');
+        await deleteHotspotUser(originalUsername || username, routerObj);
+        await addHotspotUser(username, password, profile, null, null, routerObj);
         res.redirect('/admin/hotspot?success=User+Hotspot+berhasil+diupdate');
     } catch (error) {
         res.redirect('/admin/hotspot?error=Gagal+update+user:+' + encodeURIComponent(error.message));
@@ -307,22 +397,49 @@ router.post('/generate', async (req, res) => {
 
 // POST: Generate user hotspot vouchers (JSON response)
 router.post('/generate-vouchers', async (req, res) => {
-    const { quantity, length, profile, type, charType } = req.body;
+    const { quantity, length, profile, type, charType, router_id, price, voucherModel } = req.body;
 
     try {
-        // Gunakan fungsi generateHotspotVouchers dengan parameter yang benar
-        const count = parseInt(quantity) || 5;
-        const prefix = 'wifi-'; // Default prefix
-        const server = 'all'; // Default server
+        // Fetch router object if router_id is provided
+        let routerObj = null;
+        if (router_id) {
+            const db = new sqlite3.Database('./data/billing.db');
+            routerObj = await new Promise((resolve, reject) => {
+                db.get('SELECT * FROM routers WHERE id=?', [parseInt(router_id)], (err, row) => {
+                    db.close();
+                    if (err) reject(err);
+                    else resolve(row || null);
+                });
+            });
+            if (!routerObj) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Router/NAS tidak ditemukan'
+                });
+            }
+        }
         
-        const result = await generateHotspotVouchers(count, prefix, profile, server, '', '');
+        // Gunakan fungsi generateHotspotVouchers dengan parameter yang benar
+        const count = parseInt(quantity) || parseInt(req.body.count) || 5;
+        const prefix = req.body.prefix || 'wifi-'; // Default prefix
+        const server = 'all'; // Default server
+        const validUntil = req.body.validUntil || '';
+        const voucherPrice = price || req.body.price || '';
+        const charTypeValue = charType || req.body.charType || 'alphanumeric';
+        
+        const result = await generateHotspotVouchers(count, prefix, profile, server, validUntil, voucherPrice, charTypeValue, routerObj);
         
         if (result.success) {
-            res.json({ success: true, vouchers: result.vouchers });
+            res.json({ 
+                success: true, 
+                vouchers: result.vouchers,
+                router: routerObj ? { name: routerObj.name, ip: routerObj.nas_ip } : null
+            });
         } else {
             res.status(500).json({ success: false, message: result.message });
         }
     } catch (error) {
+        console.error('Error in generate-vouchers:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 });
@@ -401,29 +518,81 @@ router.get('/active-users', async (req, res) => {
 // GET: Tampilkan halaman voucher hotspot
 router.get('/voucher', async (req, res) => {
     try {
-        // Ambil profile hotspot
-        const profilesResult = await getHotspotProfiles();
+        // Fetch routers from database
+        const db = new sqlite3.Database('./data/billing.db');
+        const routers = await new Promise((resolve, reject) => {
+            db.all('SELECT * FROM routers ORDER BY id', (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows || []);
+            });
+        });
+
+        // Aggregate profiles from all NAS
         let profiles = [];
-        if (profilesResult.success && Array.isArray(profilesResult.data)) {
-            profiles = profilesResult.data;
+        for (const router of routers) {
+            try {
+                const profilesResult = await getHotspotProfiles(router);
+                if (profilesResult.success && Array.isArray(profilesResult.data)) {
+                    profilesResult.data.forEach(prof => {
+                        const existing = profiles.find(p => p.name === prof.name && p.nas_id === router.id);
+                        if (!existing) {
+                            profiles.push({
+                                ...prof,
+                                nas_id: router.id,
+                                nas_name: router.name,
+                                nas_ip: router.nas_ip
+                            });
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error(`Error getting profiles from ${router.name}:`, e.message);
+            }
         }
         
-        // Ambil server hotspot
-        const serversResult = await getHotspotServers();
+        // Aggregate servers from all NAS
         let servers = [];
-        if (serversResult.success && Array.isArray(serversResult.data)) {
-            servers = serversResult.data;
+        for (const router of routers) {
+            try {
+                const serversResult = await getHotspotServers(router);
+                if (serversResult.success && Array.isArray(serversResult.data)) {
+                    servers = servers.concat(serversResult.data);
+                }
+            } catch (e) {
+                console.error(`Error getting servers from ${router.name}:`, e.message);
+            }
         }
         
-        // Ambil history voucher (dari user hotspot)
-        const conn = await getMikrotikConnection();
-        const allUsers = await conn.write('/ip/hotspot/user/print');
+        // Aggregate all hotspot users from all NAS for voucher history
+        let allUsers = [];
+        const activeUsernames = [];
         
-        // Ambil active users untuk menentukan status aktif
-        const activeUsersResult = await getActiveHotspotUsers();
-        const activeUsernames = activeUsersResult.success && Array.isArray(activeUsersResult.data) 
-            ? activeUsersResult.data.map(user => user.user) 
-            : [];
+        for (const router of routers) {
+            try {
+                const conn = await getMikrotikConnectionForRouter(router);
+                const users = await conn.write('/ip/hotspot/user/print');
+                allUsers = allUsers.concat(users.map(u => ({
+                    name: u.name || '',
+                    password: u.password || '',
+                    profile: u.profile || 'default',
+                    server: u.server || 'all',
+                    comment: u.comment || '',
+                    nas_id: router.id,
+                    nas_name: router.name,
+                    nas_ip: router.nas_ip
+                })));
+                
+                // Get active users from this router
+                const activeResult = await getActiveHotspotUsers(router);
+                if (activeResult.success && Array.isArray(activeResult.data)) {
+                    activeResult.data.forEach(user => {
+                        activeUsernames.push(user.user || user.name || '');
+                    });
+                }
+            } catch (e) {
+                console.error(`Error getting users from ${router.name}:`, e.message);
+            }
+        }
         
         // Filter hanya voucher (berdasarkan prefix atau kriteria lain)
         const voucherHistory = allUsers.filter(user => 
@@ -433,9 +602,12 @@ router.get('/voucher', async (req, res) => {
             password: user.password || '',
             profile: user.profile || 'default',
             server: user.server || 'all',
-            createdAt: new Date(), // Ini seharusnya diambil dari data jika tersedia
-            active: activeUsernames.includes(user.name), // Cek apakah user sedang aktif
-            comment: user.comment || ''
+            createdAt: new Date(),
+            active: activeUsernames.includes(user.name),
+            comment: user.comment || '',
+            nas_id: user.nas_id,
+            nas_name: user.nas_name,
+            nas_ip: user.nas_ip
         }));
         
         console.log(`Loaded ${voucherHistory.length} vouchers for history table`);
@@ -445,15 +617,20 @@ router.get('/voucher', async (req, res) => {
         const company_header = settings.company_header || 'Voucher Hotspot';
         const adminKontak = settings['footer_info'] || '-';
         
+        db.close();
+
         res.render('adminVoucher', {
             profiles,
             servers,
             voucherHistory,
+            routers,
             success: req.query.success,
             error: req.query.error,
             company_header,
             adminKontak,
-            settings
+            settings,
+            versionInfo: getVersionInfo(),
+            versionBadge: getVersionBadge()
         });
     } catch (error) {
         console.error('Error rendering voucher page:', error);
@@ -461,8 +638,12 @@ router.get('/voucher', async (req, res) => {
             profiles: [],
             servers: [],
             voucherHistory: [],
+            routers: [],
             success: null,
-            error: 'Gagal memuat halaman voucher: ' + error.message
+            error: 'Gagal memuat halaman voucher: ' + error.message,
+            settings: getSettingsWithCache(),
+            versionInfo: getVersionInfo(),
+            versionBadge: getVersionBadge()
         });
     }
 });
@@ -474,26 +655,49 @@ router.post('/generate-voucher', async (req, res) => {
         console.log('Generate voucher request:', req.body);
         console.log('Count from request:', req.body.count);
         console.log('Profile from request:', req.body.profile);
+        console.log('Router ID from request:', req.body.router_id);
         console.log('Price from request:', req.body.price);
         console.log('CharType from request:', req.body.charType);
         
         const count = parseInt(req.body.count) || 5;
         const prefix = req.body.prefix || 'wifi-';
         const profile = req.body.profile || 'default';
+        const router_id = req.body.router_id || req.body.routerId;
         const server = req.body.server || 'all';
         const validUntil = req.body.validUntil || '';
         const price = req.body.price || '';
         const voucherModel = req.body.voucherModel || 'standard';
         const charType = req.body.charType || 'alphanumeric';
         
+        // Fetch router object if router_id is provided
+        let routerObj = null;
+        if (router_id) {
+            const db = new sqlite3.Database('./data/billing.db');
+            routerObj = await new Promise((resolve, reject) => {
+                db.get('SELECT * FROM routers WHERE id=?', [parseInt(router_id)], (err, row) => {
+                    db.close();
+                    if (err) reject(err);
+                    else resolve(row || null);
+                });
+            });
+            if (!routerObj) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Router/NAS tidak ditemukan'
+                });
+            }
+            console.log('Router selected:', routerObj.name, routerObj.nas_ip);
+        }
+        
         console.log('Parsed values:');
         console.log('- Count:', count);
         console.log('- Profile:', profile);
+        console.log('- Router:', routerObj ? routerObj.name : 'default');
         console.log('- Price:', price);
         console.log('- CharType:', charType);
         
         // Gunakan fungsi generateHotspotVouchers yang sudah diimport di atas
-        const result = await generateHotspotVouchers(count, prefix, profile, server, validUntil, price, charType);
+        const result = await generateHotspotVouchers(count, prefix, profile, server, validUntil, price, charType, routerObj);
         
         if (!result.success) {
             throw new Error(result.message || 'Gagal generate voucher');
@@ -554,13 +758,24 @@ router.get('/print-vouchers', async (req, res) => {
 
 // POST: Delete voucher
 router.post('/delete-voucher', async (req, res) => {
-    const { username } = req.body;
+    const { username, router_id } = req.body;
     if (!username) {
         return res.redirect('/admin/hotspot/voucher?error=Username+diperlukan');
     }
 
     try {
-        await deleteHotspotUser(username);
+        let routerObj = null;
+        if (router_id) {
+            const db = new sqlite3.Database('./data/billing.db');
+            routerObj = await new Promise((resolve, reject) => {
+                db.get('SELECT * FROM routers WHERE id=?', [parseInt(router_id)], (err, row) => {
+                    db.close();
+                    if (err) reject(err);
+                    else resolve(row || null);
+                });
+            });
+        }
+        await deleteHotspotUser(username, routerObj);
         res.redirect('/admin/hotspot/voucher?success=Voucher+berhasil+dihapus');
     } catch (error) {
         console.error('Error deleting voucher:', error);
@@ -571,7 +786,7 @@ router.post('/delete-voucher', async (req, res) => {
 // POST: Generate manual voucher for online settings
 router.post('/generate-manual-voucher', async (req, res) => {
     try {
-        const { username, password, profile } = req.body;
+        const { username, password, profile, router_id } = req.body;
 
         if (!username || !password || !profile) {
             return res.status(400).json({
@@ -580,8 +795,32 @@ router.post('/generate-manual-voucher', async (req, res) => {
             });
         }
 
-        // Add user to Mikrotik
-        const result = await addHotspotUser(username, password, profile);
+        if (!router_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Pilih NAS (Router) terlebih dahulu'
+            });
+        }
+
+        // Fetch router object
+        const db = new sqlite3.Database('./data/billing.db');
+        const routerObj = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM routers WHERE id=?', [parseInt(router_id)], (err, row) => {
+                db.close();
+                if (err) reject(err);
+                else resolve(row || null);
+            });
+        });
+
+        if (!routerObj) {
+            return res.status(400).json({
+                success: false,
+                message: 'Router/NAS tidak ditemukan'
+            });
+        }
+
+        // Add user to Mikrotik with routerObj
+        const result = await addHotspotUser(username, password, profile, 'voucher', null, routerObj);
 
         if (result.success) {
             res.json({
@@ -590,7 +829,9 @@ router.post('/generate-manual-voucher', async (req, res) => {
                 voucher: {
                     username,
                     password,
-                    profile
+                    profile,
+                    nas_name: routerObj.name,
+                    nas_ip: routerObj.nas_ip
                 }
             });
         } else {
@@ -612,13 +853,37 @@ router.post('/generate-manual-voucher', async (req, res) => {
 // POST: Generate auto voucher for online settings
 router.post('/generate-auto-voucher', async (req, res) => {
     try {
-        const { count, profile, numericOnly } = req.body;
+        const { count, profile, router_id, numericOnly } = req.body;
         const numVouchers = parseInt(count) || 1;
 
         if (numVouchers > 10) {
             return res.status(400).json({
                 success: false,
                 message: 'Maksimal 10 voucher per generate'
+            });
+        }
+
+        if (!router_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Pilih NAS (Router) terlebih dahulu'
+            });
+        }
+
+        // Fetch router object
+        const db = new sqlite3.Database('./data/billing.db');
+        const routerObj = await new Promise((resolve, reject) => {
+            db.get('SELECT * FROM routers WHERE id=?', [parseInt(router_id)], (err, row) => {
+                db.close();
+                if (err) reject(err);
+                else resolve(row || null);
+            });
+        });
+
+        if (!routerObj) {
+            return res.status(400).json({
+                success: false,
+                message: 'Router/NAS tidak ditemukan'
             });
         }
 
@@ -650,12 +915,14 @@ router.post('/generate-auto-voucher', async (req, res) => {
             }
 
             try {
-                const result = await addHotspotUser(username, password, profile);
+                const result = await addHotspotUser(username, password, profile, 'voucher', null, routerObj);
                 if (result.success) {
                     generatedVouchers.push({
                         username,
                         password,
-                        profile
+                        profile,
+                        nas_name: routerObj.name,
+                        nas_ip: routerObj.nas_ip
                     });
                 }
             } catch (e) {

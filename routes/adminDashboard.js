@@ -4,8 +4,8 @@ const { adminAuth } = require('./adminAuth');
 const fs = require('fs');
 const path = require('path');
 
-const { getDevices } = require('../config/genieacs');
-const { getActivePPPoEConnections, getInactivePPPoEUsers } = require('../config/mikrotik');
+const { getAllDevicesFromAllServers } = require('../config/genieacs');
+const { getMikrotikConnectionForRouter } = require('../config/mikrotik');
 const { getSettingsWithCache } = require('../config/settingsManager');
 const { getVersionInfo, getVersionBadge } = require('../config/version-utils');
 
@@ -19,12 +19,12 @@ router.get('/dashboard', adminAuth, async (req, res) => {
     // Baca settings.json
     settings = getSettingsWithCache();
     
-    // GenieACS dengan timeout dan fallback
+    // GenieACS dengan timeout dan fallback - aggregate dari semua server
     try {
       const devices = await Promise.race([
-        getDevices(),
+        getAllDevicesFromAllServers(),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('GenieACS timeout')), 5000)
+          setTimeout(() => reject(new Error('GenieACS timeout')), 10000) // Increased timeout untuk multiple servers
         )
       ]);
       genieacsTotal = devices.length;
@@ -32,7 +32,7 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       const now = Date.now();
       genieacsOnline = devices.filter(dev => dev._lastInform && (now - new Date(dev._lastInform).getTime()) < 3600*1000).length;
       genieacsOffline = genieacsTotal - genieacsOnline;
-      console.log('✅ [DASHBOARD] GenieACS data loaded successfully');
+      console.log(`✅ [DASHBOARD] GenieACS data loaded successfully: ${genieacsTotal} devices from all servers`);
     } catch (genieacsError) {
       console.warn('⚠️ [DASHBOARD] GenieACS tidak dapat diakses - menggunakan data default:', genieacsError.message);
       // Set default values jika GenieACS tidak bisa diakses
@@ -42,25 +42,37 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       // Dashboard tetap bisa dimuat meskipun GenieACS bermasalah
     }
     
-    // Mikrotik dengan timeout dan fallback
+    // Mikrotik agregasi seluruh NAS
     try {
-      const aktifResult = await Promise.race([
-        getActivePPPoEConnections(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Mikrotik timeout')), 5000)
-        )
-      ]);
-      mikrotikAktif = aktifResult.success ? aktifResult.data.length : 0;
-      
-      const offlineResult = await Promise.race([
-        getInactivePPPoEUsers(),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Mikrotik timeout')), 5000)
-        )
-      ]);
-      mikrotikOffline = offlineResult.success ? offlineResult.totalInactive : 0;
-      mikrotikTotal = (offlineResult.success ? offlineResult.totalSecrets : 0);
-      console.log('✅ [DASHBOARD] Mikrotik data loaded successfully');
+      const sqlite3 = require('sqlite3').verbose();
+      const db = new sqlite3.Database(path.join(process.cwd(), 'data/billing.db'));
+      const routers = await new Promise((resolve) => {
+        db.all('SELECT * FROM routers ORDER BY id', (err, rows) => resolve(rows || []));
+      });
+      db.close();
+
+      let totalSecrets = 0, totalActive = 0;
+      await Promise.all((routers || []).map(async (r) => {
+        try {
+          const conn = await Promise.race([
+            getMikrotikConnectionForRouter(r),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('connect timeout')), 5000))
+          ]);
+          const [active, secrets] = await Promise.all([
+            conn.write('/ppp/active/print'),
+            conn.write('/ppp/secret/print')
+          ]);
+          totalActive += Array.isArray(active) ? active.length : 0;
+          totalSecrets += Array.isArray(secrets) ? secrets.length : 0;
+        } catch (e) {
+          console.warn('⚠️ [DASHBOARD] Skip router', r && r.nas_ip, e.message);
+        }
+      }));
+
+      mikrotikAktif = totalActive;
+      mikrotikTotal = totalSecrets;
+      mikrotikOffline = Math.max(totalSecrets - totalActive, 0);
+      console.log('✅ [DASHBOARD] Mikrotik aggregated across NAS');
     } catch (mikrotikError) {
       console.warn('⚠️ [DASHBOARD] Mikrotik tidak dapat diakses - menggunakan data default:', mikrotikError.message);
       // Set default values jika Mikrotik tidak bisa diakses

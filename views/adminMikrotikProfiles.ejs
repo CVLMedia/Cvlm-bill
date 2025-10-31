@@ -231,6 +231,7 @@
                         <tr>
                             <th>No</th>
                             <th>Nama Profile</th>
+                            <th>NAS</th>
                             <th>Rate Limit</th>
                             <th>Local Address</th>
                             <th>Remote Address</th>
@@ -248,6 +249,13 @@
                                 <strong><%= profile.name %></strong>
                                 <% if(profile.default === 'true') { %>
                                     <span class="badge bg-primary ms-1">Default</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <% if (profile.nas_name) { %>
+                                    <span class="badge bg-secondary"><%= profile.nas_name %></span>
+                                <% } else { %>
+                                    <span class="text-muted">-</span>
                                 <% } %>
                             </td>
                             <td>
@@ -303,6 +311,7 @@
                                 <button class="btn btn-sm btn-warning edit-profile-btn" 
                                         data-id="<%= profile['.id'] %>" 
                                         data-name="<%= profile.name %>" 
+                                        data-router-id="<%= profile.nas_id || '' %>"
                                         data-rate-limit="<%= profile['rate-limit'] || '' %>"
                                         data-local-address="<%= profile['local-address'] || '' %>"
                                         data-remote-address="<%= profile['remote-address'] || '' %>"
@@ -322,6 +331,7 @@
                                 <button class="btn btn-sm btn-danger delete-profile-btn" 
                                         data-id="<%= profile['.id'] %>" 
                                         data-name="<%= profile.name %>"
+                                        data-router-id="<%= profile.nas_id || '' %>"
                                         title="Hapus">
                                     <i class="bi bi-trash"></i>
                                 </button>
@@ -347,6 +357,21 @@
                 </div>
                 <div class="modal-body">
                     <input type="hidden" id="profileId" name="id">
+                    
+                    <div class="mb-3">
+                        <label for="routerId" class="form-label"><i class="bi bi-router me-1"></i>NAS (Router) *</label>
+                        <select class="form-select" id="routerId" name="router_id" required>
+                            <% if (routers && routers.length > 0) { %>
+                                <option value="">Pilih NAS</option>
+                                <% routers.forEach(function(router) { %>
+                                    <option value="<%= router.id %>"><%= router.name %> (<%= router.nas_ip %>)</option>
+                                <% }); %>
+                            <% } else { %>
+                                <option value="">Tidak ada router tersedia</option>
+                            <% } %>
+                        </select>
+                        <small class="text-muted">Pilih NAS (router) tempat profile akan dibuat</small>
+                    </div>
                     
                     <div class="row">
                         <div class="col-md-6">
@@ -600,6 +625,7 @@ $(function() {
     // Tambah Profile
     $('#btnTambahProfile').on('click', function() {
         $('#profileId').val('');
+        $('#routerId').val('');
         $('#profileName').val('');
         $('#rateLimit').val('');
         $('#localAddress').val('');
@@ -704,6 +730,7 @@ $(function() {
     // Edit Profile
     $(document).on('click', '.edit-profile-btn', function() {
         $('#profileId').val($(this).data('id'));
+        $('#routerId').val($(this).data('router-id') || '');
         $('#profileName').val($(this).data('name'));
         $('#rateLimit').val($(this).data('rate-limit') || '');
         $('#localAddress').val($(this).data('local-address') || '');
@@ -725,8 +752,15 @@ $(function() {
     // Submit Tambah/Edit Profile
     $('#profileForm').submit(function(e) {
         e.preventDefault();
+        const routerId = $('#routerId').val();
+        if (!routerId) {
+            alert('Pilih NAS (router) terlebih dahulu!');
+            return;
+        }
+        
         const formData = {
             id: $('#profileId').val(),
+            router_id: routerId,
             name: $('#profileName').val(),
             'rate-limit': $('#rateLimit').val(),
             'local-address': $('#localAddress').val(),
@@ -758,9 +792,10 @@ $(function() {
      // Hapus Profile
      $(document).on('click', '.delete-profile-btn', function() {
          const name = $(this).data('name');
+         const routerId = $(this).data('router-id');
          if(confirm('Yakin ingin menghapus profile PPPoE "' + name + '"?')) {
              const id = $(this).data('id');
-             $.post('/admin/mikrotik/delete-profile', { id }, function(res) {
+             $.post('/admin/mikrotik/delete-profile', { id, router_id: routerId }, function(res) {
                  if(res.success) {
                      alert('Profile berhasil dihapus!');
                      location.reload();

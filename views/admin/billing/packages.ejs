@@ -57,6 +57,7 @@
                                         <th>PPN</th>
                                         <th>Harga (Setelah PPN)</th>
                                         <th>PPPoE Profile</th>
+                                        <th>NAS (Router)</th>
                                         <th>Deskripsi</th>
                                         <th>Status</th>
                                         <th>Aksi</th>
@@ -91,6 +92,26 @@
                                                     <% } %>
                                                 </td>
                                                 <td><span class="badge bg-info"><%= package.pppoe_profile || 'default' %></span></td>
+                                                <td>
+                                                    <% 
+                                                    if (routers && package.router_id) {
+                                                        const router = routers.find(r => r.id === package.router_id);
+                                                        if (router) {
+                                                    %>
+                                                        <span class="badge bg-secondary"><%= router.name %> (<%= router.nas_ip %>)</span>
+                                                    <% 
+                                                        } else {
+                                                    %>
+                                                        <span class="badge bg-warning">NAS tidak ditemukan</span>
+                                                    <%
+                                                        }
+                                                    } else {
+                                                    %>
+                                                        <span class="text-muted">-</span>
+                                                    <%
+                                                    }
+                                                    %>
+                                                </td>
                                                 <td><%= package.description || '-' %></td>
                                                 <td>
                                                     <span class="badge bg-success">Aktif</span>
@@ -168,14 +189,28 @@
                             <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                         </div>
                         <div class="mb-3">
+                            <label for="router_id" class="form-label">NAS (Router) *</label>
+                            <select class="form-select" id="router_id" name="router_id" required>
+                                <% if (routers && routers.length > 0) { %>
+                                    <option value="">Pilih NAS</option>
+                                    <% routers.forEach(function(router) { %>
+                                        <option value="<%= router.id %>"><%= router.name %> (<%= router.nas_ip %>)</option>
+                                    <% }); %>
+                                <% } else { %>
+                                    <option value="">Tidak ada router tersedia</option>
+                                <% } %>
+                            </select>
+                            <small class="form-text text-muted">Pilih router/NAS untuk paket ini. Profile akan difilter berdasarkan NAS yang dipilih.</small>
+                        </div>
+                        <div class="mb-3">
                             <label for="pppoe_profile" class="form-label">PPPoE Profile</label>
                             <div class="input-group">
-                                <select class="form-select" id="pppoe_profile" name="pppoe_profile">
-                                    <option value="default">default</option>
+                                <select class="form-select" id="pppoe_profile" name="pppoe_profile" required>
+                                    <option value="">Pilih NAS terlebih dahulu</option>
                                 </select>
                                 <button class="btn btn-outline-secondary" type="button" id="reloadProfilesAdd">Reload</button>
                             </div>
-                            <small class="form-text text-muted">Pilih profile PPPoE dari Mikrotik. Klik Reload bila daftar belum muncul.</small>
+                            <small class="form-text text-muted">Pilih profile PPPoE dari Mikrotik. Profile akan muncul setelah memilih NAS.</small>
                         </div>
                         <div class="mb-3">
                             <label for="image" class="form-label">Gambar Paket (JPG)</label>
@@ -244,14 +279,28 @@
                             <textarea class="form-control" id="edit_description" name="description" rows="3"></textarea>
                         </div>
                         <div class="mb-3">
+                            <label for="edit_router_id" class="form-label">NAS (Router) *</label>
+                            <select class="form-select" id="edit_router_id" name="router_id" required>
+                                <% if (routers && routers.length > 0) { %>
+                                    <option value="">Pilih NAS</option>
+                                    <% routers.forEach(function(router) { %>
+                                        <option value="<%= router.id %>"><%= router.name %> (<%= router.nas_ip %>)</option>
+                                    <% }); %>
+                                <% } else { %>
+                                    <option value="">Tidak ada router tersedia</option>
+                                <% } %>
+                            </select>
+                            <small class="form-text text-muted">Pilih router/NAS untuk paket ini. Profile akan difilter berdasarkan NAS yang dipilih.</small>
+                        </div>
+                        <div class="mb-3">
                             <label for="edit_pppoe_profile" class="form-label">PPPoE Profile</label>
                             <div class="input-group">
-                                <select class="form-select" id="edit_pppoe_profile" name="pppoe_profile">
-                                    <option value="default">default</option>
+                                <select class="form-select" id="edit_pppoe_profile" name="pppoe_profile" required>
+                                    <option value="">Pilih NAS terlebih dahulu</option>
                                 </select>
                                 <button class="btn btn-outline-secondary" type="button" id="reloadProfilesEdit">Reload</button>
                             </div>
-                            <small class="form-text text-muted">Pilih profile PPPoE dari Mikrotik. Klik Reload bila daftar belum muncul.</small>
+                            <small class="form-text text-muted">Pilih profile PPPoE dari Mikrotik. Profile akan muncul setelah memilih NAS.</small>
                         </div>
                         <div class="mb-3">
                             <label for="edit_image" class="form-label">Gambar Paket (JPG)</label>
@@ -328,13 +377,15 @@
             // Load profiles into Add form on open
             $('#addPackageModal').on('shown.bs.modal', function(){
                 console.log('🔍 Modal opened - resetting form...');
-                loadPPPoEProfiles('#pppoe_profile');
                 // Reset form and hide tax group
                 $('#addPackageForm')[0].reset();
                 $('#enable_tax').prop('checked', false);
                 $('#tax_rate_group').hide();
                 $('#tax_rate_group input').prop('disabled', true);
                 $('#tax_rate').val(0);
+                // Reset NAS and profile dropdowns
+                $('#router_id').val('');
+                $('#pppoe_profile').html('<option value="">Pilih NAS terlebih dahulu</option>').prop('disabled', true);
                 // Ensure price with tax shows base price
                 const price = parseFloat($('#price').val()) || 0;
                 $('#price_with_tax').val(price.toLocaleString('id-ID'));
@@ -344,11 +395,23 @@
                 console.log('   - Tax rate value:', $('#tax_rate').val());
                 console.log('   - Tax rate disabled:', $('#tax_rate').prop('disabled'));
             });
-            // Preload on page ready for Add form
-            loadPPPoEProfiles('#pppoe_profile');
             // Manual reload buttons
-            $('#reloadProfilesAdd').on('click', function(){ loadPPPoEProfiles('#pppoe_profile'); });
-            $('#reloadProfilesEdit').on('click', function(){ loadPPPoEProfiles('#edit_pppoe_profile'); });
+            $('#reloadProfilesAdd').on('click', function(){ 
+                const routerId = $('#router_id').val();
+                if (routerId) {
+                    loadPPPoEProfiles('#pppoe_profile', $('#pppoe_profile').val(), parseInt(routerId));
+                } else {
+                    showAlert('warning', 'Pilih NAS terlebih dahulu');
+                }
+            });
+            $('#reloadProfilesEdit').on('click', function(){ 
+                const routerId = $('#edit_router_id').val();
+                if (routerId) {
+                    loadPPPoEProfiles('#edit_pppoe_profile', $('#edit_pppoe_profile').val(), parseInt(routerId));
+                } else {
+                    showAlert('warning', 'Pilih NAS terlebih dahulu');
+                }
+            });
 
                     // Initialize PPN calculation
         initializePPNCalculation();
@@ -505,47 +568,170 @@
             });
         }
 
-        // Fetch and populate PPPoE Profiles from Mikrotik
-        function loadPPPoEProfiles(selectSelector, selectedValue = 'default') {
+        // Store all profiles with NAS info (will be populated from API)
+        let allProfiles = [];
+        
+        // Fetch and populate PPPoE Profiles from Mikrotik with NAS filtering
+        function loadPPPoEProfiles(selectSelector, selectedValue = 'default', routerId = null) {
             const sel = document.querySelector(selectSelector);
             if (!sel) return;
+            
+            console.log('🔍 Loading PPPoE profiles:', { selectSelector, selectedValue, routerId });
+            
+            // If router_id is provided, filter profiles by NAS
+            let url = '/admin/mikrotik/profiles/api';
+            if (routerId) {
+                url += '?router_id=' + routerId;
+            }
+            
             // show loading option
             sel.innerHTML = '<option>Loading...</option>';
-            fetch('/admin/mikrotik/profiles/api')
-                .then(r => r.json())
+            sel.disabled = false;
+            
+            fetch(url)
+                .then(r => {
+                    console.log('📡 API Response status:', r.status);
+                    return r.json();
+                })
                 .then(data => {
-                    const profiles = (data && data.success && Array.isArray(data.profiles)) ? data.profiles : [];
+                    console.log('📦 API Response data:', data);
+                    let profiles = [];
+                    if (data && data.success && Array.isArray(data.profiles)) {
+                        profiles = data.profiles;
+                        console.log('✅ Profiles received:', profiles.length);
+                        
+                        // Store all profiles if not router-specific
+                        if (!routerId) {
+                            allProfiles = profiles;
+                        }
+                    } else {
+                        console.warn('⚠️ Invalid response format:', data);
+                    }
+                    
+                    // Build unique name list from profiles
+                    // If routerId is provided, profiles should already be filtered by backend
+                    // But we also filter client-side as backup
+                    let filteredProfiles = profiles;
+                    if (routerId && profiles.length > 0) {
+                        filteredProfiles = profiles.filter(p => {
+                            // Check if profile has nas_id matching routerId
+                            const matches = !p.nas_id || p.nas_id === parseInt(routerId);
+                            console.log(`Profile ${p.name}: nas_id=${p.nas_id}, routerId=${routerId}, matches=${matches}`);
+                            return matches;
+                        });
+                        console.log(`🔍 Filtered profiles for router ${routerId}:`, filteredProfiles.length);
+                    }
+                    
                     // Build unique name list
-                    const names = Array.from(new Set(profiles.map(p => p.name).filter(Boolean)));
-                    // Fallback ensure 'default' exists
-                    if (!names.includes('default')) names.unshift('default');
+                    const names = Array.from(new Set(filteredProfiles.map(p => {
+                        // Handle both 'name' and 'name' property
+                        return (p.name || p['name'] || '').trim();
+                    }).filter(Boolean)));
+                    
+                    console.log('📝 Profile names found:', names);
+                    
+                    // Fallback ensure 'default' exists if we have profiles
+                    if (names.length > 0 && !names.includes('default')) {
+                        names.unshift('default');
+                    }
+                    
                     sel.innerHTML = '';
+                    
+                    // If no profiles found and routerId is provided
+                    if (filteredProfiles.length === 0 && routerId) {
+                        const opt = document.createElement('option');
+                        opt.value = '';
+                        opt.textContent = 'Tidak ada profile untuk NAS ini';
+                        sel.appendChild(opt);
+                        sel.disabled = false;
+                        console.warn('⚠️ No profiles found for router:', routerId);
+                        return;
+                    }
+                    
+                    // If no profiles at all
+                    if (names.length === 0) {
+                        const opt = document.createElement('option');
+                        opt.value = 'default';
+                        opt.textContent = 'default';
+                        sel.appendChild(opt);
+                        sel.value = 'default';
+                        console.warn('⚠️ No profiles available, using default');
+                        return;
+                    }
+                    
+                    // Populate dropdown with profile names
                     names.forEach(name => {
                         const opt = document.createElement('option');
                         opt.value = name;
                         opt.textContent = name;
                         sel.appendChild(opt);
                     });
-                    sel.value = selectedValue || 'default';
-                    // if selected not in list, append and select it
-                    if (sel.value !== (selectedValue || 'default')) {
+                    
+                    // Set selected value
+                    if (selectedValue && names.includes(selectedValue)) {
+                        sel.value = selectedValue;
+                    } else if (names.length > 0) {
+                        sel.value = names[0];
+                    }
+                    
+                    console.log('✅ Profile dropdown populated. Selected:', sel.value);
+                    
+                    // If selectedValue is not in list but exists, append it
+                    if (selectedValue && !names.includes(selectedValue) && selectedValue !== 'default') {
                         const opt = document.createElement('option');
                         opt.value = selectedValue;
                         opt.textContent = selectedValue;
                         sel.appendChild(opt);
                         sel.value = selectedValue;
+                        console.log('➕ Added missing profile to dropdown:', selectedValue);
                     }
                 })
                 .catch(err => {
-                    console.error('Gagal load PPPoE profiles:', err);
+                    console.error('❌ Error loading PPPoE profiles:', err);
                     if (typeof showAlert === 'function') {
-                        showAlert('danger', 'Gagal memuat PPPoE profiles dari Mikrotik');
+                        showAlert('danger', 'Gagal memuat PPPoE profiles dari Mikrotik: ' + err.message);
                     }
                     // minimal fallback
                     sel.innerHTML = '<option value="default">default</option>';
+                    if (selectedValue && selectedValue !== 'default') {
+                        const opt = document.createElement('option');
+                        opt.value = selectedValue;
+                        opt.textContent = selectedValue;
+                        sel.appendChild(opt);
+                    }
                     sel.value = selectedValue || 'default';
+                    sel.disabled = false;
                 });
         }
+        
+        // Function to update profile dropdown based on selected NAS
+        function updateProfileDropdownByNAS(routerSelectId, profileSelectId) {
+            const routerSelect = document.getElementById(routerSelectId);
+            const profileSelect = document.getElementById(profileSelectId);
+            
+            if (!routerSelect || !profileSelect) return;
+            
+            const routerId = routerSelect.value;
+            if (!routerId) {
+                profileSelect.innerHTML = '<option value="">Pilih NAS terlebih dahulu</option>';
+                profileSelect.disabled = true;
+                return;
+            }
+            
+            profileSelect.disabled = false;
+            // Get current selected profile value
+            const currentValue = profileSelect.value || 'default';
+            loadPPPoEProfiles('#' + profileSelectId, currentValue, parseInt(routerId));
+        }
+        
+        // Event listeners for NAS selection changes
+        $('#router_id').on('change', function() {
+            updateProfileDropdownByNAS('router_id', 'pppoe_profile');
+        });
+        
+        $('#edit_router_id').on('change', function() {
+            updateProfileDropdownByNAS('edit_router_id', 'edit_pppoe_profile');
+        });
 
         // Add Package Form
         $('#addPackageForm').on('submit', function(e) {
@@ -569,6 +755,7 @@
             formData.append('price', parseFloat($('#price').val()));
             formData.append('tax_rate', $('#enable_tax').is(':checked') ? parseFloat($('#tax_rate').val()) : 0);
             formData.append('description', $('#description').val().trim());
+            formData.append('router_id', $('#router_id').val() || '');
             formData.append('pppoe_profile', $('#pppoe_profile').val().trim() || 'default');
             
             // Add image file if selected
@@ -632,6 +819,13 @@
                         
                         $('#edit_description').val(package.description || '');
                         
+                        // Set router_id
+                        if (package.router_id) {
+                            $('#edit_router_id').val(package.router_id);
+                        } else {
+                            $('#edit_router_id').val('');
+                        }
+                        
                         // Handle image preview
                         if (package.image) {
                             $('#currentImage').attr('src', '/img/' + package.image);
@@ -643,10 +837,26 @@
                         // Calculate and display price with tax
                         calculatePriceWithTax('edit_price', 'edit_tax_rate', 'edit_price_with_tax');
                         
-                        // Load profiles then set selection and show modal
+                        // Load profiles based on selected router_id, then set selection and show modal
+                        const routerId = package.router_id || null;
                         const selected = package.pppoe_profile || 'default';
-                        loadPPPoEProfiles('#edit_pppoe_profile', selected);
-                        $('#editPackageModal').modal('show');
+                        console.log('🔍 Edit package - Loading profiles:', { routerId, selected, package });
+                        
+                        // Always load profiles, even if router_id is not set
+                        if (routerId) {
+                            // Load profiles from specific router
+                            console.log('📡 Loading profiles from router:', routerId);
+                            loadPPPoEProfiles('#edit_pppoe_profile', selected, parseInt(routerId));
+                        } else {
+                            // Load all profiles if no router_id
+                            console.log('📡 Loading all profiles (no router_id)');
+                            loadPPPoEProfiles('#edit_pppoe_profile', selected, null);
+                        }
+                        
+                        // Wait a bit for profiles to load before showing modal
+                        setTimeout(() => {
+                            $('#editPackageModal').modal('show');
+                        }, 300);
                     } else {
                         showAlert('danger', data.message || 'Gagal mengambil data paket');
                     }
@@ -669,6 +879,7 @@
             formData.append('price', parseFloat($('#edit_price').val()));
             formData.append('tax_rate', $('#edit_enable_tax').is(':checked') ? parseFloat($('#edit_tax_rate').val()) : 0);
             formData.append('description', $('#edit_description').val().trim());
+            formData.append('router_id', $('#edit_router_id').val() || '');
             formData.append('pppoe_profile', $('#edit_pppoe_profile').val().trim() || 'default');
             
             // Add image file if selected

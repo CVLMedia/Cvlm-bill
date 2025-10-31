@@ -6,12 +6,41 @@
     <title><%= title %></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons for hamburger menu -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <!-- Admin Mobile Optimizations -->
     <link href="/css/admin-mobile.css" rel="stylesheet">
     <style>
         .main-content {
             background-color: #f8f9fa;
             min-height: 100vh;
+            margin-left: 0;
+            transition: margin-left 0.3s ease;
+        }
+        
+        /* Adjust main content when sidebar is collapsed */
+        @media (min-width: 768px) {
+            #mainContent {
+                transition: margin-left 0.3s ease, width 0.3s ease;
+            }
+            
+            .sidebar.collapsed ~ main#mainContent,
+            #sidebar.collapsed ~ main#mainContent {
+                margin-left: 0 !important;
+                width: 100% !important;
+            }
+            
+            .sidebar:not(.collapsed) ~ main#mainContent,
+            #sidebar:not(.collapsed) ~ main#mainContent {
+                margin-left: 16.666667% !important;
+            }
+        }
+        
+        /* Ensure hamburger button is visible */
+        .hamburger {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
         }
         .stat-card {
             background: white;
@@ -57,10 +86,10 @@
     </style>
 </head>
 <body>
-<div class="container-fluid">
-    <div class="row">
+<div class="container-fluid p-0">
+    <div class="row g-0">
         <%- include('../../partials/billing-sidebar') %>
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content py-4">
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content py-4" id="mainContent">
                 
                 <!-- Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">

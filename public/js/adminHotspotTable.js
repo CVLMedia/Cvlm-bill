@@ -87,10 +87,12 @@ $(function() {
     const username = $(this).data('username');
     const password = $(this).data('password');
     const profile = $(this).data('profile');
+    const routerId = $(this).data('router-id');
     // Tampilkan modal edit user, isi field
     $('#editUsername').val(username);
     $('#editPassword').val(password);
     $('#editProfile').val(profile);
+    $('#editRouterId').val(routerId || '');
     $('#originalUsername').val(username);
     $('#editUserModal').modal('show');
   });
@@ -98,10 +100,14 @@ $(function() {
   // Handler tombol hapus
   $('#hotspotTable').on('click', '.delete-user-btn', function() {
     const username = $(this).data('username');
+    const routerId = $(this).data('router-id');
     if (confirm('Yakin hapus user ' + username + '?')) {
       // Submit form hapus secara dinamis
       const form = $('<form>', { method: 'POST', action: '/admin/hotspot/delete' });
       form.append($('<input>', { type: 'hidden', name: 'username', value: username }));
+      if (routerId) {
+        form.append($('<input>', { type: 'hidden', name: 'router_id', value: routerId }));
+      }
       $('body').append(form);
       form.submit();
     }

@@ -171,6 +171,18 @@ app.use('/admin', blockTechnicianAccess, adminMappingNewRouter);
 const adminMikrotikRouter = require('./routes/adminMikrotik');
 app.use('/admin', blockTechnicianAccess, adminMikrotikRouter);
 
+// Import dan gunakan route adminRadius (Setting RADIUS)
+const adminRadiusRouter = require('./routes/adminRadius');
+app.use('/admin', blockTechnicianAccess, adminRadiusRouter);
+
+// Import dan gunakan route adminRouters (NAS management)
+const adminRoutersRouter = require('./routes/adminRouters');
+app.use('/admin', blockTechnicianAccess, adminRoutersRouter);
+
+// Import dan gunakan route adminGenieacsServers
+const adminGenieacsServersRouter = require('./routes/adminGenieacsServers');
+app.use('/admin', blockTechnicianAccess, adminGenieacsServersRouter);
+
 // Import dan gunakan route adminHotspot
 const adminHotspotRouter = require('./routes/adminHotspot');
 app.use('/admin/hotspot', blockTechnicianAccess, adminHotspotRouter);

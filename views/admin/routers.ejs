@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>NAS (RADIUS)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/responsive-admin.css" rel="stylesheet">
+</head>
+<body>
+<div class="container-fluid">
+  <div class="row">
+    <%- include('../partials/admin-responsive-sidebar', { page: 'routers', settings: settings || {} }) %>
+    <main class="col-md-10 ms-sm-auto main-content">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0"><i class="bi bi-hdd-network me-2"></i>NAS (RADIUS)</h4>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRouterModal"><i class="bi bi-plus"></i> Tambah NAS</button>
+      </div>
+      <div class="card p-3">
+        <div class="table-responsive">
+          <table class="table table-striped align-middle">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nama</th>
+                <th>NAS IP</th>
+                <th>NAS Identifier</th>
+                <th>Lokasi</th>
+                <th>POP</th>
+                <th>Port</th>
+                <th>User API</th>
+                <th>Password API</th>
+                <th>GenieACS Server</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% (routers||[]).forEach(function(r,i){ %>
+                <tr>
+                  <td><%= i+1 %></td>
+                  <td><%= r.name %></td>
+                  <td><%= r.nas_ip %></td>
+                  <td><%= r.nas_identifier || '' %></td>
+                  <td><%= r.location || '' %></td>
+                  <td><%= r.pop || '' %></td>
+                  <td><%= r.port || 8728 %></td>
+                  <td><%= r.user || '' %></td>
+                  <td><%= r.password ? '***' : '' %></td>
+                  <td>
+                    <% if (r.genieacs_server_name) { %>
+                      <span class="badge bg-info"><%= r.genieacs_server_name %></span><br>
+                      <small class="text-muted"><%= r.genieacs_server_url %></small>
+                    <% } else { %>
+                      <span class="text-muted">-</span>
+                    <% } %>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-secondary" onclick='openEdit(<%- JSON.stringify(r) %>)'><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-info" onclick='testRouter(<%= r.id %>)'><i class="bi bi-activity"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick='deleteRouter(<%= r.id %>)'><i class="bi bi-trash"></i></button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Add Modal -->
+      <div class="modal fade" id="addRouterModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Tambah NAS</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <div class="mb-3"><label class="form-label">Nama</label><input class="form-control" id="r_name"></div>
+              <div class="mb-3"><label class="form-label">NAS IP</label><input class="form-control" id="r_ip" placeholder="10.0.0.10"></div>
+              <div class="mb-3"><label class="form-label">NAS Identifier</label><input class="form-control" id="r_ident" placeholder="RouterA"></div>
+              <div class="mb-3"><label class="form-label">Lokasi</label><input class="form-control" id="r_location" placeholder="Gedung/Alamat"></div>
+              <div class="mb-3"><label class="form-label">POP</label><input class="form-control" id="r_pop" placeholder="POP-1"></div>
+              <div class="mb-3"><label class="form-label">Port</label><input type="number" class="form-control" id="r_port" placeholder="8728" value="8728" min="1" max="65535"></div>
+              <div class="mb-3"><label class="form-label">User API</label><input class="form-control" id="r_user" placeholder="admin"></div>
+              <div class="mb-3"><label class="form-label">Password API</label><input class="form-control" id="r_password" type="password"></div>
+              <div class="mb-3">
+                <label class="form-label">GenieACS Server</label>
+                <select class="form-control" id="r_genieacs_server_id">
+                  <option value="">-- Pilih GenieACS Server (Opsional) --</option>
+                  <% (genieacsServers||[]).forEach(function(s){ %>
+                    <option value="<%= s.id %>"><%= s.name %> (<%= s.url %>)</option>
+                  <% }) %>
+                </select>
+                <small class="form-text text-muted">Pilih server GenieACS yang digunakan untuk router ini</small>
+              </div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" onclick="saveRouter()">Simpan</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Modal -->
+      <div class="modal fade" id="editRouterModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">Edit NAS</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+              <input type="hidden" id="e_id">
+              <div class="mb-3"><label class="form-label">Nama</label><input class="form-control" id="e_name"></div>
+              <div class="mb-3"><label class="form-label">NAS IP</label><input class="form-control" id="e_ip"></div>
+              <div class="mb-3"><label class="form-label">NAS Identifier</label><input class="form-control" id="e_ident"></div>
+              <div class="mb-3"><label class="form-label">Lokasi</label><input class="form-control" id="e_location"></div>
+              <div class="mb-3"><label class="form-label">POP</label><input class="form-control" id="e_pop"></div>
+              <div class="mb-3"><label class="form-label">Port</label><input type="number" class="form-control" id="e_port" min="1" max="65535"></div>
+              <div class="mb-3"><label class="form-label">User API</label><input class="form-control" id="e_user"></div>
+              <div class="mb-3"><label class="form-label">Password API</label><input class="form-control" id="e_password" type="password"></div>
+              <div class="mb-3">
+                <label class="form-label">GenieACS Server</label>
+                <select class="form-control" id="e_genieacs_server_id">
+                  <option value="">-- Pilih GenieACS Server (Opsional) --</option>
+                  <% (genieacsServers||[]).forEach(function(s){ %>
+                    <option value="<%= s.id %>"><%= s.name %> (<%= s.url %>)</option>
+                  <% }) %>
+                </select>
+                <small class="form-text text-muted">Pilih server GenieACS yang digunakan untuk router ini</small>
+              </div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary" onclick="updateRouter()">Update</button></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+async function saveRouter(){
+  const body = { name: $('#r_name').val().trim(), nas_ip: $('#r_ip').val().trim(), nas_identifier: $('#r_ident').val().trim(), location: $('#r_location').val().trim(), pop: $('#r_pop').val().trim(), port: $('#r_port').val(), user: $('#r_user').val(), password: $('#r_password').val(), genieacs_server_id: $('#r_genieacs_server_id').val() || null };
+  const res = await fetch('/admin/routers', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r=>r.json());
+  if(res.success){ location.reload(); } else { alert(res.message||'Gagal simpan'); }
+}
+function openEdit(r){ 
+  $('#e_id').val(r.id); 
+  $('#e_name').val(r.name); 
+  $('#e_ip').val(r.nas_ip); 
+  $('#e_ident').val(r.nas_identifier||''); 
+  $('#e_location').val(r.location||''); 
+  $('#e_pop').val(r.pop||''); 
+  $('#e_port').val(r.port||8728); 
+  $('#e_user').val(r.user||''); 
+  $('#e_password').val(r.password||''); 
+  $('#e_genieacs_server_id').val(r.genieacs_server_id || ''); 
+  new bootstrap.Modal(document.getElementById('editRouterModal')).show(); 
+}
+async function updateRouter(){
+  const id=$('#e_id').val(); 
+  const body={ name:$('#e_name').val(), nas_ip:$('#e_ip').val(), nas_identifier:$('#e_ident').val(), location: $('#e_location').val(), pop: $('#e_pop').val(), port: $('#e_port').val(), user: $('#e_user').val(), password: $('#e_password').val(), genieacs_server_id: $('#e_genieacs_server_id').val() || null };
+  const res = await fetch('/admin/routers/'+id, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r=>r.json());
+  if(res.success){ location.reload(); } else { alert(res.message||'Gagal update'); }
+}
+async function deleteRouter(id){ if(!confirm('Hapus NAS ini?')) return; const res=await fetch('/admin/routers/'+id+'/delete',{method:'POST'}).then(r=>r.json()); if(res.success){ location.reload(); } else { alert(res.message||'Gagal hapus'); } }
+async function testRouter(id){
+  const btn = event.currentTarget; const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try { const res = await fetch('/admin/routers/'+id+'/test',{method:'POST'}).then(r=>r.json()); if(res.success){ alert('Connected: '+(res.identity||'OK')+' @ '+(res.host||'')+ (res.port? (':'+res.port):'')); } else { alert('Gagal konek: '+(res.message||'Unknown')); } }
+  catch(e){ alert('Error: '+e.message); }
+  finally { btn.disabled=false; btn.innerHTML = old; }
+}
+</script>
+</body>
+</html>
+

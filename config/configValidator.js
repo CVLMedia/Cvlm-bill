@@ -10,7 +10,7 @@ class ConfigValidator {
     constructor() {
         this.validationResults = {
             genieacs: { isValid: false, errors: [], warnings: [] },
-            mikrotik: { isValid: false, errors: [], warnings: [] },
+            mikrotik: { isValid: false, errors: [], warnings: [], routerResults: [] },
             overall: { isValid: false, needsAttention: false }
         };
     }
@@ -143,21 +143,22 @@ class ConfigValidator {
     }
 
     /**
-     * Test koneksi ke Mikrotik
+     * Test koneksi ke Mikrotik untuk router tertentu
      */
-    async testMikrotikConnection() {
+    async testMikrotikConnectionForRouter(router) {
         try {
-            const mikrotikHost = getSetting('mikrotik_host', '192.168.1.1');
-            const mikrotikPort = getSetting('mikrotik_port', '8728');
-            const mikrotikUser = getSetting('mikrotik_user', 'admin');
-            const mikrotikPassword = getSetting('mikrotik_password', '');
+            const mikrotikHost = router.nas_ip || router.ip;
+            const mikrotikPort = router.port || '8728';
+            const mikrotikUser = router.api_user || router.user || 'admin';
+            const mikrotikPassword = router.api_password || router.password || '';
 
             // Validasi IP address
-            if (!this.isValidIPAddress(mikrotikHost)) {
+            if (!mikrotikHost || !this.isValidIPAddress(mikrotikHost)) {
                 return {
                     success: false,
-                    error: 'IP address Mikrotik tidak valid',
-                    details: `IP: ${mikrotikHost}`
+                    error: `IP address Mikrotik tidak valid`,
+                    details: `IP: ${mikrotikHost || 'Kosong'}`,
+                    routerName: router.name || 'Unknown'
                 };
             }
 
@@ -165,8 +166,9 @@ class ConfigValidator {
             if (!this.isValidPort(mikrotikPort)) {
                 return {
                     success: false,
-                    error: 'Port Mikrotik tidak valid',
-                    details: `Port: ${mikrotikPort}`
+                    error: `Port Mikrotik tidak valid`,
+                    details: `Port: ${mikrotikPort}`,
+                    routerName: router.name || 'Unknown'
                 };
             }
 
@@ -174,56 +176,141 @@ class ConfigValidator {
             if (!mikrotikUser || !mikrotikPassword) {
                 return {
                     success: false,
-                    error: 'Username atau password Mikrotik tidak dikonfigurasi',
-                    details: `Username: ${mikrotikUser ? 'Ada' : 'Kosong'}, Password: ${mikrotikPassword ? 'Ada' : 'Kosong'}`
+                    error: `Username atau password Mikrotik tidak dikonfigurasi`,
+                    details: `Username: ${mikrotikUser ? 'Ada' : 'Kosong'}, Password: ${mikrotikPassword ? 'Ada' : 'Kosong'}`,
+                    routerName: router.name || 'Unknown'
                 };
             }
 
-            // Test koneksi menggunakan API Mikrotik (simulasi)
-            // Karena tidak ada library Mikrotik yang tersedia, kita test dengan ping atau TCP connection
-            const { getMikrotikConnection } = require('./mikrotik');
+            // Test koneksi menggunakan API Mikrotik
+            const { getMikrotikConnectionForRouter } = require('./mikrotik');
             
-            // Coba koneksi dengan timeout sangat pendek untuk login
+            // Coba koneksi dengan timeout
             const connection = await Promise.race([
-                getMikrotikConnection(),
+                getMikrotikConnectionForRouter(router),
                 new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Connection timeout')), 3000)
+                    setTimeout(() => reject(new Error('Connection timeout')), 5000)
                 )
             ]);
 
             if (connection) {
-                return {
-                    success: true,
-                    message: 'Koneksi ke Mikrotik berhasil',
-                    details: `Host: ${mikrotikHost}:${mikrotikPort}, User: ${mikrotikUser}`
-                };
+                // Test dengan query sederhana
+                try {
+                    await connection.write('/system/resource/print');
+                    return {
+                        success: true,
+                        message: `Koneksi ke ${router.name} berhasil`,
+                        details: `Host: ${mikrotikHost}:${mikrotikPort}, User: ${mikrotikUser}`,
+                        routerName: router.name || 'Unknown'
+                    };
+                } catch (queryError) {
+                    return {
+                        success: false,
+                        error: `Koneksi berhasil tetapi query gagal`,
+                        details: queryError.message,
+                        routerName: router.name || 'Unknown'
+                    };
+                }
             } else {
                 return {
                     success: false,
-                    error: 'Koneksi ke Mikrotik gagal',
-                    details: 'Tidak dapat membuat koneksi ke router Mikrotik'
+                    error: `Koneksi ke Mikrotik gagal`,
+                    details: 'Tidak dapat membuat koneksi ke router Mikrotik',
+                    routerName: router.name || 'Unknown'
                 };
             }
 
         } catch (error) {
-            let errorMessage = 'Gagal koneksi ke Mikrotik';
+            const mikrotikHost = router.nas_ip || router.ip || 'Unknown';
+            const mikrotikPort = router.port || '8728';
+            let errorMessage = `Gagal koneksi ke Mikrotik`;
             let errorDetails = error.message;
 
             if (error.message.includes('timeout')) {
-                errorMessage = 'Mikrotik tidak merespons';
+                errorMessage = `Mikrotik tidak merespons`;
                 errorDetails = `Timeout - server mungkin tidak aktif atau tidak dapat dijangkau pada ${mikrotikHost}:${mikrotikPort}`;
             } else if (error.message.includes('ECONNREFUSED')) {
-                errorMessage = 'Koneksi ke Mikrotik ditolak';
+                errorMessage = `Koneksi ke Mikrotik ditolak`;
                 errorDetails = `Port ${mikrotikPort} mungkin salah atau service tidak berjalan`;
             } else if (error.code === 'ENOTFOUND') {
-                errorMessage = 'Host Mikrotik tidak ditemukan';
+                errorMessage = `Host Mikrotik tidak ditemukan`;
                 errorDetails = `Alamat IP ${mikrotikHost} tidak dapat dijangkau. Periksa koneksi jaringan.`;
+            } else if (error.message.includes('invalid user name or password') || error.message.includes('username or password')) {
+                errorMessage = `Autentikasi gagal`;
+                errorDetails = `Username atau password salah untuk ${router.name || mikrotikHost}`;
             }
 
             return {
                 success: false,
                 error: errorMessage,
-                details: errorDetails
+                details: errorDetails,
+                routerName: router.name || 'Unknown'
+            };
+        }
+    }
+
+    /**
+     * Test koneksi ke semua Mikrotik router yang dikonfigurasi
+     */
+    async testMikrotikConnection() {
+        try {
+            // Ambil semua router dari database
+            const sqlite3 = require('sqlite3').verbose();
+            const db = new sqlite3.Database('./data/billing.db');
+            
+            const routers = await new Promise((resolve, reject) => {
+                db.all('SELECT * FROM routers ORDER BY id', (err, rows) => {
+                    db.close();
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(rows || []);
+                    }
+                });
+            });
+
+            if (!routers || routers.length === 0) {
+                return {
+                    success: false,
+                    error: 'Tidak ada router Mikrotik yang dikonfigurasi',
+                    details: 'Silakan tambahkan router di /admin/routers',
+                    routers: []
+                };
+            }
+
+            // Test koneksi ke setiap router
+            const routerResults = [];
+            let allSuccess = true;
+
+            for (const router of routers) {
+                const result = await this.testMikrotikConnectionForRouter(router);
+                routerResults.push({
+                    router: router.name || router.nas_ip || `Router ${router.id}`,
+                    routerId: router.id,
+                    ...result
+                });
+                
+                if (!result.success) {
+                    allSuccess = false;
+                }
+            }
+
+            return {
+                success: allSuccess,
+                error: allSuccess ? null : 'Beberapa router gagal koneksi',
+                details: allSuccess 
+                    ? `Semua ${routers.length} router terhubung dengan baik` 
+                    : `${routerResults.filter(r => !r.success).length} dari ${routers.length} router bermasalah`,
+                routers: routerResults
+            };
+
+        } catch (error) {
+            logger.error(`Error testing Mikrotik connections: ${error.message}`);
+            return {
+                success: false,
+                error: 'Gagal memvalidasi koneksi Mikrotik',
+                details: error.message,
+                routers: []
             };
         }
     }
@@ -237,7 +324,7 @@ class ConfigValidator {
         // Reset hasil validasi
         this.validationResults = {
             genieacs: { isValid: false, errors: [], warnings: [] },
-            mikrotik: { isValid: false, errors: [], warnings: [] },
+            mikrotik: { isValid: false, errors: [], warnings: [], routerResults: [] },
             overall: { isValid: false, needsAttention: false }
         };
 
@@ -260,10 +347,34 @@ class ConfigValidator {
         if (mikrotikResult.success) {
             this.validationResults.mikrotik.isValid = true;
             console.log('✅ [CONFIG_VALIDATOR] Mikrotik: Konfigurasi valid');
+            if (mikrotikResult.routers && mikrotikResult.routers.length > 0) {
+                mikrotikResult.routers.forEach(router => {
+                    console.log(`   ✓ ${router.router}: ${router.message || 'Terhubung'}`);
+                });
+            }
         } else {
-            this.validationResults.mikrotik.errors.push(mikrotikResult.error);
-            console.log(`❌ [CONFIG_VALIDATOR] Mikrotik: ${mikrotikResult.error}`);
+            if (mikrotikResult.error) {
+                this.validationResults.mikrotik.errors.push(mikrotikResult.error);
+            }
+            if (mikrotikResult.routers && mikrotikResult.routers.length > 0) {
+                mikrotikResult.routers.forEach(router => {
+                    if (!router.success) {
+                        const errorMsg = `${router.router}: ${router.error || 'Koneksi gagal'}`;
+                        if (!this.validationResults.mikrotik.errors.includes(errorMsg)) {
+                            this.validationResults.mikrotik.errors.push(errorMsg);
+                        }
+                        console.log(`   ❌ ${errorMsg}`);
+                    } else {
+                        console.log(`   ✓ ${router.router}: ${router.message || 'Terhubung'}`);
+                    }
+                });
+            } else {
+                console.log(`❌ [CONFIG_VALIDATOR] Mikrotik: ${mikrotikResult.error || 'Gagal validasi'}`);
+            }
         }
+        
+        // Simpan detail router results untuk ditampilkan di UI
+        this.validationResults.mikrotik.routerResults = mikrotikResult.routers || [];
 
         // Evaluasi hasil keseluruhan
         this.validationResults.overall.isValid = 

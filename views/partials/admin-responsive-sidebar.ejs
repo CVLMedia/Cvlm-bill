@@ -21,6 +21,11 @@
 
 <!-- Admin Sidebar -->
 <nav class="col-md-2 sidebar d-flex flex-column" id="adminSidebar">
+    <!-- Hamburger Button (Desktop) - Inside Sidebar -->
+    <button class="hamburger d-none d-md-block" id="hamburgerBtn" aria-label="Toggle Menu">
+        <i class="bi bi-list"></i>
+    </button>
+    
     <!-- Close button for mobile -->
     <div class="d-md-none text-end p-3">
         <button class="btn btn-link text-white p-0" id="sidebarClose">
@@ -77,6 +82,9 @@
     <a href="/admin/genieacs" class="<%= typeof page !== 'undefined' && page === 'genieacs' ? 'active' : '' %>">
         <i class="bi bi-hdd-network"></i> GenieACS
     </a>
+    <a href="/admin/genieacs-servers" class="<%= typeof page !== 'undefined' && page === 'genieacs-servers' ? 'active' : '' %>">
+        <i class="bi bi-server"></i> GenieACS Servers
+    </a>
     <a href="/admin/mikrotik" class="<%= typeof page !== 'undefined' && page === 'mikrotik' ? 'active' : '' %>">
         <i class="bi bi-router"></i> PPPoE
     </a>
@@ -98,6 +106,12 @@
     <a href="/admin/settings" class="<%= typeof page !== 'undefined' && page === 'setting' ? 'active' : '' %>">
         <i class="bi bi-gear"></i> Setting
     </a>
+    <a href="/admin/routers" class="<%= typeof page !== 'undefined' && page === 'routers' ? 'active' : '' %>">
+        <i class="bi bi-hdd-network"></i> Mikrotik Setup
+    </a>
+    <a href="/admin/radius"<%= typeof page !== 'undefined' && page === 'routers' ? 'active' : '' %>">
+        <i class="bi bi-hdd-network"></i> Radius/Api Setup
+    </a>
     <a href="/admin/cache" class="<%= typeof page !== 'undefined' && page === 'cache' ? 'active' : '' %>">
         <i class="bi bi-database"></i> Cache Management
     </a>
@@ -110,7 +124,7 @@
     <div class="mt-2" style="padding: 0 24px;">
         <div class="mb-2">
             <label class="form-label text-light" style="font-size: 12px;">Branch</label>
-            <input type="text" id="gitBranchInput" class="form-control form-control-sm" placeholder="mis. main" style="background:#3b4a5a;border:0;color:#fff;">
+            <input type="text" id="gitBranchInput" class="form-control form-control-sm" placeholder="mis. main" style="background:rgba(255,255,255,0.2);border:0;color:#fff;">
         </div>
         <button id="btnCheckUpdate" class="btn btn-sm btn-warning w-100 mb-2"><i class="bi bi-arrow-clockwise"></i> Check Update</button>
         <button id="btnRunUpdate" class="btn btn-sm btn-danger w-100"><i class="bi bi-cloud-download"></i> Update & Restart</button>
@@ -147,7 +161,7 @@
 <style>
 /* Mobile Top Navbar */
 .mobile-navbar {
-    background: #222e3c;
+    background: #3498DB;
     position: fixed;
     top: 0;
     left: 0;
@@ -184,7 +198,7 @@
 /* Sidebar */
 .sidebar {
     min-height: 100vh;
-    background: #222e3c;
+    background: #3498DB;
     color: #fff;
     padding-top: 32px;
 }
@@ -192,22 +206,30 @@
 .sidebar a {
     color: #fff;
     text-decoration: none;
-    display: block;
+    display: flex;
+    align-items: center;
     padding: 12px 24px;
     border-radius: 4px;
     margin-bottom: 8px;
     transition: all 0.3s ease;
+    white-space: nowrap;
 }
 
 .sidebar a.active, 
 .sidebar a:hover {
-    background: #3b4a5a;
+    background: rgba(255, 255, 255, 0.2);
     transform: translateX(3px);
+}
+
+.sidebar.collapsed a.active,
+.sidebar.collapsed a:hover {
+    transform: translateX(0); /* No translation when collapsed */
 }
 
 .sidebar a i {
     margin-right: 8px;
     width: 16px;
+    flex-shrink: 0;
 }
 
 /* Sidebar Header */
@@ -252,19 +274,204 @@
     padding: 32px 24px;
 }
 
-/* Hamburger Button (Desktop) */
-.hamburger {
-    display: none;
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    z-index: 1000;
-    background: #222e3c;
+/* Hamburger Button (Desktop) - Integrated with Sidebar */
+.sidebar .hamburger {
+    display: block !important;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 1002;
+    background: rgba(255, 255, 255, 0.2);
     color: white;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.3);
     border-radius: 4px;
-    padding: 8px 12px;
-    font-size: 1.2rem;
+    padding: 6px 10px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.sidebar .hamburger:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+/* When sidebar is collapsed, move hamburger button to fixed position */
+@media (min-width: 768px) {
+    .sidebar.collapsed .hamburger,
+    #adminSidebar.collapsed .hamburger {
+        position: fixed !important;
+        top: 20px !important;
+        left: 20px !important;
+        right: auto !important;
+        background: #3498DB !important;
+        border: none !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 1003 !important;
+    }
+    
+    .sidebar.collapsed .hamburger:hover,
+    #adminSidebar.collapsed .hamburger:hover {
+        background: #2980B9 !important;
+    }
+}
+
+/* Desktop sidebar toggle state */
+@media (min-width: 768px) {
+    .sidebar {
+        transition: width 0.3s ease, transform 0.3s ease;
+        width: 16.666667%; /* col-md-2 width */
+        position: fixed;
+        height: 100vh;
+        left: 0;
+        top: 0;
+        z-index: 1000;
+    }
+    
+    .sidebar.collapsed {
+        width: 70px !important; /* Narrow width untuk icon saja */
+        transform: translateX(0) !important; /* Tidak hilang, tetap terlihat */
+        overflow: hidden !important;
+    }
+    
+    /* Hide text labels when collapsed - menggunakan teknik yang lebih compatible */
+    .sidebar.collapsed .company-info {
+        display: none !important;
+    }
+    
+    .sidebar.collapsed .company-name {
+        display: none !important;
+    }
+    
+    .sidebar.collapsed .version-badge-small {
+        display: none !important;
+    }
+    
+    /* Hide text content in links, keep only icons */
+    .sidebar.collapsed a {
+        justify-content: center !important;
+        padding: 12px 8px !important;
+        text-align: center;
+        position: relative;
+        font-size: 0 !important; /* Hide text by making font size 0 */
+        line-height: 0 !important;
+        overflow: hidden;
+    }
+    
+    .sidebar.collapsed a i {
+        margin-right: 0 !important;
+        margin-left: 0 !important;
+        font-size: 1.3rem !important;
+        width: auto !important;
+        display: inline-block !important;
+        line-height: normal !important;
+        vertical-align: middle;
+    }
+    
+    /* Hide any text nodes inside links */
+    .sidebar.collapsed a *:not(i) {
+        display: none !important;
+    }
+    
+    /* Hide sidebar header text when collapsed */
+    .sidebar.collapsed .sidebar-header {
+        padding: 15px 8px !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    .sidebar.collapsed .sidebar-header img {
+        max-width: 50px !important;
+        max-height: 30px !important;
+    }
+    
+    /* Hide version info panel and update controls when collapsed */
+    .sidebar.collapsed .version-info-panel {
+        display: none !important;
+    }
+    
+    .sidebar.collapsed .mt-2 {
+        display: none !important;
+    }
+    
+    /* Adjust hamburger button when collapsed */
+    .sidebar.collapsed .hamburger {
+        position: absolute !important;
+        top: 10px !important;
+        right: 8px !important;
+        left: auto !important;
+        padding: 4px 6px !important;
+        font-size: 0.9rem !important;
+        width: auto !important;
+    }
+    
+    .main-content {
+        transition: margin-left 0.3s ease, width 0.3s ease;
+    }
+    
+    .main-content.sidebar-expanded {
+        margin-left: 16.666667%; /* col-md-2 width */
+        width: 83.333333%; /* 100% - sidebar width */
+    }
+    
+    .main-content.sidebar-collapsed {
+        margin-left: 70px !important; /* Width of collapsed sidebar */
+        width: calc(100% - 70px) !important;
+    }
+    
+    /* Default state: sidebar expanded */
+    .main-content:not(.sidebar-collapsed):not(.sidebar-expanded) {
+        margin-left: 16.666667%;
+        width: 83.333333%;
+    }
+    
+    /* Container fluid and body full width when sidebar collapsed */
+    body:has(.sidebar.collapsed) .container-fluid,
+    .container-fluid:has(.sidebar.collapsed) {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin-left: 0 !important;
+    }
+    
+    /* Row full width when sidebar collapsed */
+    body:has(.sidebar.collapsed) .row,
+    body:has(.sidebar.collapsed) .container-fluid > .row,
+    .sidebar.collapsed ~ * .row,
+    .sidebar.collapsed ~ .main-content .row {
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        max-width: 100% !important;
+    }
+    
+    /* Ensure main content column uses full available width */
+    body:has(.sidebar.collapsed) .row > .main-content {
+        padding-left: 15px !important;
+        padding-right: 15px !important;
+    }
+    
+    /* Ensure main content and its children are full width */
+    body:has(.sidebar.collapsed) .main-content {
+        max-width: calc(100% - 70px) !important;
+        width: calc(100% - 70px) !important;
+        margin-left: 70px !important;
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+    }
+    
+    /* Override Bootstrap column classes */
+    body:has(.sidebar.collapsed) .main-content.col-md-10,
+    body:has(.sidebar.collapsed) .col-md-10.main-content {
+        flex: 0 0 calc(100% - 70px) !important;
+        max-width: calc(100% - 70px) !important;
+        width: calc(100% - 70px) !important;
+    }
 }
 
 /* Cards */
@@ -352,11 +559,39 @@
 @media (min-width: 768px) {
     .main-content {
         margin-left: 16.666667%; /* col-md-2 width */
+        width: 83.333333%; /* 100% - sidebar width */
     }
     
     .sidebar {
         overflow-y: auto !important;
         overflow-x: hidden !important;
+        position: fixed;
+        height: 100vh;
+        left: 0;
+        top: 0;
+        z-index: 1000;
+    }
+    
+    /* Full width when sidebar collapsed */
+    .sidebar.collapsed ~ .main-content,
+    body:has(.sidebar.collapsed) .main-content {
+        margin-left: 70px !important; /* Width of collapsed sidebar */
+        width: calc(100% - 70px) !important;
+        max-width: calc(100% - 70px) !important;
+        flex: 0 0 calc(100% - 70px) !important;
+    }
+    
+    /* Override Bootstrap column classes when sidebar collapsed */
+    body:has(.sidebar.collapsed) .main-content.col-md-10 {
+        flex: 0 0 calc(100% - 70px) !important;
+        max-width: calc(100% - 70px) !important;
+        width: calc(100% - 70px) !important;
+    }
+    
+    /* Ensure container and rows are full width */
+    body:has(.sidebar.collapsed) .container-fluid {
+        width: 100% !important;
+        max-width: 100% !important;
     }
 }
 
@@ -437,12 +672,62 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Desktop hamburger support (for existing functionality)
+    // Desktop hamburger toggle functionality
     if (hamburger) {
         hamburger.addEventListener('click', function() {
-            sidebar.classList.toggle('show');
-            overlay.classList.toggle('show');
+            // For desktop: toggle collapsed state
+            if (window.innerWidth >= 768) {
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                const mainContent = document.querySelector('.main-content');
+                
+                if (isCollapsed) {
+                    sidebar.classList.remove('collapsed');
+                    if (mainContent) {
+                        mainContent.classList.remove('sidebar-collapsed');
+                        mainContent.classList.add('sidebar-expanded');
+                    }
+                    // Save state to localStorage
+                    localStorage.setItem('sidebarCollapsed', 'false');
+                } else {
+                    sidebar.classList.add('collapsed');
+                    if (mainContent) {
+                        mainContent.classList.remove('sidebar-expanded');
+                        mainContent.classList.add('sidebar-collapsed');
+                    }
+                    // Save state to localStorage
+                    localStorage.setItem('sidebarCollapsed', 'true');
+                }
+            } else {
+                // For mobile: use existing show/hide
+                sidebar.classList.toggle('show');
+                overlay.classList.toggle('show');
+            }
         });
+    }
+    
+    // Restore sidebar state from localStorage on page load (desktop only)
+    if (window.innerWidth >= 768) {
+        const sidebarState = localStorage.getItem('sidebarCollapsed');
+        const mainContent = document.querySelector('.main-content');
+        if (sidebarState === 'true') {
+            sidebar.classList.add('collapsed');
+            if (mainContent) {
+                mainContent.classList.remove('sidebar-expanded');
+                mainContent.classList.add('sidebar-collapsed');
+            }
+        } else {
+            sidebar.classList.remove('collapsed');
+            if (mainContent) {
+                mainContent.classList.add('sidebar-expanded');
+                mainContent.classList.remove('sidebar-collapsed');
+            }
+        }
+    } else {
+        // On mobile, ensure main content has no margin
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.classList.remove('sidebar-expanded', 'sidebar-collapsed');
+        }
     }
     
     // Close sidebar functions

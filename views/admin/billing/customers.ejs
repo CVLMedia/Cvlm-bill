@@ -370,6 +370,14 @@
                     
                     <!-- Desktop: Show all buttons -->
                     <div class="d-none d-lg-block">
+                        <div class="d-inline-block me-2">
+                            <select id="routerFilter" class="form-select form-select-sm">
+                                <option value="">Semua NAS</option>
+                                <% if (typeof routers !== 'undefined') { routers.forEach(function(r){ %>
+                                    <option value="<%= r.id %>" <%= (typeof routerFilter !== 'undefined' && routerFilter == r.id) ? 'selected' : '' %>><%= r.name %> (<%= r.nas_ip %>)</option>
+                                <% }); } %>
+                            </select>
+                        </div>
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
                             <i class="bx bx-plus"></i> Tambah Pelanggan
                         </button>
@@ -392,6 +400,14 @@
                             <i class="bx bx-menu"></i> Menu
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionMenuDropdown">
+                            <li class="px-3 py-2">
+                                <select id="routerFilterMobile" class="form-select form-select-sm">
+                                    <option value="">Semua NAS</option>
+                                    <% if (typeof routers !== 'undefined') { routers.forEach(function(r){ %>
+                                        <option value="<%= r.id %>" <%= (typeof routerFilter !== 'undefined' && routerFilter == r.id) ? 'selected' : '' %>><%= r.name %> (<%= r.nas_ip %>)</option>
+                                    <% }); } %>
+                                </select>
+                            </li>
                             <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
                                 <i class="bx bx-plus"></i> Tambah Pelanggan
                             </a></li>
@@ -567,9 +583,8 @@
                                         <th>Paket</th>
                                         <th>PPPoE Profile</th>
                                         <th>Tipe Tagihan</th>
-                                        <th>Auto Isolir</th>
+                                        <th>NAS</th>
                                         <th>Status Pelanggan</th>
-                                        <th>Status Pembayaran</th>
                                         <th>Aksi</th>
                                     </tr>
                                 </thead>
@@ -598,10 +613,10 @@
                                                     <% } %>
                                                 </td>
                                                 <td>
-                                                    <% if (customer.auto_suspension === 1) { %>
-                                                        <span class="badge bg-success">Ya</span>
+                                                    <% if (customer.router_name) { %>
+                                                        <span class="badge bg-secondary"><%= customer.router_name %></span>
                                                     <% } else { %>
-                                                        <span class="badge bg-secondary">Tidak</span>
+                                                        <span class="text-muted">-</span>
                                                     <% } %>
                                                 </td>
                                                 <td class="cust-status">
@@ -611,17 +626,6 @@
                                                         <span class="badge bg-danger">Isolir</span>
                                                     <% } else { %>
                                                         <span class="badge bg-secondary">Nonaktif</span>
-                                                    <% } %>
-                                                </td>
-                                                <td class="pay-status">
-                                                    <% if (customer.payment_status === 'paid') { %>
-                                                        <span class="badge bg-success">Lunas</span>
-                                                    <% } else if (customer.payment_status === 'unpaid') { %>
-                                                        <span class="badge bg-warning">Belum Lunas</span>
-                                                    <% } else if (customer.payment_status === 'overdue') { %>
-                                                        <span class="badge bg-danger">Terlambat</span>
-                                                    <% } else { %>
-                                                        <span class="badge bg-info">Belum Ada Tagihan</span>
                                                     <% } %>
                                                 </td>
                                                 <td>
@@ -709,6 +713,16 @@
         });
     });
     </script>
+    <script>
+      // Router filter change -> reload with query
+      function applyRouterFilter(val){
+        const url = new URL(window.location.href);
+        if(val) url.searchParams.set('router', val); else url.searchParams.delete('router');
+        window.location.href = url.toString();
+      }
+      document.getElementById('routerFilter')?.addEventListener('change', function(){ applyRouterFilter(this.value); });
+      document.getElementById('routerFilterMobile')?.addEventListener('change', function(){ applyRouterFilter(this.value); });
+    </script>
 
     <!-- Add Customer Modal -->
     <div class="modal fade" id="addCustomerModal" tabindex="-1">
@@ -737,6 +751,16 @@
                             <label for="email" class="form-label">Email</label>
                             <input type="email" class="form-control" id="email" name="email" placeholder="Akan otomatis terisi dari nama (contoh: test@gembok.com)">
                             <small class="form-text text-muted">Email akan digunakan untuk notifikasi. Format otomatis: nama@gembok.com</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="router_id" class="form-label">NAS (Router)</label>
+                            <select class="form-select" id="router_id" name="router_id">
+                                <option value="">- Pilih NAS -</option>
+                                <% if (typeof routers !== 'undefined') { routers.forEach(function(r){ %>
+                                    <option value="<%= r.id %>"><%= r.name %> (<%= r.nas_ip %>)</option>
+                                <% }); } %>
+                            </select>
+                            <small class="form-text text-muted">Pilih router tempat pelanggan ini biasanya terkoneksi (untuk pelabelan & rekap per-router).</small>
                         </div>
                         <div class="mb-3">
                             <label for="pppoe_username" class="form-label">PPPoE Username (opsional)</label>
@@ -899,13 +923,17 @@
                         <div class="mb-3">
                             <label for="package_id" class="form-label">Paket *</label>
                             <select class="form-control" id="package_id" name="package_id" onchange="updateProfileField()" required>
-                                <option value="">Pilih Paket</option>
+                                <option value="">Pilih NAS terlebih dahulu</option>
                                 <% if (packages && packages.length > 0) { %>
                                     <% packages.forEach(function(package) { %>
-                                        <option value="<%= package.id %>" data-profile="<%= package.pppoe_profile || 'default' %>"><%= package.name %> - Rp <%= parseFloat(package.price).toLocaleString('id-ID') %></option>
+                                        <option value="<%= package.id %>" 
+                                                data-profile="<%= package.pppoe_profile || 'default' %>"
+                                                data-router-id="<%= package.router_id || '' %>"
+                                                style="display: none;"><%= package.name %> - Rp <%= parseFloat(package.price).toLocaleString('id-ID') %></option>
                                     <% }); %>
                                 <% } %>
                             </select>
+                            <small class="form-text text-muted">Pilih NAS terlebih dahulu untuk melihat paket yang tersedia.</small>
                         </div>
                         <div class="mb-3">
                             <label for="odp_id" class="form-label">ODP (Optical Distribution Point)</label>
@@ -1083,13 +1111,17 @@
                         <div class="mb-3">
                             <label for="edit_package_id" class="form-label">Paket *</label>
                             <select class="form-control" id="edit_package_id" name="package_id" onchange="updateEditProfileField()" required>
-                                <option value="">Pilih Paket</option>
+                                <option value="">Pilih NAS terlebih dahulu</option>
                                 <% if (packages && packages.length > 0) { %>
                                     <% packages.forEach(function(package) { %>
-                                        <option value="<%= package.id %>" data-profile="<%= package.pppoe_profile || 'default' %>"><%= package.name %> - Rp <%= parseFloat(package.price).toLocaleString('id-ID') %></option>
+                                        <option value="<%= package.id %>" 
+                                                data-profile="<%= package.pppoe_profile || 'default' %>"
+                                                data-router-id="<%= package.router_id || '' %>"
+                                                style="display: none;"><%= package.name %> - Rp <%= parseFloat(package.price).toLocaleString('id-ID') %></option>
                                     <% }); %>
                                 <% } %>
                             </select>
+                            <small class="form-text text-muted">Pilih NAS terlebih dahulu untuk melihat paket yang tersedia.</small>
                         </div>
                         <div class="mb-3">
                             <label for="edit_odp_id" class="form-label">ODP (Optical Distribution Point)</label>
@@ -1113,6 +1145,16 @@
                             <label for="edit_pppoe_profile" class="form-label">PPPoE Profile</label>
                             <input type="text" class="form-control" id="edit_pppoe_profile" name="pppoe_profile" placeholder="Profile akan otomatis terisi sesuai paket">
                             <small class="form-text text-muted">Profile PPPoE yang akan digunakan untuk pelanggan ini</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_router_id" class="form-label">NAS (Router)</label>
+                            <select class="form-control" id="edit_router_id" name="router_id">
+                                <option value="">- Pilih NAS -</option>
+                                <% if (typeof routers !== 'undefined') { routers.forEach(function(r){ %>
+                                    <option value="<%= r.id %>"><%= r.name %> (<%= r.nas_ip %>)</option>
+                                <% }); } %>
+                            </select>
+                            <small class="form-text text-muted">Pilih router tempat pelanggan ini terhubung untuk operasi isolir/restore.</small>
                         </div>
                         <div class="mb-3">
                             <label for="edit_auto_suspension" class="form-label">Auto Suspension</label>
@@ -1314,6 +1356,87 @@
                 },
                 pageLength: 25,
                 lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+            });
+            
+            // Function to filter packages based on selected NAS (router_id)
+            window.filterPackagesByNAS = function(routerSelectId, packageSelectId) {
+                const routerSelect = document.getElementById(routerSelectId);
+                const packageSelect = document.getElementById(packageSelectId);
+                
+                if (!routerSelect || !packageSelect) return;
+                
+                const selectedRouterId = routerSelect.value;
+                const allPackageOptions = packageSelect.querySelectorAll('option[data-router-id]');
+                const currentSelectedValue = packageSelect.value;
+                
+                console.log('🔍 Filtering packages for router:', selectedRouterId || 'none');
+                
+                // Hide all package options first
+                allPackageOptions.forEach(opt => {
+                    opt.style.display = 'none';
+                });
+                
+                // Show only packages that match selected router_id or have no router_id (null/empty)
+                let visibleCount = 0;
+                allPackageOptions.forEach(opt => {
+                    const packageRouterId = opt.getAttribute('data-router-id');
+                    // Show if: router not selected, OR package has no router_id, OR package router_id matches selected
+                    if (!selectedRouterId || !packageRouterId || packageRouterId === selectedRouterId) {
+                        opt.style.display = '';
+                        visibleCount++;
+                        console.log('  ✓ Showing package:', opt.textContent, 'router_id:', packageRouterId || 'none');
+                    } else {
+                        console.log('  ✗ Hiding package:', opt.textContent, 'router_id:', packageRouterId);
+                    }
+                });
+                
+                console.log('📦 Total visible packages:', visibleCount);
+                
+                // Update first option text
+                const firstOption = packageSelect.querySelector('option[value=""]');
+                if (firstOption) {
+                    if (!selectedRouterId) {
+                        firstOption.textContent = 'Pilih NAS terlebih dahulu';
+                    } else if (visibleCount === 0) {
+                        firstOption.textContent = 'Tidak ada paket untuk NAS ini';
+                    } else {
+                        firstOption.textContent = 'Pilih Paket';
+                    }
+                }
+                
+                // Reset selection if current selection is not visible
+                if (currentSelectedValue) {
+                    const currentOption = packageSelect.querySelector(`option[value="${currentSelectedValue}"]`);
+                    if (currentOption && currentOption.style.display === 'none') {
+                        packageSelect.value = '';
+                        console.log('⚠️ Current package selection is not available for this NAS, reset to empty');
+                    }
+                }
+            }
+            
+            // Event listeners for NAS selection changes (Add Customer form)
+            $('#router_id').on('change', function() {
+                filterPackagesByNAS('router_id', 'package_id');
+            });
+            
+            // Event listeners for NAS selection changes (Edit Customer form)
+            $('#edit_router_id').on('change', function() {
+                filterPackagesByNAS('edit_router_id', 'edit_package_id');
+            });
+            
+            // Initialize package dropdowns when modals are shown
+            $('#addCustomerModal').on('shown.bs.modal', function() {
+                // Reset NAS selection and filter packages
+                $('#router_id').val('');
+                filterPackagesByNAS('router_id', 'package_id');
+            });
+            
+            $('#editCustomerModal').on('shown.bs.modal', function() {
+                // Filter packages based on current NAS selection (if any)
+                const currentRouterId = $('#edit_router_id').val();
+                if (currentRouterId) {
+                    filterPackagesByNAS('edit_router_id', 'edit_package_id');
+                }
             });
 
             // Update bulk delete button state
@@ -2109,7 +2232,8 @@
                 cable_length: $('#cable_length').val() ? parseInt($('#cable_length').val()) : null,
                 port_number: $('#port_number').val() ? parseInt($('#port_number').val()) : null,
                 cable_status: $('#cable_status').val().trim() || 'connected',
-                cable_notes: $('#cable_notes').val().trim()
+                cable_notes: $('#cable_notes').val().trim(),
+                router_id: $('#router_id').val()
             };
             
             fetch('/admin/billing/customers', {
@@ -2166,9 +2290,23 @@
                         $('#edit_address').val(customer.address || '');
                         $('#edit_latitude').val(customer.latitude || '');
                         $('#edit_longitude').val(customer.longitude || '');
-                        $('#edit_package_id').val(customer.package_id || '');
                         $('#edit_odp_id').val(customer.odp_id || '');
                         $('#edit_pppoe_profile').val(customer.pppoe_profile || '');
+                        
+                        // Set router_id first, then filter packages, then set package_id
+                        if ($('#edit_router_id').length) { 
+                            $('#edit_router_id').val(customer.router_id || ''); 
+                            // Filter packages based on router_id after setting it
+                            setTimeout(() => {
+                                if (typeof filterPackagesByNAS === 'function') {
+                                    filterPackagesByNAS('edit_router_id', 'edit_package_id');
+                                }
+                                // Set package_id after filtering
+                                $('#edit_package_id').val(customer.package_id || '');
+                            }, 100);
+                        } else {
+                            $('#edit_package_id').val(customer.package_id || '');
+                        }
                         $('#edit_auto_suspension').val(customer.auto_suspension !== undefined ? customer.auto_suspension : 1);
                         $('#edit_status').val(customer.status);
                         $('#edit_billing_day').val((function(){
@@ -2270,6 +2408,7 @@
                     if (Number.isFinite(v)) return Math.min(Math.max(v, 1), 28);
                     return 15;
                 })() : null,
+                router_id: $('#edit_router_id').length ? ($('#edit_router_id').val() || null) : null,
                 latitude: safeVal('#edit_latitude'),
                 longitude: safeVal('#edit_longitude'),
                 static_ip: safeVal('#edit_static_ip'),

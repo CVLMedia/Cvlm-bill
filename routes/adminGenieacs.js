@@ -136,11 +136,11 @@ function getParameterWithPaths(device, paths) {
 // GET: List Device GenieACS
 router.get('/genieacs', adminAuth, async (req, res) => {
   try {
-    // Ambil data device dari GenieACS
-    // ENHANCEMENT: Gunakan cached version untuk performa lebih baik
-    const { getDevicesCached } = require('../config/genieacs');
-    const devicesRaw = await getDevicesCached();
-    // Mapping data sesuai kebutuhan tabel
+    // Ambil data device dari semua GenieACS servers
+    const { getAllDevicesFromAllServers, getAllGenieacsServers } = require('../config/genieacs');
+    const devicesRaw = await getAllDevicesFromAllServers();
+    const servers = await getAllGenieacsServers();
+    // Mapping data sesuai kebutuhan tabel dengan info server
     const devices = devicesRaw.map((device, i) => ({
       id: device._id || '-',
       serialNumber: device.DeviceID?.SerialNumber || device._id || '-',
@@ -151,6 +151,8 @@ router.get('/genieacs', adminAuth, async (req, res) => {
       password: device.InternetGatewayDevice?.LANDevice?.['1']?.WLANConfiguration?.['1']?.KeyPassphrase?._value || '-',
       userKonek: device.InternetGatewayDevice?.LANDevice?.['1']?.WLANConfiguration?.['1']?.TotalAssociations?._value || '-',
       rxPower: getParameterWithPaths(device, parameterPaths.rxPower),
+      genieacsServer: device._genieacs_server_name || 'Default',
+      genieacsServerId: device._genieacs_server_id || null,
       tag: (Array.isArray(device.Tags) && device.Tags.length > 0)
         ? device.Tags.join(', ')
         : (typeof device.Tags === 'string' && device.Tags)
@@ -167,7 +169,17 @@ router.get('/genieacs', adminAuth, async (req, res) => {
     const genieacsOnline = devicesRaw.filter(dev => dev._lastInform && (now - new Date(dev._lastInform).getTime()) < 3600*1000).length;
     const genieacsOffline = genieacsTotal - genieacsOnline;
     const settings = getSettingsWithCache();
-    res.render('adminGenieacs', { title: 'Device GenieACS', devices, settings, genieacsTotal, genieacsOnline, genieacsOffline });
+    
+    res.render('adminGenieacs', {
+      title: 'Device GenieACS',
+      devices,
+      servers, // Pass servers for filter dropdown
+      genieacsTotal,
+      genieacsOnline,
+      genieacsOffline,
+      settings,
+      page: 'genieacs'
+    });
   } catch (err) {
     res.render('adminGenieacs', { title: 'Device GenieACS', devices: [], error: 'Gagal mengambil data device.' });
   }
@@ -176,13 +188,32 @@ router.get('/genieacs', adminAuth, async (req, res) => {
 // Endpoint edit SSID/Password - Optimized like WhatsApp (Fast Response)
 router.post('/genieacs/edit', adminAuth, async (req, res) => {
   try {
-    const { id, ssid, password } = req.body;
-    console.log('Edit request received:', { id, ssid, password });
+    const { id, ssid, password, server_id } = req.body;
+    console.log('Edit request received:', { id, ssid, password, server_id });
 
-    const { getSetting } = require('../config/settingsManager');
-    const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-    const genieacsUsername = getSetting('genieacs_username', 'admin');
-    const genieacsPassword = getSetting('genieacs_password', 'password');
+    // Get GenieACS server berdasarkan server_id
+    let genieacsServer = null;
+    if (server_id && server_id !== 'default' && server_id !== 'null') {
+      try {
+        const sqlite3 = require('sqlite3').verbose();
+        const dbPath = path.join(__dirname, '../data/billing.db');
+        const db = new sqlite3.Database(dbPath);
+        genieacsServer = await new Promise((resolve, reject) => {
+          db.get(`SELECT * FROM genieacs_servers WHERE id = ?`, [server_id], (err, row) => {
+            db.close();
+            if (err) reject(err);
+            else resolve(row || null);
+          });
+        });
+      } catch (e) {
+        console.error('Error getting GenieACS server:', e);
+      }
+    }
+    
+    // Fallback ke default jika tidak ada server
+    const genieacsUrl = genieacsServer ? genieacsServer.url : (require('../config/settingsManager').getSetting('genieacs_url', 'http://localhost:7557'));
+    const genieacsUsername = genieacsServer ? genieacsServer.username : (require('../config/settingsManager').getSetting('genieacs_username', 'admin'));
+    const genieacsPassword = genieacsServer ? genieacsServer.password : (require('../config/settingsManager').getSetting('genieacs_password', 'password'));
 
     // Encode deviceId untuk URL
     const encodedDeviceId = encodeURIComponent(id);
@@ -404,14 +435,33 @@ async function updatePasswordOptimized(deviceId, newPassword, genieacsUrl, usern
 // Endpoint edit tag (nomor pelanggan)
 router.post('/genieacs/edit-tag', adminAuth, async (req, res) => {
   try {
-    const { id, tag } = req.body;
+    const { id, tag, server_id } = req.body;
     if (!id || typeof tag === 'undefined') {
       return res.status(400).json({ success: false, message: 'ID dan tag wajib diisi' });
     }
-    const { getSetting } = require('../config/settingsManager');
-    const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-    const genieacsUsername = getSetting('genieacs_username', 'admin');
-    const genieacsPassword = getSetting('genieacs_password', 'password');
+    
+    // Get GenieACS server berdasarkan server_id
+    let genieacsServer = null;
+    if (server_id && server_id !== 'default' && server_id !== 'null') {
+      try {
+        const sqlite3 = require('sqlite3').verbose();
+        const dbPath = path.join(__dirname, '../data/billing.db');
+        const db = new sqlite3.Database(dbPath);
+        genieacsServer = await new Promise((resolve, reject) => {
+          db.get(`SELECT * FROM genieacs_servers WHERE id = ?`, [server_id], (err, row) => {
+            db.close();
+            if (err) reject(err);
+            else resolve(row || null);
+          });
+        });
+      } catch (e) {
+        console.error('Error getting GenieACS server:', e);
+      }
+    }
+    
+    const genieacsUrl = genieacsServer ? genieacsServer.url : (require('../config/settingsManager').getSetting('genieacs_url', 'http://localhost:7557'));
+    const genieacsUsername = genieacsServer ? genieacsServer.username : (require('../config/settingsManager').getSetting('genieacs_username', 'admin'));
+    const genieacsPassword = genieacsServer ? genieacsServer.password : (require('../config/settingsManager').getSetting('genieacs_password', 'password'));
     // 1. Ambil tag lama perangkat
     let oldTags = [];
     try {
@@ -448,15 +498,33 @@ router.post('/genieacs/edit-tag', adminAuth, async (req, res) => {
 // Endpoint restart ONU
 router.post('/genieacs/restart-onu', adminAuth, async (req, res) => {
   try {
-    const { id } = req.body;
+    const { id, server_id } = req.body;
     if (!id) {
       return res.status(400).json({ success: false, message: 'Device ID wajib diisi' });
     }
 
-    const { getSetting } = require('../config/settingsManager');
-    const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-    const genieacsUsername = getSetting('genieacs_username', 'admin');
-    const genieacsPassword = getSetting('genieacs_password', 'password');
+    // Get GenieACS server berdasarkan server_id
+    let genieacsServer = null;
+    if (server_id && server_id !== 'default' && server_id !== 'null') {
+      try {
+        const sqlite3 = require('sqlite3').verbose();
+        const dbPath = path.join(__dirname, '../data/billing.db');
+        const db = new sqlite3.Database(dbPath);
+        genieacsServer = await new Promise((resolve, reject) => {
+          db.get(`SELECT * FROM genieacs_servers WHERE id = ?`, [server_id], (err, row) => {
+            db.close();
+            if (err) reject(err);
+            else resolve(row || null);
+          });
+        });
+      } catch (e) {
+        console.error('Error getting GenieACS server:', e);
+      }
+    }
+    
+    const genieacsUrl = genieacsServer ? genieacsServer.url : (require('../config/settingsManager').getSetting('genieacs_url', 'http://localhost:7557'));
+    const genieacsUsername = genieacsServer ? genieacsServer.username : (require('../config/settingsManager').getSetting('genieacs_username', 'admin'));
+    const genieacsPassword = genieacsServer ? genieacsServer.password : (require('../config/settingsManager').getSetting('genieacs_password', 'password'));
 
     // Kirim perintah restart ke GenieACS menggunakan endpoint yang benar
     const taskData = {

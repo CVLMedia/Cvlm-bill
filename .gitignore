@@ -54,3 +54,8 @@ temp/
 # PM2 files
 .pm2/
 node_modules
+
+# Settings files (contains sensitive data)
+settings.json
+# But allow template
+!settings.server.template.json

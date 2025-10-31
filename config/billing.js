@@ -251,8 +251,10 @@ class BillingManager {
                 tax_rate DECIMAL(5,2) DEFAULT 11.00,
                 description TEXT,
                 pppoe_profile TEXT DEFAULT 'default',
+                router_id INTEGER,
                 is_active BOOLEAN DEFAULT 1,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (router_id) REFERENCES routers(id)
             )`,
 
             // Tabel pelanggan
@@ -277,6 +279,25 @@ class BillingManager {
                 cable_status TEXT DEFAULT 'connected',
                 cable_notes TEXT,
                 FOREIGN KEY (package_id) REFERENCES packages (id)
+            )`,
+
+            // Tabel routers (NAS) untuk RADIUS mapping
+            `CREATE TABLE IF NOT EXISTS routers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                nas_ip TEXT NOT NULL,
+                nas_identifier TEXT,
+                secret TEXT,
+                UNIQUE(nas_ip)
+            )`,
+
+            // Mapping customer ke router (tanpa ubah skema customers)
+            `CREATE TABLE IF NOT EXISTS customer_router_map (
+                customer_id INTEGER NOT NULL,
+                router_id INTEGER NOT NULL,
+                PRIMARY KEY (customer_id),
+                FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+                FOREIGN KEY (router_id) REFERENCES routers(id) ON DELETE CASCADE
             )`,
 
             // Tabel tagihan
@@ -714,10 +735,15 @@ class BillingManager {
     // Paket Management
     async createPackage(packageData) {
         return new Promise((resolve, reject) => {
-            const { name, speed, price, tax_rate, description, pppoe_profile, image } = packageData;
-            const sql = `INSERT INTO packages (name, speed, price, tax_rate, description, pppoe_profile, image) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+            // Add router_id column if it doesn't exist (migration)
+            this.db.run(`ALTER TABLE packages ADD COLUMN router_id INTEGER`, (err) => {
+                // Ignore error if column already exists
+            });
             
-            this.db.run(sql, [name, speed, price, tax_rate !== undefined ? tax_rate : 11.00, description, pppoe_profile || 'default', image || null], function(err) {
+            const { name, speed, price, tax_rate, description, pppoe_profile, image, router_id } = packageData;
+            const sql = `INSERT INTO packages (name, speed, price, tax_rate, description, pppoe_profile, image, router_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+            
+            this.db.run(sql, [name, speed, price, tax_rate !== undefined ? tax_rate : 11.00, description, pppoe_profile || 'default', image || null, router_id || null], function(err) {
                 if (err) {
                     reject(err);
                 } else {
@@ -757,10 +783,15 @@ class BillingManager {
 
     async updatePackage(id, packageData) {
         return new Promise((resolve, reject) => {
-            const { name, speed, price, tax_rate, description, pppoe_profile, image } = packageData;
-            const sql = `UPDATE packages SET name = ?, speed = ?, price = ?, tax_rate = ?, description = ?, pppoe_profile = ?, image = ? WHERE id = ?`;
+            // Add router_id column if it doesn't exist (migration)
+            this.db.run(`ALTER TABLE packages ADD COLUMN router_id INTEGER`, (err) => {
+                // Ignore error if column already exists
+            });
             
-            this.db.run(sql, [name, speed, price, tax_rate || 0, description, pppoe_profile || 'default', image || null, id], function(err) {
+            const { name, speed, price, tax_rate, description, pppoe_profile, image, router_id } = packageData;
+            const sql = `UPDATE packages SET name = ?, speed = ?, price = ?, tax_rate = ?, description = ?, pppoe_profile = ?, image = ?, router_id = ? WHERE id = ?`;
+            
+            this.db.run(sql, [name, speed, price, tax_rate || 0, description, pppoe_profile || 'default', image || null, router_id || null, id], function(err) {
                 if (err) {
                     reject(err);
                 } else {
@@ -923,6 +954,7 @@ class BillingManager {
             const sql = `
                 SELECT c.*, p.name as package_name, p.price as package_price, p.image as package_image, p.tax_rate,
                        c.latitude, c.longitude,
+                       r.name as router_name,
                        CASE 
                            WHEN EXISTS (
                                SELECT 1 FROM invoices i 
@@ -943,7 +975,9 @@ class BillingManager {
                            ELSE 'no_invoice'
                        END as payment_status
                 FROM customers c 
-                LEFT JOIN packages p ON c.package_id = p.id 
+                LEFT JOIN packages p ON c.package_id = p.id
+                LEFT JOIN customer_router_map m ON m.customer_id = c.id
+                LEFT JOIN routers r ON r.id = m.router_id
                 ORDER BY c.name ASC
             `;
             

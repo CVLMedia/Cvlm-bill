@@ -15,233 +15,124 @@
 <div class="sidebar-overlay d-md-none" id="sidebarOverlay"></div>
 
 <!-- Billing Sidebar -->
-<nav class="col-md-3 col-lg-2 d-md-block sidebar collapse" id="sidebar">
-    <div class="position-sticky pt-3">
-        <!-- Close button for mobile -->
-        <div class="d-md-none text-end p-3">
-            <button class="btn btn-link text-white p-0" id="sidebarClose">
-                <i class="bx bx-x" style="font-size: 1.5rem;"></i>
-            </button>
-        </div>
-        
-        <!-- Logo Section -->
-        <div class="sidebar-header mb-2 text-center">
-            <img src="/img/GEMBOK-Bill.png?ts=<%= Date.now() %>" alt="GEMBOK Bill Logo" style="max-width:100px;max-height:50px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-        </div>
-        
-        <ul class="nav flex-column">
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin">
-                    <i class="bx bx-home"></i> Dashboard Utama
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/dashboard">
-                    <i class="bx bx-bar-chart-alt-2"></i> Dashboard Billing
-                </a>
-            </li>
-            
-            <!-- Customer Management Section -->
-            <li class="nav-item">
-                <div class="sidebar-section-header">
-                    <i class="bx bx-users"></i> Manajemen Pelanggan
-                </div>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/customers">
-                    <i class="bx bx-user"></i> Pelanggan
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/packages">
-                    <i class="bx bx-package"></i> Paket
-                </a>
-            </li>
-            
-            <!-- Invoice Management Section -->
-            <li class="nav-item">
-                <div class="sidebar-section-header">
-                    <i class="bx bx-receipt"></i> Manajemen Invoice
-                </div>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/invoices">
-                    <i class="bx bx-file-plus"></i> Buat Invoice
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/auto-invoice">
-                    <i class="bx bx-calendar-check"></i> Auto Invoice
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/invoices-by-type">
-                    <i class="bx bx-list-ul"></i> Invoice per Tipe
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/invoice-list">
-                    <i class="bx bx-receipt"></i> Semua Invoice
-                </a>
-            </li>
-            
-            <!-- Payment & Financial Section -->
-            <li class="nav-item">
-                <div class="sidebar-section-header">
-                    <i class="bx bx-credit-card"></i> Pembayaran & Keuangan
-                </div>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/payments">
-                    <i class="bx bx-user-check"></i> Transaksi Kolektor
-                    <small class="d-block text-muted" style="font-size: 0.7rem; margin-left: 1.5rem;">Hanya transaksi tukang tagih</small>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/all-payments">
-                    <i class="bx bx-credit-card"></i> Riwayat Pembayaran
-                    <small class="d-block text-muted" style="font-size: 0.7rem; margin-left: 1.5rem;">Semua pembayaran (admin + kolektor)</small>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/collectors">
-                    <i class="bx bx-group"></i> Tukang Tagih
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/collector-reports">
-                    <i class="bx bx-bar-chart"></i> Laporan Kolektor
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/collector-remittance">
-                    <i class="bx bx-money"></i> Terima Setoran
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/financial-report">
-                    <i class="bx bx-line-chart"></i> Laporan Keuangan
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/reports">
-                    <i class="bx bx-analytics"></i> Laporan Analisis
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/expenses">
-                    <i class="bx bx-money-withdraw"></i> Manajemen Pengeluaran
-                </a>
-            </li>
-            
-            <!-- System & Settings Section -->
-            <li class="nav-item">
-                <div class="sidebar-section-header">
-                    <i class="bx bx-cog"></i> Sistem & Pengaturan
-                </div>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/payment-settings">
-                    <i class="bx bx-cog"></i> Pengaturan Pembayaran
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/whatsapp-settings">
-                    <i class="bx bx-message-dots"></i> Pengaturan WhatsApp
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/service-suspension">
-                    <i class="bx bx-pause-circle"></i> Penangguhan Layanan
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/billing/mapping-new">
-                    <i class="bx bx-map"></i> Network Mapping
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link text-white" href="/admin/genieacs">
-                    <i class="bx bx-wifi"></i> GenieACS
-                </a>
-            </li>
-        </ul>
+<nav class="col-md-2 sidebar d-flex flex-column" id="sidebar">
+    <!-- Hamburger Button (Desktop) - Inside Sidebar -->
+    <button class="hamburger d-none d-md-block" id="hamburgerBtn" aria-label="Toggle Menu">
+        <i class="bi bi-list"></i>
+    </button>
+    
+    <!-- Close button for mobile -->
+    <div class="d-md-none text-end p-3">
+        <button class="btn btn-link text-white p-0" id="sidebarClose">
+            <i class="bi bi-x" style="font-size: 1.5rem;"></i>
+        </button>
     </div>
+    
+    <!-- Logo Section -->
+    <div class="sidebar-header mb-4 text-center">
+        <img id="logoImage" src="/img/GEMBOK-Bill.png?v=<%= new Date().getTime() %>" alt="GEMBOK Bill Logo" style="max-width:120px;max-height:60px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <div class="company-info mt-2">
+            <h6 class="company-name mb-1">
+                <%= typeof versionInfo !== 'undefined' ? versionInfo.companyHeader : 'CV.LINTAS MULTIMEDIA' %>
+            </h6>
+            <div class="version-badge-small">
+                <span class="badge <%= typeof versionBadge !== 'undefined' ? versionBadge.class : 'badge-secondary' %>">
+                    <%= typeof versionInfo !== 'undefined' ? versionInfo.version : 'v2.1.2' %>
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Navigation Links -->
+    <a href="/admin/dashboard" class="<%= typeof page !== 'undefined' && page === 'dashboard' ? 'active' : '' %>">
+        <i class="bi bi-house"></i> Dashboard Utama
+    </a>
+    <a href="/admin/billing/dashboard" class="<%= typeof page !== 'undefined' && page === 'billing' ? 'active' : '' %>">
+        <i class="bi bi-bar-chart-alt-2"></i> Dashboard Billing
+    </a>
+    
+    <!-- Customer Management Section -->
+    <div class="sidebar-section-header">
+        <i class="bi bi-people"></i> Manajemen Pelanggan
+    </div>
+    <a href="/admin/billing/customers" class="<%= typeof page !== 'undefined' && page === 'customers' ? 'active' : '' %>">
+        <i class="bi bi-person"></i> Pelanggan
+    </a>
+    <a href="/admin/billing/packages" class="<%= typeof page !== 'undefined' && page === 'packages' ? 'active' : '' %>">
+        <i class="bi bi-box-seam"></i> Paket
+    </a>
+    
+    <!-- Invoice Management Section -->
+    <div class="sidebar-section-header">
+        <i class="bi bi-receipt"></i> Manajemen Invoice
+    </div>
+    <a href="/admin/billing/invoices" class="<%= typeof page !== 'undefined' && page === 'invoices' ? 'active' : '' %>">
+        <i class="bi bi-file-plus"></i> Buat Invoice
+    </a>
+    <a href="/admin/billing/auto-invoice" class="<%= typeof page !== 'undefined' && page === 'auto-invoice' ? 'active' : '' %>">
+        <i class="bi bi-calendar-check"></i> Auto Invoice
+    </a>
+    <a href="/admin/billing/invoices-by-type" class="<%= typeof page !== 'undefined' && page === 'invoices-by-type' ? 'active' : '' %>">
+        <i class="bi bi-list-ul"></i> Invoice per Tipe
+    </a>
+    <a href="/admin/billing/invoice-list" class="<%= typeof page !== 'undefined' && page === 'invoice-list' ? 'active' : '' %>">
+        <i class="bi bi-receipt"></i> Semua Invoice
+    </a>
+    
+    <!-- Payment & Financial Section -->
+    <div class="sidebar-section-header">
+        <i class="bi bi-credit-card"></i> Pembayaran & Keuangan
+    </div>
+    <a href="/admin/billing/payments" class="<%= typeof page !== 'undefined' && page === 'payments' ? 'active' : '' %>">
+        <i class="bi bi-person-check"></i> Transaksi Kolektor
+    </a>
+    <a href="/admin/billing/all-payments" class="<%= typeof page !== 'undefined' && page === 'all-payments' ? 'active' : '' %>">
+        <i class="bi bi-credit-card"></i> Riwayat Pembayaran
+    </a>
+    <a href="/admin/collectors" class="<%= typeof page !== 'undefined' && page === 'collectors' ? 'active' : '' %>">
+        <i class="bi bi-people"></i> Tukang Tagih
+    </a>
+    <a href="/admin/billing/collector-reports" class="<%= typeof page !== 'undefined' && page === 'collector-reports' ? 'active' : '' %>">
+        <i class="bi bi-bar-chart"></i> Laporan Kolektor
+    </a>
+    <a href="/admin/billing/collector-remittance" class="<%= typeof page !== 'undefined' && page === 'collector-remittance' ? 'active' : '' %>">
+        <i class="bi bi-cash"></i> Terima Setoran
+    </a>
+    <a href="/admin/billing/financial-report" class="<%= typeof page !== 'undefined' && page === 'financial-report' ? 'active' : '' %>">
+        <i class="bi bi-graph-up"></i> Laporan Keuangan
+    </a>
+    <a href="/admin/billing/reports" class="<%= typeof page !== 'undefined' && page === 'reports' ? 'active' : '' %>">
+        <i class="bi bi-graph-up-arrow"></i> Laporan Analisis
+    </a>
+    <a href="/admin/billing/expenses" class="<%= typeof page !== 'undefined' && page === 'expenses' ? 'active' : '' %>">
+        <i class="bi bi-cash-coin"></i> Manajemen Pengeluaran
+    </a>
+    
+    <!-- System & Settings Section -->
+    <div class="sidebar-section-header">
+        <i class="bi bi-gear"></i> Sistem & Pengaturan
+    </div>
+    <a href="/admin/billing/payment-settings" class="<%= typeof page !== 'undefined' && page === 'payment-settings' ? 'active' : '' %>">
+        <i class="bi bi-gear"></i> Pengaturan Pembayaran
+    </a>
+    <a href="/admin/billing/whatsapp-settings" class="<%= typeof page !== 'undefined' && page === 'whatsapp-settings' ? 'active' : '' %>">
+        <i class="bi bi-chat-dots"></i> Pengaturan WhatsApp
+    </a>
+    <a href="/admin/billing/service-suspension" class="<%= typeof page !== 'undefined' && page === 'service-suspension' ? 'active' : '' %>">
+        <i class="bi bi-pause-circle"></i> Penangguhan Layanan
+    </a>
+    <a href="/admin/billing/mapping-new" class="<%= typeof page !== 'undefined' && page === 'mapping-new' ? 'active' : '' %>">
+        <i class="bi bi-map"></i> Network Mapping
+    </a>
+    <a href="/admin/genieacs" class="<%= typeof page !== 'undefined' && page === 'genieacs' ? 'active' : '' %>">
+        <i class="bi bi-wifi"></i> GenieACS
+    </a>
 </nav>
 
 <style>
-/* Global layout fixes */
-body {
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow-x: hidden !important;
-}
-
-.container-fluid {
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-.row {
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-/* Prevent CSS conflicts from other files */
-#sidebar * {
-    box-sizing: border-box !important;
-}
-
-#sidebar .nav-link,
-#sidebar .nav-item,
-#sidebar .sidebar-section-header {
-    all: unset !important;
-    display: flex !important;
-    align-items: center !important;
-}
-
-/* Sidebar scrolling */
-#sidebar {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
-}
-
-#sidebar::-webkit-scrollbar {
-    width: 8px;
-}
-
-#sidebar::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-}
-
-#sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.5);
-}
-
-/* Billing Sidebar Specific Styles - Override any conflicting styles */
-#sidebar {
-    min-height: 100vh !important;
-    background: #111827 !important;
-    display: flex !important;
-    flex-direction: column !important;
-}
-
-#sidebar .position-sticky {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
-}
-
 /* Mobile Top Navbar */
 .mobile-navbar {
-    background: #111827;
+    background: #3498DB;
     position: fixed;
     top: 0;
     left: 0;
@@ -278,143 +169,48 @@ body {
 /* Sidebar */
 .sidebar {
     min-height: 100vh;
-    background: #111827;
+    background: #3498DB;
+    color: #fff;
+    padding-top: 32px;
+}
+
+.sidebar a {
+    color: #fff;
+    text-decoration: none;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    padding: 12px 24px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
 }
 
-.sidebar .position-sticky {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    overflow-x: hidden;
+.sidebar a.active, 
+.sidebar a:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateX(3px);
 }
 
-.sidebar .nav {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 0.5rem 0;
+.sidebar.collapsed a.active,
+.sidebar.collapsed a:hover {
+    transform: translateX(0); /* No translation when collapsed */
 }
 
-.sidebar .nav-item {
-    margin-bottom: 0.1rem;
-}
-
-/* Section Headers */
-#sidebar .sidebar-section-header {
-    color: rgba(255, 255, 255, 0.6) !important;
-    font-size: 0.75rem !important;
-    font-weight: 600 !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
-    padding: 0.8rem 0.5rem 0.4rem 0.5rem !important;
-    margin: 0.3rem 0.25rem 0.1rem 0.25rem !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 0 !important;
-    line-height: 1.2 !important;
-    width: 100% !important;
-    flex-direction: row !important;
-}
-
-/* Visual separators */
-#sidebar .sidebar-section-header::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: rgba(255, 255, 255, 0.1);
-    margin-left: 0.5rem;
-}
-
-#sidebar .sidebar-section-header i {
-    font-size: 0.9rem !important;
-    opacity: 0.8 !important;
-    flex-shrink: 0 !important;
-}
-
-/* Override any conflicting CSS from components.css */
-.sidebar-nav .nav-link.active,
-.sidebar .nav-link.active {
-    transform: translateX(1px) !important;
-    background-color: rgba(255, 255, 255, 0.08) !important;
-    color: white !important;
-}
-
-/* Ensure our sidebar styles take precedence */
-#sidebar .nav-item {
-    margin-bottom: 0.1rem !important;
-    width: 100% !important;
-}
-
-#sidebar .nav-link {
-    color: rgba(255, 255, 255, 0.8) !important;
-    padding: 0.6rem 0.5rem 0.6rem 0.5rem !important;
-    border-radius: 0.375rem !important;
-    margin: 0.1rem 0.25rem !important;
-    transition: all 0.3s ease !important;
-    white-space: nowrap !important;
-    font-size: 0.9rem !important;
-    text-align: left !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    line-height: 1.4 !important;
-    width: 100% !important;
-    text-decoration: none !important;
-    flex-direction: row !important;
-    gap: 0 !important;
-}
-
-#sidebar .nav-link:hover,
-#sidebar .nav-link.active {
-    color: white !important;
-    background-color: rgba(255, 255, 255, 0.08) !important;
-    transform: translateX(1px) !important;
-    border-radius: 0.5rem !important;
-}
-
-/* Icon positioning - ensure all icons are at the start */
-#sidebar .nav-link i:first-child,
-#sidebar .sidebar-section-header i:first-child {
-    order: -1 !important;
-    margin-right: 0.5rem !important;
-    margin-left: 0 !important;
-    flex-shrink: 0 !important;
-    width: 16px !important;
-    text-align: center !important;
-    display: inline-block !important;
-    vertical-align: middle !important;
-}
-
-/* Ensure text content comes after icon */
-#sidebar .nav-link > *:not(i):first-child,
-#sidebar .sidebar-section-header > *:not(i):first-child {
-    order: 1 !important;
-}
-
-#sidebar .sidebar-section-header i {
-    font-size: 0.9rem !important;
-    opacity: 0.8 !important;
-    flex-shrink: 0 !important;
-    margin-right: 0.5rem !important;
-    margin-left: 0 !important;
-    width: 16px !important;
-    text-align: center !important;
-    display: inline-block !important;
-    vertical-align: middle !important;
-    order: -1 !important;
-}
-
-/* Logo styling */
-.sidebar-header {
-    padding: 1rem 0.5rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    margin-bottom: 0.5rem;
+.sidebar a i {
+    margin-right: 8px;
+    width: 16px;
     flex-shrink: 0;
+}
+
+/* Sidebar Header */
+.sidebar .sidebar-header {
+    font-size: 1.3rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 0 24px 24px 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 1rem;
 }
 
 .sidebar-header img {
@@ -423,6 +219,224 @@ body {
 
 .sidebar-header img:hover {
     transform: scale(1.05);
+}
+
+.company-info {
+    color: #fff;
+}
+
+.company-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0;
+    color: #fff;
+    line-height: 1.2;
+}
+
+.version-badge-small .badge {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+/* Sidebar Section Headers */
+.sidebar-section-header {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 24px;
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+}
+
+.sidebar-section-header i {
+    margin-right: 8px;
+    font-size: 0.9rem;
+}
+
+/* Hamburger Button (Desktop) - Integrated with Sidebar */
+.sidebar .hamburger {
+    display: block !important;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 1002;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+.sidebar .hamburger:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+/* When sidebar is collapsed, move hamburger button to fixed position */
+@media (min-width: 768px) {
+    .sidebar.collapsed .hamburger,
+    #sidebar.collapsed .hamburger {
+        position: fixed !important;
+        top: 20px !important;
+        left: 20px !important;
+        right: auto !important;
+        background: #3498DB !important;
+        border: none !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 1003 !important;
+    }
+    
+    .sidebar.collapsed .hamburger:hover,
+    #sidebar.collapsed .hamburger:hover {
+        background: #2980B9 !important;
+    }
+}
+
+/* Sidebar scrolling */
+.sidebar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+/* Desktop sidebar toggle state */
+@media (min-width: 768px) {
+    .sidebar {
+        transition: width 0.3s ease, transform 0.3s ease;
+        width: 16.666667%; /* col-md-2 width */
+        position: fixed;
+        height: 100vh;
+        left: 0;
+        top: 0;
+        z-index: 1000;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    
+    .sidebar.collapsed {
+        width: 70px !important; /* Narrow width untuk icon saja */
+        transform: translateX(0) !important; /* Tidak hilang, tetap terlihat */
+        overflow: hidden !important;
+    }
+    
+    /* Hide text labels when collapsed - menggunakan teknik yang lebih compatible */
+    .sidebar.collapsed .company-info {
+        display: none !important;
+    }
+    
+    .sidebar.collapsed .company-name {
+        display: none !important;
+    }
+    
+    .sidebar.collapsed .version-badge-small {
+        display: none !important;
+    }
+    
+    .sidebar.collapsed .sidebar-section-header {
+        display: none !important;
+    }
+    
+    /* Hide text content in links, keep only icons */
+    .sidebar.collapsed a {
+        justify-content: center !important;
+        padding: 12px 8px !important;
+        text-align: center;
+        position: relative;
+        font-size: 0 !important; /* Hide text by making font size 0 */
+        line-height: 0 !important;
+        overflow: hidden;
+    }
+    
+    .sidebar.collapsed a i {
+        margin-right: 0 !important;
+        margin-left: 0 !important;
+        font-size: 1.3rem !important;
+        width: auto !important;
+        display: inline-block !important;
+        line-height: normal !important;
+        vertical-align: middle;
+    }
+    
+    /* Hide any text nodes inside links */
+    .sidebar.collapsed a *:not(i) {
+        display: none !important;
+    }
+    
+    /* Hide sidebar header text when collapsed */
+    .sidebar.collapsed .sidebar-header {
+        padding: 15px 8px !important;
+        margin-bottom: 0.5rem !important;
+    }
+    
+    .sidebar.collapsed .sidebar-header img {
+        max-width: 50px !important;
+        max-height: 30px !important;
+    }
+    
+    /* Adjust hamburger button when collapsed */
+    .sidebar.collapsed .hamburger {
+        position: absolute !important;
+        top: 10px !important;
+        right: 8px !important;
+        left: auto !important;
+        padding: 4px 6px !important;
+        font-size: 0.9rem !important;
+        width: auto !important;
+    }
+    
+    .main-content {
+        transition: margin-left 0.3s ease, width 0.3s ease;
+    }
+    
+    .main-content.sidebar-expanded {
+        margin-left: 16.666667%; /* col-md-2 width */
+        width: 83.333333%; /* 100% - sidebar width */
+    }
+    
+    .main-content.sidebar-collapsed {
+        margin-left: 70px !important; /* Width of collapsed sidebar */
+        width: calc(100% - 70px) !important;
+    }
+    
+    /* Default state: sidebar expanded */
+    .main-content:not(.sidebar-collapsed):not(.sidebar-expanded) {
+        margin-left: 16.666667%;
+        width: 83.333333%;
+    }
+}
+
+/* Main Content */
+.main-content {
+    padding: 32px 24px;
 }
 
 /* Main content styling - removed to avoid conflicts with Bootstrap grid */
@@ -450,10 +464,12 @@ body {
 /* Mobile responsive */
 @media (max-width: 767.98px) {
     .main-content {
-        /* Removed to avoid conflicts with Bootstrap grid */
+        margin-left: 0;
+        margin-top: 60px; /* Space for mobile navbar */
+        padding: 15px;
     }
     
-    #sidebar {
+    .sidebar {
         position: fixed !important;
         top: 0 !important;
         left: 0 !important;
@@ -464,47 +480,29 @@ body {
         transition: transform 0.3s ease !important;
         box-shadow: 2px 0 10px rgba(0,0,0,0.3) !important;
         overflow: hidden !important;
+        padding-top: 0 !important;
     }
     
-    #sidebar.show {
+    .sidebar.show {
         transform: translateX(0) !important;
     }
     
-    #sidebar .position-sticky {
-        height: 100% !important;
+    .sidebar .sidebar-header {
+        margin-top: 20px !important;
+        padding-top: 20px !important;
+        flex-shrink: 0 !important;
+    }
+    
+    /* Enable scrolling for sidebar content */
+    .sidebar {
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch !important;
-        padding-bottom: 20px !important;
-        max-height: 100vh !important;
     }
     
-    #sidebar .nav {
-        padding-bottom: 20px !important;
-        min-height: auto !important;
-        flex-wrap: nowrap !important;
-    }
-    
-    #sidebar .sidebar-header {
-        margin-top: 20px !important;
+    /* Ensure all sidebar content is scrollable */
+    .sidebar > * {
         flex-shrink: 0 !important;
-        position: sticky !important;
-        top: 0 !important;
-        background: #111827 !important;
-        z-index: 10 !important;
-        padding: 15px 0 !important;
-    }
-    
-    /* Ensure navigation items are properly spaced */
-    #sidebar .nav-item {
-        margin-bottom: 5px !important;
-    }
-    
-    #sidebar .nav-link {
-        padding: 12px 20px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
     }
     
     /* Adjust content for better mobile view */
@@ -520,37 +518,33 @@ body {
 /* Extra small devices */
 @media (max-width: 575.98px) {
     .main-content {
-        /* Removed to avoid conflicts with Bootstrap grid */
+        padding: 10px;
     }
     
-    #sidebar {
+    .sidebar {
         width: 260px !important;
     }
     
     .mobile-navbar .navbar-brand {
         font-size: 1rem;
     }
-    
-    #sidebar .nav-link {
-        padding: 10px 15px !important;
-        font-size: 0.9rem !important;
-    }
 }
 
 /* Desktop specific */
 @media (min-width: 768px) {
     .main-content {
-        /* Removed to avoid conflicts with Bootstrap grid */
+        margin-left: 16.666667%; /* col-md-2 width */
+        width: 83.333333%; /* 100% - sidebar width */
     }
     
-    #sidebar {
+    .sidebar {
         overflow-y: auto !important;
         overflow-x: hidden !important;
-    }
-    
-    #sidebar .position-sticky {
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
+        position: fixed;
+        height: 100vh;
+        left: 0;
+        top: 0;
+        z-index: 1000;
     }
 }
 
@@ -679,42 +673,17 @@ body {
         transform: translateX(0) !important;
     }
     
-    #sidebar .position-sticky {
-        height: 100% !important;
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-        -webkit-overflow-scrolling: touch !important;
-        padding-bottom: 20px !important;
-        max-height: 100vh !important;
-    }
-    
-    #sidebar .nav {
-        padding-bottom: 20px !important;
-        min-height: auto !important;
-        flex-wrap: nowrap !important;
-    }
     
     #sidebar .sidebar-header {
         margin-top: 20px !important;
         flex-shrink: 0 !important;
         position: sticky !important;
         top: 0 !important;
-        background: #111827 !important;
+        background: #3498DB !important;
         z-index: 10 !important;
         padding: 15px 0 !important;
     }
     
-    /* Ensure navigation items are properly spaced */
-    #sidebar .nav-item {
-        margin-bottom: 5px !important;
-    }
-    
-    #sidebar .nav-link {
-        padding: 12px 20px !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
     
     /* Adjust content for better mobile view */
     .card {
@@ -739,11 +708,6 @@ body {
     .mobile-navbar .navbar-brand {
         font-size: 1rem;
     }
-    
-    #sidebar .nav-link {
-        padding: 10px 15px !important;
-        font-size: 0.9rem !important;
-    }
 }
 
 /* Desktop specific */
@@ -752,33 +716,96 @@ body {
         /* Removed to avoid conflicts with Bootstrap grid */
     }
     
-    #sidebar {
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-    }
-    
-    #sidebar .position-sticky {
-        overflow-y: auto !important;
-        overflow-x: hidden !important;
-    }
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarToggle = document.getElementById('sidebarToggle'); // Mobile
+    const hamburgerBtn = document.getElementById('hamburgerBtn'); // Desktop
     const sidebarClose = document.getElementById('sidebarClose');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
     
-    // Toggle sidebar on hamburger click
+    // Toggle sidebar on hamburger click (mobile)
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', function() {
-            sidebar.classList.add('show');
-            overlay.classList.add('show');
-            document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            if (window.innerWidth < 768) {
+                // For mobile: use existing show/hide
+                sidebar.classList.add('show');
+                overlay.classList.add('show');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+            }
         });
     }
+    
+    // Desktop hamburger toggle
+    if (hamburgerBtn) {
+        hamburgerBtn.addEventListener('click', function() {
+            if (window.innerWidth >= 768) {
+                const isCollapsed = sidebar.classList.contains('collapsed');
+                const mainContent = document.querySelector('.main-content');
+                
+                if (isCollapsed) {
+                    sidebar.classList.remove('collapsed');
+                    if (mainContent) {
+                        mainContent.classList.remove('sidebar-collapsed');
+                        mainContent.classList.add('sidebar-expanded');
+                    }
+                    localStorage.setItem('sidebarCollapsed', 'false');
+                } else {
+                    sidebar.classList.add('collapsed');
+                    if (mainContent) {
+                        mainContent.classList.remove('sidebar-expanded');
+                        mainContent.classList.add('sidebar-collapsed');
+                    }
+                    localStorage.setItem('sidebarCollapsed', 'true');
+                }
+            }
+        });
+    }
+    
+    // Restore sidebar state from localStorage on page load (desktop only)
+    if (window.innerWidth >= 768) {
+        const sidebarState = localStorage.getItem('sidebarCollapsed');
+        const mainContent = document.querySelector('.main-content');
+        if (sidebarState === 'true') {
+            sidebar.classList.add('collapsed');
+            if (mainContent) {
+                mainContent.classList.remove('sidebar-expanded');
+                mainContent.classList.add('sidebar-collapsed');
+            }
+        } else {
+            sidebar.classList.remove('collapsed');
+            if (mainContent) {
+                mainContent.classList.add('sidebar-expanded');
+                mainContent.classList.remove('sidebar-collapsed');
+            }
+        }
+    } else {
+        // On mobile, ensure main content has no margin
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.classList.remove('sidebar-expanded', 'sidebar-collapsed');
+        }
+    }
+    
+    // Hide sidebar section headers when collapsed
+    function updateSidebarCollapsedState() {
+        if (sidebar.classList.contains('collapsed')) {
+            sidebar.querySelectorAll('.sidebar-section-header').forEach(header => {
+                header.style.display = 'none';
+            });
+        } else {
+            sidebar.querySelectorAll('.sidebar-section-header').forEach(header => {
+                header.style.display = 'flex';
+            });
+        }
+    }
+    
+    // Call on initial load and when collapsed state changes
+    updateSidebarCollapsedState();
+    hamburgerBtn?.addEventListener('click', updateSidebarCollapsedState);
     
     // Close sidebar functions
     function closeSidebar() {
@@ -798,7 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Close sidebar when clicking on nav links (mobile)
-    const navLinks = sidebar.querySelectorAll('.nav-link');
+    const navLinks = sidebar.querySelectorAll('a');
     navLinks.forEach(link => {
         link.addEventListener('click', function() {
             if (window.innerWidth < 768) {
@@ -820,12 +847,5 @@ document.addEventListener('DOMContentLoaded', function() {
             e.stopPropagation();
         }
     });
-    
-    // Enable smooth scrolling for sidebar content on mobile
-    const sidebarContent = sidebar.querySelector('.position-sticky');
-    if (sidebarContent) {
-        sidebarContent.style.webkitOverflowScrolling = 'touch';
-        sidebarContent.style.overflowScrolling = 'touch';
-    }
 });
 </script> 

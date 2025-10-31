@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Setting RADIUS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/css/responsive-admin.css" rel="stylesheet">
+  <style>
+    body { background: #f5f6fa; }
+    .main-content { padding: 32px 24px; }
+    .card { border: none; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  </style>
+</head>
+<body>
+<div class="container-fluid">
+  <div class="row">
+    <%- include('partials/admin-responsive-sidebar', { page: 'setting-radius', settings: settings }) %>
+    <main class="col-md-10 ms-sm-auto main-content">
+      <h3 class="mb-3"><i class="bi bi-gear-wide-connected"></i> Setting RADIUS</h3>
+      <% if (error) { %>
+        <div class="alert alert-danger"><%= error %></div>
+      <% } %>
+      <% if (success) { %>
+        <div class="alert alert-success"><%= success %></div>
+      <% } %>
+
+      <form method="post" action="/admin/radius" class="card p-3 shadow-sm" style="max-width: 560px;">
+        <div class="mb-3">
+          <label class="form-label">Mode Autentikasi</label>
+          <select name="user_auth_mode" class="form-select">
+            <option value="radius" <%= (settings.user_auth_mode||'radius')==='radius'?'selected':'' %>>RADIUS</option>
+            <option value="mikrotik" <%= settings.user_auth_mode==='mikrotik'?'selected':'' %>>Mikrotik API</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">RADIUS Host</label>
+          <input type="text" name="radius_host" class="form-control" value="<%= settings.radius_host || 'localhost' %>" placeholder="127.0.0.1">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">RADIUS User</label>
+          <input type="text" name="radius_user" class="form-control" value="<%= settings.radius_user || 'radius' %>">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">RADIUS Password</label>
+          <input type="password" name="radius_password" class="form-control" value="<%= settings.radius_password || 'radius' %>">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">RADIUS Database</label>
+          <input type="text" name="radius_database" class="form-control" value="<%= settings.radius_database || 'radius' %>">
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Simpan</button>
+      </form>
+    </main>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

@@ -168,16 +168,21 @@
                                 <input type="text" class="form-control" id="voucherPrefix" name="prefix" placeholder="contoh: wifi-" value="wifi-">
                             </div>
                             <div class="mb-3">
-                                <label for="voucherProfile" class="form-label"><i class="bi bi-speedometer2 me-1"></i>Profile</label>
-                                <select class="form-select" id="voucherProfile" name="profile" required>
-                                    <option value="">Pilih Profile</option>
-                                    <% if (profiles && profiles.length > 0) { %>
-                                        <% profiles.forEach(function(profile) { %>
-                                            <option value="<%= profile.name %>"><%= profile.name %></option>
+                                <label for="voucherRouterId" class="form-label"><i class="bi bi-router me-1"></i>NAS (Router) *</label>
+                                <select class="form-select" id="voucherRouterId" name="router_id" required>
+                                    <% if (routers && routers.length > 0) { %>
+                                        <% routers.forEach(function(router) { %>
+                                            <option value="<%= router.id %>"><%= router.name %> (<%= router.nas_ip %>)</option>
                                         <% }); %>
                                     <% } else { %>
-                                        <option value="">Tidak ada profile tersedia</option>
+                                        <option value="">Tidak ada router tersedia</option>
                                     <% } %>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="voucherProfile" class="form-label"><i class="bi bi-speedometer2 me-1"></i>Profile</label>
+                                <select class="form-select" id="voucherProfile" name="profile" required>
+                                    <option value="">Pilih NAS terlebih dahulu</option>
                                 </select>
                                 <small class="text-muted">Profile yang dipilih akan digunakan untuk semua voucher yang dibuat</small>
                             </div>
@@ -637,6 +642,7 @@
                                         <th>Username</th>
                                         <th>Password</th>
                                         <th>Profile</th>
+                                        <th>NAS Status</th>
                                         <th>Status</th>
                                         <th>Aksi</th>
                                     </tr>
@@ -649,6 +655,9 @@
                                             <td><%= voucher.username %></td>
                                             <td><%= voucher.password %></td>
                                             <td><%= voucher.profile %></td>
+                                            <td>
+                                                <%= voucher.nas_name || 'N/A' %> (<%= voucher.nas_ip || 'N/A' %>)
+                                            </td>
                                             <td>
                                                 <% if (voucher.active) { %>
                                                     <span class="badge bg-success">Aktif</span>
@@ -663,6 +672,7 @@
                                                     </button>
                                                     <form action="/admin/hotspot/delete-voucher" method="POST" class="d-inline" onsubmit="return confirm('Yakin hapus voucher <%= voucher.username %>?')">
                                                         <input type="hidden" name="username" value="<%= voucher.username %>">
+                                                        <input type="hidden" name="router_id" value="<%= voucher.nas_id || '' %>">
                                                         <button type="submit" class="btn btn-danger"><i class="bi bi-trash"></i></button>
                                                     </form>
                                                 </div>
@@ -671,7 +681,7 @@
                                         <% }); %>
                                     <% } else { %>
                                         <tr>
-                                            <td colspan="6" class="text-center">Belum ada history voucher.</td>
+                                            <td colspan="7" class="text-center">Belum ada history voucher.</td>
                                         </tr>
                                     <% } %>
                                 </tbody>
@@ -804,10 +814,59 @@
             profileElement.textContent = `Profile: ${profile}`;
         }
         
-        // Debug: log available profiles
-        const profileSelect = document.getElementById('voucherProfile');
-        if (profileSelect) {
-            console.log('Profile options:', Array.from(profileSelect.options).map(opt => opt.value));
+        // Store all profiles with NAS info for filtering
+        const allProfiles = <%- JSON.stringify(profiles || []) %>;
+        
+        // Function to filter and update profile dropdown based on selected NAS
+        function updateVoucherProfileDropdown(routerId) {
+            const profileSelect = document.getElementById('voucherProfile');
+            if (!profileSelect) return;
+            
+            // Clear existing options
+            profileSelect.innerHTML = '';
+            
+            if (!routerId) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Pilih NAS terlebih dahulu';
+                profileSelect.appendChild(option);
+                return;
+            }
+            
+            // Filter profiles by nas_id
+            const routerIdNum = parseInt(routerId);
+            const filteredProfiles = allProfiles.filter(function(profile) {
+                return profile.nas_id === routerIdNum;
+            });
+            
+            if (filteredProfiles.length === 0) {
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'Tidak ada profile untuk NAS ini';
+                profileSelect.appendChild(option);
+                return;
+            }
+            
+            // Add filtered profiles to dropdown
+            filteredProfiles.forEach(function(profile) {
+                const option = document.createElement('option');
+                option.value = profile.name;
+                option.textContent = profile.name;
+                profileSelect.appendChild(option);
+            });
+        }
+        
+        // Event listener for NAS selection changes
+        const voucherRouterSelect = document.getElementById('voucherRouterId');
+        if (voucherRouterSelect) {
+            voucherRouterSelect.addEventListener('change', function() {
+                updateVoucherProfileDropdown(this.value);
+            });
+            
+            // Initialize on page load if router is selected
+            if (voucherRouterSelect.value) {
+                updateVoucherProfileDropdown(voucherRouterSelect.value);
+            }
         }
         
         // Initialize preview voucher
