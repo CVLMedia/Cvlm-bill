@@ -9,30 +9,42 @@ const logger = require('../config/logger');
 const { spawn } = require('child_process');
 
 // Konfigurasi penyimpanan file
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, path.join(__dirname, '../public/img'));
-    },
-    filename: function (req, file, cb) {
-        // Selalu gunakan nama 'logo' dengan ekstensi file asli
-        const ext = path.extname(file.originalname).toLowerCase();
-        cb(null, 'logo' + ext);
-    }
-});
-
-const upload = multer({ 
-    storage: storage,
+const createImageUploader = (baseName) => multer({
+    storage: multer.diskStorage({
+        destination: function (req, file, cb) {
+            cb(null, path.join(__dirname, '../public/img'));
+        },
+        filename: function (req, file, cb) {
+            const ext = path.extname(file.originalname).toLowerCase() || '.png';
+            cb(null, baseName + ext);
+        }
+    }),
     limits: {
         fileSize: 2 * 1024 * 1024 // 2MB
     },
     fileFilter: function (req, file, cb) {
-        // Hanya izinkan file gambar dan SVG
         if (file.mimetype.startsWith('image/') || file.originalname.toLowerCase().endsWith('.svg')) {
             cb(null, true);
         } else {
             cb(new Error('Hanya file gambar yang diizinkan'), false);
         }
     }
+});
+
+const logoUpload = createImageUploader('logo');
+const billingQrUpload = createImageUploader('billing-qr');
+
+const backupUpload = multer({
+    storage: multer.diskStorage({
+        destination: function (req, file, cb) {
+            const backupDir = path.join(__dirname, '../data/backup');
+            fs.mkdirSync(backupDir, { recursive: true });
+            cb(null, backupDir);
+        },
+        filename: function (req, file, cb) {
+            cb(null, file.originalname);
+        }
+    })
 });
 
 const settingsPath = path.join(__dirname, '../settings.json');
@@ -316,7 +328,7 @@ router.get('/interval-status', (req, res) => {
 });
 
 // POST: Upload Logo
-router.post('/upload-logo', upload.single('logo'), (req, res) => {
+router.post('/upload-logo', logoUpload.single('logo'), (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ 
@@ -383,12 +395,82 @@ router.post('/upload-logo', upload.single('logo'), (req, res) => {
             filename: filename,
             message: 'Logo berhasil diupload dan disimpan'
         });
-
+        
     } catch (error) {
         console.error('Error saat upload logo:', error);
         res.status(500).json({ 
             success: false, 
             error: 'Terjadi kesalahan saat mengupload logo: ' + error.message 
+        });
+    }
+});
+
+router.post('/upload-billing-qr', billingQrUpload.single('billingQr'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'Tidak ada file yang diupload'
+            });
+        }
+
+        const filename = req.file.filename;
+        const filePath = req.file.path;
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(500).json({
+                success: false,
+                error: 'File gagal disimpan'
+            });
+        }
+
+        let settings = {};
+
+        try {
+            settings = getSettingsWithCache();
+        } catch (err) {
+            console.error('Gagal membaca settings.json:', err);
+            return res.status(500).json({
+                success: false,
+                error: 'Gagal membaca pengaturan'
+            });
+        }
+
+        if (settings.billing_qr_filename && settings.billing_qr_filename !== filename) {
+            const oldQrPath = path.join(__dirname, '../public/img', settings.billing_qr_filename);
+            if (fs.existsSync(oldQrPath)) {
+                try {
+                    fs.unlinkSync(oldQrPath);
+                    console.log('QR penagihan lama dihapus:', oldQrPath);
+                } catch (err) {
+                    console.error('Gagal menghapus QR penagihan lama:', err);
+                }
+            }
+        }
+
+        settings.billing_qr_filename = filename;
+
+        try {
+            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+            console.log('Settings.json berhasil diupdate dengan QR penagihan baru:', filename);
+        } catch (err) {
+            console.error('Gagal menyimpan settings.json:', err);
+            return res.status(500).json({
+                success: false,
+                error: 'Gagal menyimpan pengaturan'
+            });
+        }
+
+        res.json({
+            success: true,
+            filename: filename,
+            message: 'QR code penagihan berhasil diupload dan disimpan'
+        });
+    } catch (error) {
+        console.error('Error saat upload QR penagihan:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Terjadi kesalahan saat mengupload QR code penagihan: ' + error.message
         });
     }
 });
@@ -521,7 +603,7 @@ router.post('/backup', async (req, res) => {
 });
 
 // Restore database
-router.post('/restore', upload.single('backup_file'), async (req, res) => {
+router.post('/restore', backupUpload.single('backup_file'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({

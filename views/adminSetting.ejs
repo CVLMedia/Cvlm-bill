@@ -456,16 +456,29 @@
                             <label class="form-label">Logo Saat Ini:</label>
                             <img id="logoPreview" src="/img/<%= typeof settings !== 'undefined' && settings.logo_filename ? settings.logo_filename : 'logo.png' %>?ts=<%= Date.now() %>" alt="Logo" style="max-width:200px;max-height:120px;">
                         </div>
-                        <!-- Keterangan Donasi Masjid (di dalam section logo) -->
-                        <div class="alert alert-info mt-3" style="border-radius: 10px;">
-                            <div class="text-center">
-                                <img src="/admin/settings/donation-qr?ts=<%= Date.now() %>" alt="QR Donasi Masjid" style="max-width:260px;width:100%;height:auto;border-radius:8px;">
-                                <div class="mt-1" style="font-size:0.95rem;">Donasi Untuk Pengembangan Aplikasi</div>
-                                <div class="mt-2">
-                                    <a href="/admin/settings/donation-qr" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
-                                        Buka QR ukuran penuh
-                                    </a>
+                        <% const billingQrFilename = (typeof settings !== 'undefined' && settings.billing_qr_filename) ? settings.billing_qr_filename : 'qr-donasi.jpg'; %>
+                        <div class="form-section mt-4">
+                            <h5 class="mb-3">
+                                <i class="bi bi-qr-code-scan text-primary"></i> QR Code Penagihan WhatsApp
+                            </h5>
+                            <form id="billingQrUploadForm" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label class="form-label">Upload QR Code Baru</label>
+                                    <input type="file" name="billingQr" accept="image/*,.svg" class="form-control" required>
+                                    <div class="form-text">Format: PNG, JPG, JPEG, GIF, BMP, WEBP, SVG. Maksimal 2MB.</div>
                                 </div>
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="bi bi-upload"></i> Upload QR Code
+                                </button>
+                            </form>
+                            <div class="logo-preview mt-3">
+                                <label class="form-label">QR Code Saat Ini:</label>
+                                <img id="billingQrPreview" src="/img/<%= billingQrFilename %>?ts=<%= Date.now() %>" alt="QR Code Penagihan" style="max-width:260px;width:100%;height:auto;border-radius:8px;">
+                            </div>
+                            <div class="mt-2">
+                                <a id="billingQrFullLink" href="/img/<%= billingQrFilename %>?ts=<%= Date.now() %>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                                    Buka QR ukuran penuh
+                                </a>
                             </div>
                         </div>
 
@@ -2061,6 +2074,41 @@ $(document).ready(function() {
             error: function(xhr, status, error) {
                 console.error('Error uploading logo:', error);
                 var errorMsg = 'Terjadi kesalahan saat mengupload logo';
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMsg = xhr.responseJSON.error;
+                }
+                showNotification('danger', errorMsg);
+            }
+        });
+    });
+
+    // 1b. Handle Billing QR Upload
+    $('#billingQrUploadForm').on('submit', function(e) {
+        e.preventDefault();
+
+        var formData = new FormData(this);
+
+        $.ajax({
+            url: '/admin/settings/upload-billing-qr',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    var timestamp = Date.now();
+                    if (response.filename) {
+                        $('#billingQrPreview').attr('src', '/img/' + response.filename + '?ts=' + timestamp);
+                        $('#billingQrFullLink').attr('href', '/img/' + response.filename + '?ts=' + timestamp);
+                    }
+                    showNotification('success', 'QR code penagihan berhasil diupload!');
+                } else {
+                    showNotification('danger', response.error || 'Gagal mengupload QR code penagihan');
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error uploading billing QR:', error);
+                var errorMsg = 'Terjadi kesalahan saat mengupload QR code penagihan';
                 if (xhr.responseJSON && xhr.responseJSON.error) {
                     errorMsg = xhr.responseJSON.error;
                 }
