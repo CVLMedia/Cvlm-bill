@@ -4,6 +4,7 @@ const logger = require('./logger');
 const fs = require('fs');
 const path = require('path');
 const { getCompanyHeader } = require('./message-templates');
+const { generateInvoicePdf } = require('./invoicePdf');
 
 class WhatsAppNotificationManager {
     constructor() {
@@ -329,6 +330,115 @@ Balas dengan: *BANTU* atau *HELP*
         return null;
     }
 
+    // Helper untuk mendapatkan QR code pembayaran berdasarkan data pelanggan/paket
+    getCustomerQrImagePath(customer = null) {
+        try {
+            const imagesDir = path.resolve(__dirname, '../public/img');
+            const candidateFiles = [];
+
+            // Jika ada field package_image langsung gunakan
+            if (customer?.package_image) {
+                candidateFiles.push(path.join(imagesDir, customer.package_image));
+            }
+
+            // Mapping nama paket ke file QR
+            if (customer?.package_name) {
+                const packageName = customer.package_name.toLowerCase();
+                const packageImageMap = {
+                    bronze: 'bronze.jpg',
+                    silver: 'silver.jpg',
+                    gold: 'gold.jpg',
+                    sosial: 'sosial.jpg',
+                    social: 'sosial.jpg',
+                    qris: 'ewallet.jpg',
+                    ewallet: 'ewallet.jpg',
+                    donasi: 'qr-donasi.jpg'
+                };
+
+                Object.entries(packageImageMap).forEach(([keyword, filename]) => {
+                    if (packageName.includes(keyword)) {
+                        candidateFiles.push(path.join(imagesDir, filename));
+                    }
+                });
+            }
+
+            // Tambahkan fallback default
+            candidateFiles.push(
+                path.join(imagesDir, 'ewallet.jpg'),
+                path.join(imagesDir, 'tagihan.jpg'),
+                path.join(imagesDir, 'logo.png')
+            );
+
+            for (const filePath of candidateFiles) {
+                if (filePath && fs.existsSync(filePath)) {
+                    logger.info(`📸 Using customer QR image: ${filePath}`);
+                    return filePath;
+                }
+            }
+        } catch (error) {
+            logger.warn(`⚠️ Failed to resolve customer QR image: ${error.message}`);
+        }
+
+        // fallback terakhir ke fungsi invoice image (bila ada)
+        return this.getInvoiceImagePath();
+    }
+
+    async prepareInvoicePdf(invoiceId) {
+        if (!invoiceId) {
+            return null;
+        }
+
+        try {
+            const pdfData = await generateInvoicePdf(invoiceId);
+            if (!pdfData?.buffer) {
+                return null;
+            }
+
+            return {
+                buffer: pdfData.buffer,
+                mimetype: 'application/pdf',
+                fileName: pdfData.fileName || `Invoice-${invoiceId}.pdf`
+            };
+        } catch (error) {
+            logger.error(`❌ Failed to generate invoice PDF for invoice ${invoiceId}:`, error);
+            return null;
+        }
+    }
+
+    async getLatestInvoiceForCustomer(customer) {
+        try {
+            let resolvedCustomer = customer;
+
+            if (!resolvedCustomer?.id) {
+                if (customer?.username) {
+                    resolvedCustomer = await billingManager.getCustomerByUsername(customer.username);
+                }
+
+                if (!resolvedCustomer && customer?.pppoe_username) {
+                    resolvedCustomer = await billingManager.getCustomerByUsername(customer.pppoe_username);
+                }
+
+                if (!resolvedCustomer && customer?.phone) {
+                    resolvedCustomer = await billingManager.getCustomerByPhone(customer.phone);
+                }
+            }
+
+            if (!resolvedCustomer?.id) {
+                return null;
+            }
+
+            const invoices = await billingManager.getInvoicesByCustomer(resolvedCustomer.id);
+            if (invoices && invoices.length > 0) {
+                return invoices[0];
+            }
+
+            return null;
+        } catch (error) {
+            logger.error(`❌ Failed getting latest invoice for customer ${customer?.username || customer?.phone}:`, error);
+            return null;
+        }
+    }
+
     // Replace template variables with actual data
     replaceTemplateVariables(template, data) {
         let message = template;
@@ -408,6 +518,26 @@ Balas dengan: *BANTU* atau *HELP*
             
             const fullMessage = `${companyHeader}${message}${footerInfo}`;
             
+            // Handle document attachment first (e.g., PDF invoice)
+            if (options.document?.buffer) {
+                try {
+                    const documentPayload = {
+                        document: options.document.buffer,
+                        mimetype: options.document.mimetype || 'application/pdf',
+                        fileName: options.document.fileName || 'invoice.pdf',
+                        caption: fullMessage
+                    };
+
+                    await this.sock.sendMessage(jid, documentPayload);
+                    logger.info(`✅ WhatsApp document notification sent to ${phoneNumber}`);
+
+                    this.incrementDailyMessageCount();
+                    return { success: true, withDocument: true };
+                } catch (docErr) {
+                    logger.error(`❌ Failed sending document to ${phoneNumber}, falling back:`, docErr);
+                }
+            }
+
             // If imagePath provided and exists, try to send as image with caption
             if (options.imagePath) {
                 try {
@@ -679,8 +809,9 @@ Balas dengan: *BANTU* atau *HELP*
             );
 
             // Attach invoice banner image if available
-            const imagePath = this.getInvoiceImagePath();
-            return await this.sendNotification(customer.phone, message, { imagePath });
+            const imagePath = this.getCustomerQrImagePath(customer);
+            const options = imagePath ? { imagePath } : {};
+            return await this.sendNotification(customer.phone, message, options);
         } catch (error) {
             logger.error('Error sending invoice created notification:', error);
             return { success: false, error: error.message };
@@ -724,9 +855,9 @@ Balas dengan: *BANTU* atau *HELP*
                 data
             );
 
-            // Attach same invoice banner image
-            const imagePath = this.getInvoiceImagePath();
-            return await this.sendNotification(customer.phone, message, { imagePath });
+            const imagePath = this.getCustomerQrImagePath(customer);
+            const options = imagePath ? { imagePath } : {};
+            return await this.sendNotification(customer.phone, message, options);
         } catch (error) {
             logger.error('Error sending due date reminder:', error);
             return { success: false, error: error.message };
@@ -765,9 +896,14 @@ Balas dengan: *BANTU* atau *HELP*
                 data
             );
 
-            // Attach same invoice banner image
-            const imagePath = this.getInvoiceImagePath();
-            return await this.sendNotification(customer.phone, message, { imagePath });
+            const options = {};
+
+            const pdfAttachment = await this.prepareInvoicePdf(invoice.id);
+            if (pdfAttachment) {
+                options.document = pdfAttachment;
+            }
+
+            return await this.sendNotification(customer.phone, message, options);
         } catch (error) {
             logger.error('Error sending payment received notification:', error);
             return { success: false, error: error.message };
@@ -993,7 +1129,9 @@ Balas dengan: *BANTU* atau *HELP*
                 }
             );
 
-            const result = await this.sendNotification(customer.phone, message);
+            const imagePath = this.getCustomerQrImagePath(customer);
+            const options = imagePath ? { imagePath } : {};
+            const result = await this.sendNotification(customer.phone, message, options);
             if (result.success) {
                 logger.info(`Service suspension notification sent to ${customer.name} (${customer.phone})`);
             } else {
@@ -1031,7 +1169,15 @@ Balas dengan: *BANTU* atau *HELP*
                 }
             );
 
-            const result = await this.sendNotification(customer.phone, message);
+            const notificationOptions = {};
+
+            const invoice = await this.getLatestInvoiceForCustomer(customer);
+            const pdfAttachment = invoice ? await this.prepareInvoicePdf(invoice.id) : null;
+            if (pdfAttachment) {
+                notificationOptions.document = pdfAttachment;
+            }
+
+            const result = await this.sendNotification(customer.phone, message, notificationOptions);
             if (result.success) {
                 logger.info(`Service restoration notification sent to ${customer.name} (${customer.phone})`);
             } else {
