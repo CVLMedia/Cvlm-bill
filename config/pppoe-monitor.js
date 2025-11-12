@@ -1,6 +1,8 @@
 // pppoe-monitor.js - Enhanced PPPoE monitoring with notification control
 const logger = require('./logger');
 const pppoeNotifications = require('./pppoe-notifications');
+const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
 
 let monitorInterval = null;
 let lastActivePPPoE = [];
@@ -29,6 +31,12 @@ async function startPPPoEMonitoring() {
 
         isMonitoring = true;
         logger.info(`PPPoE monitoring started with interval ${interval}ms`);
+
+        try {
+            await checkPPPoEChanges();
+        } catch (initialError) {
+            logger.error(`Error in initial PPPoE monitoring check: ${initialError.message}`);
+        }
         
         return { 
             success: true, 
@@ -143,6 +151,27 @@ async function checkPPPoEChanges() {
     }
 }
 
+function getConfiguredRouters() {
+    return new Promise((resolve) => {
+        try {
+            const dbPath = path.join(__dirname, '../data/billing.db');
+            const db = new sqlite3.Database(dbPath);
+            db.all('SELECT id, name, nas_ip, port FROM routers ORDER BY id', (err, rows) => {
+                db.close();
+                if (err) {
+                    logger.error(`[PPPOE] Error loading router configuration: ${err.message}`);
+                    resolve([]);
+                } else {
+                    resolve(rows || []);
+                }
+            });
+        } catch (error) {
+            logger.error(`[PPPOE] Error accessing router database: ${error.message}`);
+            resolve([]);
+        }
+    });
+}
+
 // Get monitoring status
 function getMonitoringStatus() {
     const settings = pppoeNotifications.getSettings();
@@ -200,6 +229,17 @@ async function initializePPPoEMonitoring() {
         
         // Auto-start monitoring if enabled
         if (settings.enabled) {
+            const routers = await getConfiguredRouters();
+            if (!routers.length) {
+                logger.warn('[PPPOE] Tidak ditemukan router Mikrotik yang aktif di menu admin/routers. PPPoE monitoring tidak dapat dimulai.');
+                return;
+            }
+
+            const routerSummary = routers
+                .map(router => `${router.name || 'Router'} (${router.nas_ip}${router.port ? `:${router.port}` : ''})`)
+                .join(', ');
+            logger.info(`[PPPOE] Router yang digunakan untuk monitoring: ${routerSummary}`);
+
             await startPPPoEMonitoring();
             logger.info('PPPoE monitoring auto-started on initialization');
         } else {

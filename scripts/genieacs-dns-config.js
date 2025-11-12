@@ -10,32 +10,32 @@
  */
 
 const axios = require('axios');
-const { getSetting } = require('../config/settingsManager');
 const genieacs = require('../config/genieacs');
 const mikrotik = require('../config/mikrotik');
 
 class GenieACSDNSConfig {
     constructor() {
-        this.genieacsUrl = getSetting('genieacs_url', 'http://192.168.8.89:7547');
-        this.genieacsUsername = getSetting('genieacs_username', 'admin');
-        this.genieacsPassword = getSetting('genieacs_password', 'admin');
+        this.genieacsUrl = null;
+        this.genieacsUsername = null;
+        this.genieacsPassword = null;
         this.dnsServer = '192.168.8.89'; // IP GenieACS server
         this.pppoeRange = '192.168.10.0/24';
+        this.axiosInstance = null;
     }
 
     // Helper untuk membuat axios instance
-    getAxiosInstance() {
-        return axios.create({
-            baseURL: this.genieacsUrl,
-            auth: {
-                username: this.genieacsUsername,
-                password: this.genieacsPassword
-            },
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
+    async getAxiosInstance() {
+        if (!this.axiosInstance) {
+            const serverDetails = await genieacs.getGenieacsCredentials();
+            if (!serverDetails || !serverDetails.url) {
+                throw new Error('GenieACS belum dikonfigurasi. Tambahkan server di /admin/genieacs-servers');
             }
-        });
+            this.genieacsUrl = serverDetails.url;
+            this.genieacsUsername = serverDetails.username || '';
+            this.genieacsPassword = serverDetails.password || '';
+            this.axiosInstance = await genieacs.getAxiosInstance(serverDetails);
+        }
+        return this.axiosInstance;
     }
 
     // Fungsi untuk mengatur DNS server pada ONU
@@ -44,7 +44,7 @@ class GenieACSDNSConfig {
             console.log(`🔧 Mengatur DNS server untuk device: ${deviceId}`);
             console.log(`📋 DNS Servers: ${dnsServers.join(', ')}`);
 
-            const axiosInstance = this.getAxiosInstance();
+            const axiosInstance = await this.getAxiosInstance();
 
             // Cek apakah device online dan dapat diakses
             try {

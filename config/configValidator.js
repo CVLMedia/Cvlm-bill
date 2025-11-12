@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { getSetting } = require('./settingsManager');
+const { getGenieacsCredentials } = require('./genieacs');
 const logger = require('./logger');
 
 /**
@@ -71,9 +72,18 @@ class ConfigValidator {
      */
     async testGenieACSConnection() {
         try {
-            const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-            const genieacsUsername = getSetting('genieacs_username', 'acs');
-            const genieacsPassword = getSetting('genieacs_password', '');
+            const serverDetails = await getGenieacsCredentials();
+            if (!serverDetails || !serverDetails.url) {
+                return {
+                    success: false,
+                    error: 'GenieACS belum dikonfigurasi',
+                    details: 'Tambahkan server di /admin/genieacs-servers'
+                };
+            }
+
+            const genieacsUrl = serverDetails.url;
+            const genieacsUsername = serverDetails.username || 'acs';
+            const genieacsPassword = serverDetails.password || '';
 
             // Validasi URL format
             if (!this.isValidURL(genieacsUrl)) {
@@ -422,24 +432,29 @@ class ConfigValidator {
     /**
      * Cek apakah konfigurasi saat ini menggunakan settingan default/dummy
      */
-    checkForDefaultSettings() {
+    async checkForDefaultSettings() {
         const warnings = [];
         
         // Cek GenieACS
-        const genieacsUrl = getSetting('genieacs_url', '');
-        const genieacsUser = getSetting('genieacs_username', '');
-        const genieacsPass = getSetting('genieacs_password', '');
-        
-        if (genieacsUrl.includes('localhost') || genieacsUrl.includes('127.0.0.1')) {
-            warnings.push('GenieACS menggunakan alamat localhost - pastikan ini sesuai dengan setup Anda');
-        }
-        
-        if (genieacsUser === 'admin' || genieacsUser === 'acs' || genieacsUser === '') {
-            warnings.push('GenieACS menggunakan username default - pertimbangkan untuk mengubahnya');
-        }
-        
-        if (genieacsPass === 'admin' || genieacsPass === 'password' || genieacsPass === '') {
-            warnings.push('GenieACS menggunakan password default - segera ubah untuk keamanan');
+        try {
+            const serverDetails = await getGenieacsCredentials();
+            if (!serverDetails || !serverDetails.url) {
+                warnings.push('GenieACS belum dikonfigurasi di menu /admin/genieacs-servers.');
+            } else {
+                if (serverDetails.url.includes('localhost') || serverDetails.url.includes('127.0.0.1')) {
+                    warnings.push('GenieACS menggunakan alamat localhost - pastikan ini sesuai dengan setup Anda');
+                }
+                
+                if (!serverDetails.username || serverDetails.username === 'admin' || serverDetails.username === 'acs') {
+                    warnings.push('GenieACS menggunakan username default - pertimbangkan untuk mengubahnya');
+                }
+                
+                if (!serverDetails.password || serverDetails.password === 'admin' || serverDetails.password === 'password') {
+                    warnings.push('GenieACS menggunakan password default - segera ubah untuk keamanan');
+                }
+            }
+        } catch (error) {
+            warnings.push(`Tidak dapat membaca konfigurasi GenieACS: ${error.message}`);
         }
 
         // Cek Mikrotik

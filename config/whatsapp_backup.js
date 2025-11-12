@@ -3945,17 +3945,7 @@ return;
                 await sendFormattedMessage(remoteJid, '❌ *Hanya admin yang dapat mengubah GenieACS config!*');
                 return;
             }
-const params = messageText.split(' ').slice(1);
-            if (params.length < 3) {
-                await sendFormattedMessage(remoteJid, '❌ *Format salah!*\n\nsetgenieacs [url] [username] [password]');
-return;
-}
-            let settings = getAppSettings();
-            settings.genieacs_url = params[0];
-            settings.genieacs_username = params[1];
-            settings.genieacs_password = params.slice(2).join(' ');
-            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-            await sendFormattedMessage(remoteJid, `✅ *Konfigurasi GenieACS berhasil diubah!*`);
+            await sendFormattedMessage(remoteJid, 'ℹ️ *Pengaturan GenieACS kini dilakukan melalui portal admin.*\n\nBuka menu *Admin → GenieACS Servers* untuk menambahkan atau mengubah koneksi GenieACS.');
 return;
 }
 

@@ -1,4 +1,5 @@
 const { getSetting } = require('./settingsManager');
+const { getGenieacsCredentials } = require('./genieacs');
 const { sendMessage, formatMessageWithHeaderFooter } = require('./sendMessage');
 const { findDeviceByTag } = require('./addWAN');
 const axios = require('axios');
@@ -92,9 +93,14 @@ async function checkRXPowerAndNotify() {
     console.log('📊 Checking RX Power for all devices...');
     
     // Ambil semua device dari GenieACS
-    const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-    const username = getSetting('genieacs_username', '');
-    const password = getSetting('genieacs_password', '');
+    const server = await getGenieacsCredentials();
+    if (!server || !server.url) {
+      console.error('❌ GenieACS server belum dikonfigurasi. Lewati pemeriksaan RX Power.');
+      return;
+    }
+    const genieacsUrl = server.url;
+    const username = server.username || '';
+    const password = server.password || '';
     
     // Gunakan axios sebagai pengganti fetch
     const response = await axios.get(`${genieacsUrl}/devices`, {

@@ -874,7 +874,11 @@ async function refreshDevice(deviceId) {
             return { success: false, message: "Device ID tidak valid" };
         }
         // Ambil konfigurasi GenieACS dari helper
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        const configDetails = await getGenieacsConfig();
+        if (configDetails.error) {
+            return { success: false, message: 'GenieACS belum dikonfigurasi di /admin/genieacs-servers' };
+        }
+        const { genieacsUrl, genieacsUsername, genieacsPassword } = configDetails;
         // 2. Coba mendapatkan device terlebih dahulu untuk memastikan ID valid
         // Cek apakah device ada
         try {
@@ -1504,7 +1508,16 @@ async function handleAdminCheckONUWithBilling(remoteJid, searchTerm) {
 async function findDeviceByTag(tag) {
     try {
         console.log(`Searching for device with tag: ${tag}`);
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        let genieacsUrl, genieacsUsername, genieacsPassword;
+        try {
+            const config = await getGenieacsConfig();
+            genieacsUrl = config.genieacsUrl;
+            genieacsUsername = config.genieacsUsername;
+            genieacsPassword = config.genieacsPassword;
+        } catch (configError) {
+            console.error('GenieACS not configured:', configError.message);
+            return null;
+        }
         console.log('DEBUG GenieACS URL:', genieacsUrl);
         try {
             const exactResponse = await axios.get(`${genieacsUrl}/devices/?query={"_tags":"${tag}"}`,
@@ -1572,7 +1585,13 @@ async function findDeviceByTag(tag) {
 async function handleChangeSSID(senderNumber, remoteJid, params) {
     try {
         console.log(`Handling change SSID request from ${senderNumber} with params:`, params);
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        const genieacsConfig = await getGenieacsConfig();
+        if (genieacsConfig.error) {
+            console.error('GenieACS not configured:', genieacsConfig.error.message);
+            await sock.sendMessage(remoteJid, { text: '❌ GenieACS belum dikonfigurasi. Hubungi admin untuk mengatur server di /admin/genieacs-servers.' });
+            return;
+        }
+        const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log('DEBUG GenieACS URL:', genieacsUrl);
         const device = await getDeviceByNumber(senderNumber);
         if (!device) {
@@ -1732,7 +1751,13 @@ Coba lagi nanti ya!${getSetting('footer_info', 'Internet Tanpa Batas')}`
 // Handler untuk admin mengubah password WiFi pelanggan
 async function handleAdminEditPassword(adminJid, customerNumber, newPassword) {
     try {
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        const genieacsConfig = await getGenieacsConfig();
+        if (genieacsConfig.error) {
+            console.error('GenieACS not configured:', genieacsConfig.error.message);
+            await sock.sendMessage(adminJid, { text: '❌ GenieACS belum dikonfigurasi. Atur server di /admin/genieacs-servers sebelum menggunakan perintah ini.' });
+            return;
+        }
+        const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log(`Admin mengubah password WiFi untuk pelanggan ${customerNumber}`);
         
         // Validasi panjang password
@@ -1940,7 +1965,13 @@ Coba lagi nanti ya!${getSetting('footer_info', 'Internet Tanpa Batas')}`
 // Handler untuk admin mengubah SSID pelanggan
 async function handleAdminEditSSID(adminJid, customerNumber, newSSID) {
     try {
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        const genieacsConfig = await getGenieacsConfig();
+        if (genieacsConfig.error) {
+            console.error('GenieACS not configured:', genieacsConfig.error.message);
+            await sock.sendMessage(adminJid, { text: '❌ GenieACS belum dikonfigurasi. Atur server di /admin/genieacs-servers sebelum menggunakan perintah ini.' });
+            return;
+        }
+        const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log(`Admin mengubah SSID untuk pelanggan ${customerNumber} menjadi ${newSSID}`);
         
         // Format nomor pelanggan untuk mencari di GenieACS
@@ -2264,7 +2295,12 @@ Silakan coba lagi nanti atau hubungi admin.${getSetting('footer_info', 'Internet
 // Fungsi untuk mengubah password WiFi perangkat
 async function changePassword(deviceId, newPassword) {
     try {
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        const genieacsConfig = await getGenieacsConfig();
+        if (genieacsConfig.error) {
+            console.error('GenieACS not configured:', genieacsConfig.error.message);
+            throw new Error('GenieACS belum dikonfigurasi di /admin/genieacs-servers');
+        }
+        const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log(`Changing password for device: ${deviceId}`);
         // Encode deviceId untuk URL
         const encodedDeviceId = encodeDeviceId(deviceId);
@@ -2355,7 +2391,12 @@ async function changePassword(deviceId, newPassword) {
 // Handler untuk admin mengubah password WiFi pelanggan
 async function handleAdminEditPassword(remoteJid, customerNumber, newPassword) {
     try {
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        const genieacsConfig = await getGenieacsConfig();
+        if (genieacsConfig.error) {
+            console.error('GenieACS not configured:', genieacsConfig.error.message);
+            throw new Error('GenieACS belum dikonfigurasi di /admin/genieacs-servers');
+        }
+        const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log(`Handling admin edit password request`);
         
         // Validasi parameter
@@ -2629,7 +2670,12 @@ async function handleAdminEditSSIDWithParams(remoteJid, params) {
         console.error('Sock instance not set');
         return;
     }
-    const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+    const genieacsConfig = await getGenieacsConfig();
+    if (genieacsConfig.error) {
+        console.error('GenieACS not configured:', genieacsConfig.error.message);
+        return { success: false, message: 'GenieACS belum dikonfigurasi di /admin/genieacs-servers' };
+    }
+    const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
 
     console.log(`Processing adminssid command with params:`, params);
 
@@ -2821,7 +2867,12 @@ async function handleAdminEditSSIDWithParams(remoteJid, params) {
 // Fungsi untuk mengubah SSID
 async function changeSSID(deviceId, newSSID) {
     try {
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        const genieacsConfig = await getGenieacsConfig();
+        if (genieacsConfig.error) {
+            console.error('GenieACS not configured:', genieacsConfig.error.message);
+            throw new Error('GenieACS belum dikonfigurasi di /admin/genieacs-servers');
+        }
+        const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log(`Changing SSID for device ${deviceId} to "${newSSID}"`);
         
         // Encode deviceId untuk URL
@@ -3075,7 +3126,15 @@ async function handleListONU(remoteJid) {
 async function getAllDevices() {
     try {
         // Ambil konfigurasi GenieACS dari helper
-        const { genieacsUrl, genieacsUsername, genieacsPassword } = getGenieacsConfig();
+        const genieacsConfig = await getGenieacsConfig();
+        if (genieacsConfig.error) {
+            console.error('GenieACS not configured:', genieacsConfig.error.message);
+            return res.status(500).json({
+                success: false,
+                message: 'GenieACS belum dikonfigurasi di /admin/genieacs-servers'
+            });
+        }
+        const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         const response = await axios.get(`${genieacsUrl}/devices`, {
             auth: {
                 username: genieacsUsername,
@@ -4528,22 +4587,12 @@ return;
         // Handler setgenieacs
         if (command.startsWith('setgenieacs ')) {
             if (!isAdmin) {
-                await sendFormattedMessage(remoteJid, 'âŒ *Hanya admin yang dapat mengubah GenieACS config!*');
+                await sendFormattedMessage(remoteJid, '❌ *Hanya admin yang dapat mengubah GenieACS config!*');
                 return;
             }
-const params = messageText.split(' ').slice(1);
-            if (params.length < 3) {
-                await sendFormattedMessage(remoteJid, 'âŒ *Format salah!*\n\nsetgenieacs [url] [username] [password]');
-return;
-}
-            let settings = getAppSettings();
-            settings.genieacs_url = params[0];
-            settings.genieacs_username = params[1];
-            settings.genieacs_password = params.slice(2).join(' ');
-            fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-            await sendFormattedMessage(remoteJid, `✅ *Konfigurasi GenieACS berhasil diubah!*`);
-return;
-}
+            await sendFormattedMessage(remoteJid, 'ℹ️ *Pengaturan GenieACS kini dilakukan melalui portal admin.*\n\nBuka menu *Admin → GenieACS Servers* untuk menambahkan atau mengubah koneksi GenieACS.');
+            return;
+        }
 
         // Handler setmikrotik
         if (command.startsWith('setmikrotik ')) {
@@ -6112,13 +6161,22 @@ function getAppSettings() {
 }
 
 // Deklarasi helper agar DRY
-function getGenieacsConfig() {
-    const { getSetting } = require('./settingsManager');
-    return {
-        genieacsUrl: getSetting('genieacs_url', 'http://localhost:7557'),
-        genieacsUsername: getSetting('genieacs_username', 'admin'),
-        genieacsPassword: getSetting('genieacs_password', 'password'),
-    };
+async function getGenieacsConfig() {
+    const { getGenieacsCredentials } = require('./genieacs');
+    try {
+        const serverDetails = await getGenieacsCredentials();
+        if (!serverDetails || !serverDetails.url) {
+            throw new Error('GenieACS belum dikonfigurasi');
+        }
+        return {
+            genieacsUrl: serverDetails.url,
+            genieacsUsername: serverDetails.username || 'admin',
+            genieacsPassword: serverDetails.password || 'password',
+        };
+    } catch (error) {
+        console.error('Error getting GenieACS configuration:', error.message);
+        return { error };
+    }
 }
 
 // Fungsi untuk menangani info layanan (tambahan billing)

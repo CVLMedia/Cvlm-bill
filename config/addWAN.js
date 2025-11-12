@@ -1,7 +1,7 @@
 // Fungsi untuk menambahkan konfigurasi WAN pada perangkat ONU
 const axios = require('axios');
 const logger = require('./logger');
-const { getSetting } = require('./settingsManager');
+const { getGenieacsCredentials } = require('./genieacs');
 
 // Fungsi untuk menambahkan konfigurasi WAN pada perangkat ONU
 async function handleAddWAN(remoteJid, params, sock) {
@@ -25,13 +25,15 @@ async function handleAddWAN(remoteJid, params, sock) {
         }
         
         // Dapatkan URL GenieACS
-        const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-        if (!genieacsUrl) {
+        const server = await getGenieacsCredentials();
+        if (!server || !server.url) {
             await sock.sendMessage(remoteJid, {
                 text: `❌ *Konfigurasi tidak lengkap*\n\nURL GenieACS tidak dikonfigurasi`
             });
             return;
         }
+        const genieacsUrl = server.url;
+        const auth = { username: server.username || '', password: server.password || '' };
         
         // Cari perangkat berdasarkan tag nomor pelanggan
         const device = await findDeviceByTag(customerNumber);
@@ -57,7 +59,7 @@ async function handleAddWAN(remoteJid, params, sock) {
                 `${genieacsUrl}/devices/${device._id}/tasks?connection_request`,
                 task,
                 {
-                    auth: { username: getSetting('genieacs_username', 'admin'), password: getSetting('genieacs_password', 'admin') }
+                    auth
                 }
             );
             
@@ -101,11 +103,13 @@ async function findDeviceByTag(customerNumber) {
         console.log(`🔍 [FIND_DEVICE] Searching for device with tag: ${customerNumber}`);
         
         // Dapatkan URL GenieACS
-        const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-        if (!genieacsUrl) {
+        const server = await getGenieacsCredentials();
+        if (!server || !server.url) {
             logger.error('GenieACS URL not configured');
             return null;
         }
+        const genieacsUrl = server.url;
+        const auth = { username: server.username || '', password: server.password || '' };
         
         console.log(`🌐 [FIND_DEVICE] GenieACS URL: ${genieacsUrl}`);
         
@@ -118,10 +122,7 @@ async function findDeviceByTag(customerNumber) {
             console.log(`📋 [FIND_DEVICE] Trying exact tag match:`, queryObj);
             
             const response = await axios.get(`${genieacsUrl}/devices/?query=${encodedQuery}`, {
-                auth: { 
-                    username: getSetting('genieacs_username', 'admin'), 
-                    password: getSetting('genieacs_password', 'admin') 
-                },
+                auth,
                 headers: {
                     'Accept': 'application/json'
                 },
@@ -145,10 +146,7 @@ async function findDeviceByTag(customerNumber) {
             console.log(`🔍 [FIND_DEVICE] Trying partial match query:`, partialQueryObj);
             
             const partialResponse = await axios.get(`${genieacsUrl}/devices/?query=${partialEncodedQuery}`, {
-                auth: { 
-                    username: getSetting('genieacs_username', 'admin'), 
-                    password: getSetting('genieacs_password', 'admin') 
-                },
+                auth,
                 headers: {
                     'Accept': 'application/json'
                 },
@@ -168,10 +166,7 @@ async function findDeviceByTag(customerNumber) {
             console.log(`🔍 [FIND_DEVICE] Trying manual search through all devices...`);
             
             const allDevicesResponse = await axios.get(`${genieacsUrl}/devices`, {
-                auth: { 
-                    username: getSetting('genieacs_username', 'admin'), 
-                    password: getSetting('genieacs_password', 'admin') 
-                },
+                auth,
                 headers: {
                     'Accept': 'application/json'
                 },

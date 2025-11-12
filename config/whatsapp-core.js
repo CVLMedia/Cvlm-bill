@@ -168,12 +168,22 @@ class WhatsAppCore {
     }
 
     // Get GenieACS configuration
-    getGenieacsConfig() {
-        return {
-            genieacsUrl: getSetting('genieacs_url'),
-            genieacsUsername: getSetting('genieacs_username'),
-            genieacsPassword: getSetting('genieacs_password')
-        };
+    async getGenieacsConfig() {
+        const { getGenieacsCredentials } = require('./genieacs');
+        try {
+            const serverDetails = await getGenieacsCredentials();
+            if (!serverDetails || !serverDetails.url) {
+                return null;
+            }
+            return {
+                genieacsUrl: serverDetails.url,
+                genieacsUsername: serverDetails.username || '',
+                genieacsPassword: serverDetails.password || ''
+            };
+        } catch (error) {
+            console.error('Error getting GenieACS configuration from whatsapp-core:', error.message);
+            return null;
+        }
     }
 
     // Format phone number for WhatsApp

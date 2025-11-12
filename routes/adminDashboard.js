@@ -101,7 +101,7 @@ router.get('/dashboard', adminAuth, async (req, res) => {
         
         const validationResults = await validateConfiguration();
         const summary = getValidationSummary();
-        const defaultSettingsWarnings = checkForDefaultSettings();
+        const defaultSettingsWarnings = await checkForDefaultSettings();
         
         // Update session dengan hasil validasi terbaru
         req.session.configValidation = {

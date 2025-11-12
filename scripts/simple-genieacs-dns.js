@@ -6,41 +6,40 @@
  */
 
 const axios = require('axios');
-const { getSetting } = require('../config/settingsManager');
 const genieacs = require('../config/genieacs');
 
 class SimpleGenieACSDNS {
     constructor() {
-        this.genieacsUrl = getSetting('genieacs_url', 'http://192.168.8.89:7547');
-        this.genieacsUsername = getSetting('genieacs_username', 'admin');
-        this.genieacsPassword = getSetting('genieacs_password', 'admin');
+        this.genieacsUrl = null;
+        this.genieacsUsername = null;
+        this.genieacsPassword = null;
         this.dnsServer = '192.168.8.89';
+        this.axiosInstance = null;
     }
 
     // Helper untuk membuat axios instance
-    getAxiosInstance() {
-        return axios.create({
-            baseURL: this.genieacsUrl,
-            auth: {
-                username: this.genieacsUsername,
-                password: this.genieacsPassword
-            },
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            timeout: 30000
-        });
+    async getAxiosInstance() {
+        if (!this.axiosInstance) {
+            const serverDetails = await genieacs.getGenieacsCredentials();
+            if (!serverDetails || !serverDetails.url) {
+                throw new Error('GenieACS belum dikonfigurasi. Tambahkan server di /admin/genieacs-servers');
+            }
+            this.genieacsUrl = serverDetails.url;
+            this.genieacsUsername = serverDetails.username || '';
+            this.genieacsPassword = serverDetails.password || '';
+            this.axiosInstance = await genieacs.getAxiosInstance(serverDetails);
+            this.axiosInstance.defaults.timeout = 30000;
+        }
+        return this.axiosInstance;
     }
 
     // Fungsi untuk test koneksi GenieACS
     async testConnection() {
         try {
+            const axiosInstance = await this.getAxiosInstance();
             console.log('🔍 Testing koneksi ke GenieACS...');
             console.log(`📋 URL: ${this.genieacsUrl}`);
             console.log(`📋 Username: ${this.genieacsUsername}`);
-            
-            const axiosInstance = this.getAxiosInstance();
             const response = await axiosInstance.get('/devices');
             
             console.log(`✅ Koneksi berhasil! Ditemukan ${response.data.length} device`);
@@ -86,7 +85,7 @@ class SimpleGenieACSDNS {
         try {
             console.log(`📤 Mengirim task ${task.name} ke device ${deviceId}...`);
             
-            const axiosInstance = this.getAxiosInstance();
+            const axiosInstance = await this.getAxiosInstance();
             
             // Kirim task dengan retry sederhana
             let retryCount = 0;

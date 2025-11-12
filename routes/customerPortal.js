@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const { findDeviceByTag } = require('../config/addWAN');
-const { findDeviceByPPPoE } = require('../config/genieacs');
+const { findDeviceByPPPoE, getGenieacsCredentials, getGenieacsServerForCustomer } = require('../config/genieacs');
 const { sendMessage } = require('../config/sendMessage');
 const { getSettingsWithCache, getSetting } = require('../config/settingsManager');
 const billingManager = require('../config/billing');
@@ -70,7 +70,6 @@ async function isValidCustomer(phone) {
         for (const v of variants) {
           const customer = await billingManager.getCustomerByPhone(v);
           if (customer && customer.pppoe_username) {
-            const { findDeviceByPPPoE } = require('../config/genieacs');
             device = await findDeviceByPPPoE(customer.pppoe_username);
             if (device) {
               console.log(`✅ [VALIDATION] Device found by PPPoE username: ${customer.pppoe_username} (phone: ${v})`);
@@ -180,7 +179,6 @@ async function getCustomerDeviceData(phone) {
       // 2. CUSTOMER BILLING: Cari device berdasarkan PPPoE username (FAST PATH)
       if (customer.pppoe_username || customer.username) {
         try {
-          const { findDeviceByPPPoE, testPPPoEUsernameSearch } = require('../config/genieacs');
           const pppoeToSearch = customer.pppoe_username || customer.username;
           console.log(`🔍 [BILLING] Searching device by PPPoE username: ${pppoeToSearch}`);
           console.log(`📋 [BILLING] Customer data:`, {
@@ -200,7 +198,7 @@ async function getCustomerDeviceData(phone) {
           if (pppoeToSearch === 'server@ilik' || customer.pppoe_username === 'server@ilik' || customer.username === 'server@ilik') {
             console.log(`🧪 [TEST] Testing direct search for server@ilik...`);
             try {
-              const testResult = await testPPPoEUsernameSearch('server@ilik');
+              const testResult = await findDeviceByPPPoE('server@ilik');
               if (testResult) {
                 console.log(`✅ [TEST] Direct test successful for server@ilik`);
                 device = testResult;
@@ -411,7 +409,6 @@ async function updateSSID(phone, newSSID) {
       try {
         const customer = await billingManager.getCustomerByPhone(phone);
         if (customer && customer.pppoe_username) {
-          const { findDeviceByPPPoE } = require('../config/genieacs');
           device = await findDeviceByPPPoE(customer.pppoe_username);
         }
       } catch (error) {
@@ -422,10 +419,14 @@ async function updateSSID(phone, newSSID) {
     if (!device) return false;
     const deviceId = device._id;
     const encodedDeviceId = encodeURIComponent(deviceId);
-    const settings = getSettingsWithCache();
-    const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
-    const username = settings.genieacs_username || '';
-    const password = settings.genieacs_password || '';
+    const server = await getGenieacsCredentials();
+    if (!server || !server.url) {
+      console.error('GenieACS server belum dikonfigurasi. Tidak dapat memperbarui SSID.');
+      return false;
+    }
+    const genieacsUrl = server.url;
+    const username = server.username || '';
+    const password = server.password || '';
     // Update SSID 2.4GHz
     await axios.post(
       `${genieacsUrl}/devices/${encodedDeviceId}/tasks?connection_request`,
@@ -519,7 +520,6 @@ async function updateSSIDOptimized(phone, newSSID) {
     let genieacsServer = null;
     if (customer) {
       try {
-        const { getGenieacsServerForCustomer } = require('../config/genieacs');
         genieacsServer = await getGenieacsServerForCustomer(customer);
         if (genieacsServer) {
           console.log(`✅ GenieACS server found for customer: ${genieacsServer.name} (${genieacsServer.url})`);
@@ -537,7 +537,6 @@ async function updateSSIDOptimized(phone, newSSID) {
     // Method 1: Jika ada customer dengan PPPoE username, coba cari device dengan itu (lebih akurat)
     if (customer && customer.pppoe_username) {
       try {
-        const { findDeviceByPPPoE } = require('../config/genieacs');
         device = await findDeviceByPPPoE(customer.pppoe_username, customer);
         if (device) {
           console.log(`✅ Device found by PPPoE username: ${customer.pppoe_username}`);
@@ -589,13 +588,18 @@ async function updateSSIDOptimized(phone, newSSID) {
       return { success: false, message: 'Device tidak ditemukan' };
     }
     
-    // STEP 4: Gunakan server dari customer jika ada, fallback ke settings.json
-    const settings = getSettingsWithCache();
-    const genieacsUrl = genieacsServer ? genieacsServer.url : (settings.genieacs_url || 'http://localhost:7557');
-    const username = genieacsServer ? genieacsServer.username : (settings.genieacs_username || '');
-    const password = genieacsServer ? genieacsServer.password : (settings.genieacs_password || '');
+    // STEP 4: Gunakan server dari customer jika ada, fallback ke default dari /admin/genieacs-servers
+    const serverDetails = await getGenieacsCredentials(genieacsServer);
+    if (!serverDetails || !serverDetails.url) {
+      console.error('GenieACS server belum dikonfigurasi. Tidak dapat memperbarui SSID.');
+      return { success: false, message: 'GenieACS belum dikonfigurasi' };
+    }
+    const genieacsUrl = serverDetails.url;
+    const username = serverDetails.username || '';
+    const password = serverDetails.password || '';
+    const serverName = serverDetails.name || (genieacsServer ? genieacsServer.name : 'Default');
     
-    console.log(`🌐 Using GenieACS server: ${genieacsUrl} (${genieacsServer ? genieacsServer.name : 'Default'})`);
+    console.log(`🌐 Using GenieACS server: ${genieacsUrl} (${serverName})`);
     console.log(`📱 Device ID: ${device._id}`);
     
     const deviceId = device._id;
@@ -732,7 +736,6 @@ async function updatePassword(phone, newPassword) {
       try {
         const customer = await billingManager.getCustomerByPhone(phone);
         if (customer && customer.pppoe_username) {
-          const { findDeviceByPPPoE } = require('../config/genieacs');
           device = await findDeviceByPPPoE(customer.pppoe_username);
         }
       } catch (error) {
@@ -743,10 +746,14 @@ async function updatePassword(phone, newPassword) {
     if (!device) return false;
     const deviceId = device._id;
     const encodedDeviceId = encodeURIComponent(deviceId);
-    const settings = getSettingsWithCache();
-    const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
-    const username = settings.genieacs_username || '';
-    const password = settings.genieacs_password || '';
+    const serverDetails = await getGenieacsCredentials();
+    if (!serverDetails || !serverDetails.url) {
+      console.error('GenieACS server belum dikonfigurasi. Tidak dapat memperbarui password SSID.');
+      return false;
+    }
+    const genieacsUrl = serverDetails.url;
+    const username = serverDetails.username || '';
+    const password = serverDetails.password || '';
     const tasksUrl = `${genieacsUrl}/devices/${encodedDeviceId}/tasks`;
     // Update password 2.4GHz
     await axios.post(`${tasksUrl}?connection_request`, {
@@ -827,7 +834,6 @@ async function updatePasswordOptimized(phone, newPassword) {
     let genieacsServer = null;
     if (customer) {
       try {
-        const { getGenieacsServerForCustomer } = require('../config/genieacs');
         genieacsServer = await getGenieacsServerForCustomer(customer);
         if (genieacsServer) {
           console.log(`✅ GenieACS server found for customer: ${genieacsServer.name} (${genieacsServer.url})`);
@@ -845,7 +851,6 @@ async function updatePasswordOptimized(phone, newPassword) {
     // Method 1: Jika ada customer dengan PPPoE username, coba cari device dengan itu (lebih akurat)
     if (customer && customer.pppoe_username) {
       try {
-        const { findDeviceByPPPoE } = require('../config/genieacs');
         device = await findDeviceByPPPoE(customer.pppoe_username, customer);
         if (device) {
           console.log(`✅ Device found by PPPoE username: ${customer.pppoe_username}`);
@@ -897,13 +902,18 @@ async function updatePasswordOptimized(phone, newPassword) {
       return { success: false, message: 'Device tidak ditemukan' };
     }
     
-    // STEP 4: Gunakan server dari customer jika ada, fallback ke settings.json
-    const settings = getSettingsWithCache();
-    const genieacsUrl = genieacsServer ? genieacsServer.url : (settings.genieacs_url || 'http://localhost:7557');
-    const username = genieacsServer ? genieacsServer.username : (settings.genieacs_username || '');
-    const passwordAuth = genieacsServer ? genieacsServer.password : (settings.genieacs_password || '');
+    // STEP 4: Gunakan server dari customer jika ada, fallback ke default dari /admin/genieacs-servers
+    const serverDetails = await getGenieacsCredentials(genieacsServer);
+    if (!serverDetails || !serverDetails.url) {
+      console.error('GenieACS server belum dikonfigurasi. Tidak dapat memperbarui password.');
+      return { success: false, message: 'GenieACS belum dikonfigurasi' };
+    }
+    const genieacsUrl = serverDetails.url;
+    const username = serverDetails.username || '';
+    const passwordAuth = serverDetails.password || '';
+    const serverName = serverDetails.name || (genieacsServer ? genieacsServer.name : 'Default');
     
-    console.log(`🌐 Using GenieACS server: ${genieacsUrl} (${genieacsServer ? genieacsServer.name : 'Default'})`);
+    console.log(`🌐 Using GenieACS server: ${genieacsUrl} (${serverName})`);
     console.log(`📱 Device ID: ${device._id}`);
     
     const deviceId = device._id;
@@ -1336,11 +1346,18 @@ router.post('/restart-device', async (req, res) => {
     
     console.log(`✅ Device is online. Last inform: ${lastInform.toLocaleString()}`);
     
-    // Ambil konfigurasi GenieACS
-    const settings = getSettingsWithCache();
-    const genieacsUrl = settings.genieacs_url || 'http://localhost:7557';
-    const username = settings.genieacs_username || 'admin';
-    const password = settings.genieacs_password || 'admin';
+    // Ambil konfigurasi GenieACS dari /admin/genieacs-servers
+    const serverDetails = await getGenieacsCredentials(genieacsServer);
+    if (!serverDetails || !serverDetails.url) {
+      console.error('GenieACS server belum dikonfigurasi. Tidak dapat menjalankan restart.');
+      return res.status(500).json({
+        success: false,
+        message: 'GenieACS belum dikonfigurasi. Tambahkan server di /admin/genieacs-servers.'
+      });
+    }
+    const genieacsUrl = serverDetails.url;
+    const username = serverDetails.username || 'admin';
+    const password = serverDetails.password || 'admin';
     
     console.log(`🔗 GenieACS URL: ${genieacsUrl}`);
     

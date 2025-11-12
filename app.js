@@ -320,6 +320,10 @@ const mikrotikCommands = require('./config/mikrotik-commands');
 // Import RX Power Monitor module
 const rxPowerMonitor = require('./config/rxPowerMonitor');
 
+pppoeMonitor.initializePPPoEMonitoring().catch((err) => {
+    logger.error('[PPPOE] Failed to initialize monitoring on startup:', err.message || err);
+});
+
 // Tambahkan view engine dan static
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));

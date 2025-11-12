@@ -1,7 +1,7 @@
 // Modul untuk menambahkan nomor pelanggan ke tag GenieACS
 const axios = require('axios');
 const logger = require('./logger');
-const { getSetting } = require('./settingsManager');
+const { getGenieacsCredentials } = require('./genieacs');
 
 let sock = null;
 
@@ -32,13 +32,15 @@ async function addCustomerTag(remoteJid, params) {
         }
         
         // Dapatkan URL GenieACS
-        const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-        if (!genieacsUrl) {
+        const server = await getGenieacsCredentials();
+        if (!server || !server.url) {
             await sock.sendMessage(remoteJid, {
                 text: `❌ *Konfigurasi tidak lengkap*\n\nURL GenieACS tidak dikonfigurasi`
             });
             return;
         }
+        const genieacsUrl = server.url;
+        const auth = { username: server.username || '', password: server.password || '' };
         
         // Kirim pesan bahwa proses sedang berlangsung
         await sock.sendMessage(remoteJid, {
@@ -54,10 +56,7 @@ async function addCustomerTag(remoteJid, params) {
                 tagUrl,
                 {},
                 {
-                    auth: {
-                        username: getSetting('genieacs_username', 'admin'),
-                        password: getSetting('genieacs_password', 'admin')
-                    }
+                    auth
                 }
             );
             
@@ -98,11 +97,13 @@ async function addCustomerTag(remoteJid, params) {
 async function findDeviceById(deviceId) {
     try {
         // Dapatkan URL GenieACS
-        const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-        if (!genieacsUrl) {
+        const server = await getGenieacsCredentials();
+        if (!server || !server.url) {
             logger.error('GenieACS URL not configured');
             return null;
         }
+        const genieacsUrl = server.url;
+        const auth = { username: server.username || '', password: server.password || '' };
         
         // Buat query untuk mencari perangkat berdasarkan ID
         const queryObj = { "_id": deviceId };
@@ -111,10 +112,7 @@ async function findDeviceById(deviceId) {
         
         // Ambil perangkat dari GenieACS
         const response = await axios.get(`${genieacsUrl}/devices/?query=${encodedQuery}`, {
-            auth: {
-                username: getSetting('genieacs_username', 'admin'),
-                password: getSetting('genieacs_password', 'admin')
-            },
+            auth,
             headers: {
                 'Accept': 'application/json'
             }
@@ -153,13 +151,15 @@ async function addTagByPPPoE(remoteJid, params, sock) {
         }
         
         // Dapatkan URL GenieACS
-        const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-        if (!genieacsUrl) {
+        const server = await getGenieacsCredentials();
+        if (!server || !server.url) {
             await sock.sendMessage(remoteJid, {
                 text: `❌ *Konfigurasi tidak lengkap*\n\nURL GenieACS tidak dikonfigurasi`
             });
             return;
         }
+        const genieacsUrl = server.url;
+        const auth = { username: server.username || '', password: server.password || '' };
         
         // Kirim pesan bahwa proses sedang berlangsung
         await sock.sendMessage(remoteJid, {
@@ -193,10 +193,7 @@ async function addTagByPPPoE(remoteJid, params, sock) {
                 tagUrl,
                 {},
                 {
-                    auth: {
-                        username: getSetting('genieacs_username', 'admin'),
-                        password: getSetting('genieacs_password', 'admin')
-                    }
+                    auth
                 }
             );
             
@@ -238,11 +235,13 @@ async function addTagByPPPoE(remoteJid, params, sock) {
 async function findDeviceByPPPoE(pppoeUsername) {
     try {
         // Dapatkan URL GenieACS
-        const genieacsUrl = getSetting('genieacs_url', 'http://localhost:7557');
-        if (!genieacsUrl) {
+        const server = await getGenieacsCredentials();
+        if (!server || !server.url) {
             logger.error('GenieACS URL not configured');
             return null;
         }
+        const genieacsUrl = server.url;
+        const auth = { username: server.username || '', password: server.password || '' };
         
         // Parameter paths untuk PPPoE Username
         const pppUsernamePaths = [
@@ -268,10 +267,7 @@ async function findDeviceByPPPoE(pppoeUsername) {
         
         // Ambil perangkat dari GenieACS
         const response = await axios.get(`${genieacsUrl}/devices/?query=${encodedQuery}`, {
-            auth: {
-                username: getSetting('genieacs_username', 'admin'),
-                password: getSetting('genieacs_password', 'admin')
-            },
+            auth,
             headers: {
                 'Accept': 'application/json'
             }

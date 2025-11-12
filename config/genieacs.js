@@ -2,7 +2,6 @@ const axios = require('axios');
 const { sendTechnicianMessage } = require('./sendMessage');
 const mikrotik = require('./mikrotik');
 const { getMikrotikConnection } = require('./mikrotik');
-const { getSetting } = require('./settingsManager');
 const cacheManager = require('./cacheManager');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
@@ -88,36 +87,85 @@ async function getGenieacsServerForCustomer(customer) {
     });
 }
 
-// Helper untuk membuat axios instance dinamis dengan server tertentu
-function getAxiosInstance(genieacsServer = null) {
-    let GENIEACS_URL, GENIEACS_USERNAME, GENIEACS_PASSWORD;
-    
-    if (genieacsServer) {
-        // Gunakan server yang spesifik
-        GENIEACS_URL = genieacsServer.url;
-        GENIEACS_USERNAME = genieacsServer.username;
-        GENIEACS_PASSWORD = genieacsServer.password;
-    } else {
-        // Fallback ke settings.json (untuk backward compatibility sementara)
-        GENIEACS_URL = getSetting('genieacs_url', 'http://localhost:7557');
-        GENIEACS_USERNAME = getSetting('genieacs_username', 'acs');
-        GENIEACS_PASSWORD = getSetting('genieacs_password', '');
+async function getDefaultGenieacsServer() {
+    return new Promise((resolve) => {
+        try {
+            const dbPath = path.join(__dirname, '../data/billing.db');
+            const db = new sqlite3.Database(dbPath);
+            db.get('SELECT * FROM genieacs_servers ORDER BY id LIMIT 1', [], (err, row) => {
+                db.close();
+                if (err) {
+                    console.error('❌ Error loading default GenieACS server:', err.message);
+                    resolve(null);
+                } else {
+                    resolve(row || null);
+                }
+            });
+        } catch (error) {
+            console.error('❌ Error accessing GenieACS servers:', error.message);
+            resolve(null);
+        }
+    });
+}
+
+function sanitizeGenieacsServer(server) {
+    if (!server || !server.url) {
+        throw new Error('GenieACS server belum dikonfigurasi. Silakan tambah melalui /admin/genieacs-servers');
     }
-    
+
+    const base = String(server.url || '').trim();
+    if (!base) {
+        throw new Error('GenieACS server URL kosong. Perbarui konfigurasi di /admin/genieacs-servers');
+    }
+
+    if (!/^https?:\/\//i.test(base)) {
+        throw new Error(`URL GenieACS tidak valid: ${base}. Gunakan format lengkap, misalnya http://host:port`);
+    }
+
+    return {
+        ...server,
+        url: base.replace(/\/+$/, '')
+    };
+}
+
+async function resolveGenieacsServer(genieacsServer = null) {
+    if (genieacsServer) {
+        return sanitizeGenieacsServer(genieacsServer);
+    }
+
+    const defaultServer = await getDefaultGenieacsServer();
+    if (!defaultServer) {
+        throw new Error('Tidak ada GenieACS server yang terkonfigurasi. Tambahkan server di /admin/genieacs-servers');
+    }
+
+    return sanitizeGenieacsServer(defaultServer);
+}
+
+function createAxiosInstance(server) {
     return axios.create({
-        baseURL: GENIEACS_URL,
+        baseURL: server.url,
         auth: {
-            username: GENIEACS_USERNAME,
-            password: GENIEACS_PASSWORD
+            username: server.username || '',
+            password: server.password || ''
         },
         headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
         },
-        timeout: 5000 // 5 second timeout
+        timeout: 5000
     });
 }
 
+async function getAxiosInstance(genieacsServer = null) {
+    const server = await resolveGenieacsServer(genieacsServer);
+    return createAxiosInstance(server);
+}
+
+async function getGenieacsCredentials(genieacsServer = null) {
+    return resolveGenieacsServer(genieacsServer);
+}
+
+// Helper untuk membuat axios instance dinamis dengan server tertentu
 // GenieACS API wrapper
 const genieacsApi = {
     async getDevices() {
@@ -132,7 +180,7 @@ const genieacsApi = {
             }
 
             console.log('🔍 Fetching devices from GenieACS API...');
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             const response = await axiosInstance.get('/devices');
             const devices = response.data || [];
             
@@ -162,7 +210,7 @@ const genieacsApi = {
                 console.error(`Error finding customer for phone ${phoneNumber}:`, billingError.message);
             }
             
-            const axiosInstance = getAxiosInstance(genieacsServer);
+            const axiosInstance = await getAxiosInstance(genieacsServer);
             // Mencari device berdasarkan tag yang berisi nomor telepon
             const response = await axiosInstance.get('/devices', {
                 params: {
@@ -213,7 +261,7 @@ const genieacsApi = {
                 genieacsServer = await getGenieacsServerForCustomer(customer);
             }
             
-            const axiosInstance = getAxiosInstance(genieacsServer);
+            const axiosInstance = await getAxiosInstance(genieacsServer);
             
             // Parameter paths untuk PPPoE Username
             const pppUsernamePaths = [
@@ -265,7 +313,7 @@ const genieacsApi = {
 
     async getDevice(deviceId) {
         try {
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             const response = await axiosInstance.get(`/devices/${encodeURIComponent(deviceId)}`);
             return response.data;
         } catch (error) {
@@ -277,7 +325,7 @@ const genieacsApi = {
     async setParameterValues(deviceId, parameters) {
         try {
             console.log('Setting parameters for device:', deviceId, parameters);
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             // Format parameter values untuk GenieACS
             const parameterValues = [];
             for (const [path, value] of Object.entries(parameters)) {
@@ -339,7 +387,7 @@ const genieacsApi = {
 
     async reboot(deviceId) {
         try {
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             const task = {
                 name: "reboot",
                 timestamp: new Date().toISOString()
@@ -357,7 +405,7 @@ const genieacsApi = {
 
     async factoryReset(deviceId) {
         try {
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             const task = {
                 name: "factoryReset",
                 timestamp: new Date().toISOString()
@@ -376,7 +424,7 @@ const genieacsApi = {
     async addTagToDevice(deviceId, tag) {
         try {
             console.log(`Adding tag "${tag}" to device: ${deviceId}`);
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             
             // Dapatkan device terlebih dahulu untuk melihat tag yang sudah ada
             const device = await this.getDevice(deviceId);
@@ -410,7 +458,7 @@ const genieacsApi = {
     async removeTagFromDevice(deviceId, tag) {
         try {
             console.log(`Removing tag "${tag}" from device: ${deviceId}`);
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             
             // Dapatkan device terlebih dahulu untuk melihat tag yang sudah ada
             const device = await this.getDevice(deviceId);
@@ -443,7 +491,7 @@ const genieacsApi = {
 
     async getDeviceParameters(deviceId, parameterNames) {
         try {
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             const queryString = parameterNames.map(name => `query=${encodeURIComponent(name)}`).join('&');
             const response = await axiosInstance.get(`/devices/${encodeURIComponent(deviceId)}?${queryString}`);
             return response.data;
@@ -456,16 +504,8 @@ const genieacsApi = {
     async getDeviceInfo(deviceId) {
         try {
             console.log(`Getting device info for device ID: ${deviceId}`);
-            const GENIEACS_URL = getSetting('genieacs_url', 'http://localhost:7557');
-            const GENIEACS_USERNAME = getSetting('genieacs_username', 'acs');
-            const GENIEACS_PASSWORD = getSetting('genieacs_password', '');
-            // Mendapatkan device detail
-            const deviceResponse = await axios.get(`${GENIEACS_URL}/devices/${encodeURIComponent(deviceId)}`, {
-                auth: {
-                    username: GENIEACS_USERNAME,
-                    password: GENIEACS_PASSWORD
-                }
-            });
+            const axiosInstance = await getAxiosInstance();
+            const deviceResponse = await axiosInstance.get(`/devices/${encodeURIComponent(deviceId)}`);
             return deviceResponse.data;
         } catch (error) {
             console.error(`Error getting device info for ${deviceId}:`, error.response?.data || error.message);
@@ -475,7 +515,7 @@ const genieacsApi = {
 
     async getVirtualParameters(deviceId) {
         try {
-            const axiosInstance = getAxiosInstance();
+            const axiosInstance = await getAxiosInstance();
             const response = await axiosInstance.get(`/devices/${encodeURIComponent(deviceId)}`);
             return response.data.VirtualParameters || {};
         } catch (error) {
@@ -944,7 +984,7 @@ async function getAllDevicesFromAllServers() {
         const allDevices = [];
         for (const server of servers) {
             try {
-                const axiosInstance = getAxiosInstance(server);
+                const axiosInstance = await getAxiosInstance(server);
                 const response = await axiosInstance.get('/devices', { timeout: 5000 });
                 const devices = (response.data || []).map(device => ({
                     ...device,
@@ -982,6 +1022,8 @@ module.exports = {
     findDeviceByPPPoE: genieacsApi.findDeviceByPPPoE,
     // Helper functions for multi-server support
     getGenieacsServerForCustomer,
+    getDefaultGenieacsServer,
+    getGenieacsCredentials,
     getAxiosInstance,
     getAllGenieacsServers,
     getAllDevicesFromAllServers,

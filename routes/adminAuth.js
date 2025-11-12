@@ -73,7 +73,7 @@ router.post('/login', async (req, res) => {
       setImmediate(() => {
         console.log('🔍 [ADMIN_LOGIN] Memvalidasi konfigurasi sistem secara asinkron...');
         
-        validateConfiguration().then(validationResults => {
+        validateConfiguration().then(async validationResults => {
           console.log('🔍 [ADMIN_LOGIN] Validasi selesai, menyimpan hasil ke session...');
           
             // Simpan hasil validasi ke session untuk ditampilkan di dashboard
@@ -82,7 +82,7 @@ router.post('/login', async (req, res) => {
               hasValidationRun: true,
               results: validationResults,
               summary: getValidationSummary(),
-              defaultSettingsWarnings: checkForDefaultSettings(),
+              defaultSettingsWarnings: await checkForDefaultSettings(),
               lastValidationTime: Date.now()
             };
           

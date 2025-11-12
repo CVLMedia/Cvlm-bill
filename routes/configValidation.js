@@ -16,7 +16,7 @@ router.get('/validate', adminAuth, async (req, res) => {
         // Jalankan validasi
         const validationResults = await validateConfiguration();
         const summary = getValidationSummary();
-        const defaultSettingsWarnings = checkForDefaultSettings();
+        const defaultSettingsWarnings = await checkForDefaultSettings();
         
         // Simpan hasil ke session
         req.session.configValidation = {

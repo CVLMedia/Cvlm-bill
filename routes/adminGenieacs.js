@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { adminAuth } = require('./adminAuth');
-const { getDevices, setParameterValues } = require('../config/genieacs');
+const { getDevices, setParameterValues, getGenieacsCredentials } = require('../config/genieacs');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
@@ -211,9 +211,16 @@ router.post('/genieacs/edit', adminAuth, async (req, res) => {
     }
     
     // Fallback ke default jika tidak ada server
-    const genieacsUrl = genieacsServer ? genieacsServer.url : (require('../config/settingsManager').getSetting('genieacs_url', 'http://localhost:7557'));
-    const genieacsUsername = genieacsServer ? genieacsServer.username : (require('../config/settingsManager').getSetting('genieacs_username', 'admin'));
-    const genieacsPassword = genieacsServer ? genieacsServer.password : (require('../config/settingsManager').getSetting('genieacs_password', 'password'));
+    const serverDetails = await getGenieacsCredentials(genieacsServer);
+    if (!serverDetails || !serverDetails.url) {
+      return res.status(500).json({
+        success: false,
+        message: 'GenieACS belum dikonfigurasi. Tambahkan server di /admin/genieacs-servers.'
+      });
+    }
+    const genieacsUrl = serverDetails.url;
+    const genieacsUsername = serverDetails.username || 'admin';
+    const genieacsPassword = serverDetails.password || 'password';
 
     // Encode deviceId untuk URL
     const encodedDeviceId = encodeURIComponent(id);
@@ -459,9 +466,16 @@ router.post('/genieacs/edit-tag', adminAuth, async (req, res) => {
       }
     }
     
-    const genieacsUrl = genieacsServer ? genieacsServer.url : (require('../config/settingsManager').getSetting('genieacs_url', 'http://localhost:7557'));
-    const genieacsUsername = genieacsServer ? genieacsServer.username : (require('../config/settingsManager').getSetting('genieacs_username', 'admin'));
-    const genieacsPassword = genieacsServer ? genieacsServer.password : (require('../config/settingsManager').getSetting('genieacs_password', 'password'));
+    const serverDetails = await getGenieacsCredentials(genieacsServer);
+    if (!serverDetails || !serverDetails.url) {
+      return res.status(500).json({
+        success: false,
+        message: 'GenieACS belum dikonfigurasi. Tambahkan server di /admin/genieacs-servers.'
+      });
+    }
+    const genieacsUrl = serverDetails.url;
+    const genieacsUsername = serverDetails.username || 'admin';
+    const genieacsPassword = serverDetails.password || 'password';
     // 1. Ambil tag lama perangkat
     let oldTags = [];
     try {
@@ -522,9 +536,16 @@ router.post('/genieacs/restart-onu', adminAuth, async (req, res) => {
       }
     }
     
-    const genieacsUrl = genieacsServer ? genieacsServer.url : (require('../config/settingsManager').getSetting('genieacs_url', 'http://localhost:7557'));
-    const genieacsUsername = genieacsServer ? genieacsServer.username : (require('../config/settingsManager').getSetting('genieacs_username', 'admin'));
-    const genieacsPassword = genieacsServer ? genieacsServer.password : (require('../config/settingsManager').getSetting('genieacs_password', 'password'));
+    const serverDetails = await getGenieacsCredentials(genieacsServer);
+    if (!serverDetails || !serverDetails.url) {
+      return res.status(500).json({
+        success: false,
+        message: 'GenieACS belum dikonfigurasi. Tambahkan server di /admin/genieacs-servers.'
+      });
+    }
+    const genieacsUrl = serverDetails.url;
+    const genieacsUsername = serverDetails.username || 'admin';
+    const genieacsPassword = serverDetails.password || 'password';
 
     // Kirim perintah restart ke GenieACS menggunakan endpoint yang benar
     const taskData = {
