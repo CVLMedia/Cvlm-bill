@@ -69,6 +69,10 @@ router.get('/data', (req, res) => {
                     json.payment_gateway.tripay.base_url = '';
                 }
             } catch (_) {}
+            // Ensure voucher_validity_log_enabled exists (default: true)
+            if (typeof json.voucher_validity_log_enabled === 'undefined') {
+                json.voucher_validity_log_enabled = true;
+            }
             res.json(json);
         } catch (e) {
             res.status(500).json({ error: 'Format settings.json tidak valid' });
@@ -405,6 +409,50 @@ router.post('/upload-logo', logoUpload.single('logo'), (req, res) => {
     }
 });
 
+// GET: Serve billing QR image (used for WhatsApp notifications)
+router.get('/billing-qr', (req, res) => {
+    try {
+        const settings = getSettingsWithCache();
+        const candidates = [];
+
+        // Prioritas 1: File dari settings.billing_qr_filename
+        if (settings && settings.billing_qr_filename) {
+            candidates.push(path.join(__dirname, '../public/img', settings.billing_qr_filename));
+        }
+
+        // Prioritas 2: File dengan nama billing-qr.* (dari upload)
+        const imgDir = path.join(__dirname, '../public/img');
+        if (fs.existsSync(imgDir)) {
+            const files = fs.readdirSync(imgDir);
+            const billingQrFiles = files.filter(f => f.startsWith('billing-qr.'));
+            billingQrFiles.forEach(file => {
+                candidates.push(path.join(imgDir, file));
+            });
+        }
+
+        // Prioritas 3: File fallback
+        candidates.push(
+            path.join(__dirname, '../public/img/tagihan.jpg'),
+            path.join(__dirname, '../public/img/tagihan.png'),
+            path.join(__dirname, '../public/img/invoice.jpg'),
+            path.join(__dirname, '../public/img/invoice.png'),
+            path.join(__dirname, '../public/img/logo.png')
+        );
+
+        const existingPath = candidates.find((filePath) => filePath && fs.existsSync(filePath));
+
+        if (!existingPath) {
+            return res.status(404).send('QR image not found');
+        }
+
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.sendFile(existingPath);
+    } catch (e) {
+        logger.error('Error serving billing QR:', e);
+        res.status(500).send('Failed to load billing QR image');
+    }
+});
+
 router.post('/upload-billing-qr', billingQrUpload.single('billingQr'), (req, res) => {
     try {
         if (!req.file) {
@@ -503,30 +551,178 @@ router.use((error, req, res, next) => {
 // GET: Status WhatsApp
 router.get('/wa-status', async (req, res) => {
     try {
+        const gatewayManager = require('../config/whatsapp-gateway-manager');
+        const gatewayStatus = gatewayManager.getGatewayStatus();
+
+        // Get Baileys status directly for QR code and detailed info
         const { getWhatsAppStatus } = require('../config/whatsapp');
-        const status = getWhatsAppStatus();
+        const baileysStatus = getWhatsAppStatus();
         
         // Pastikan QR code dalam format yang benar
         let qrCode = null;
-        if (status.qrCode) {
-            qrCode = status.qrCode;
-        } else if (status.qr) {
-            qrCode = status.qr;
+        if (baileysStatus.qrCode) {
+            qrCode = baileysStatus.qrCode;
+        } else if (baileysStatus.qr) {
+            qrCode = baileysStatus.qr;
         }
         
+        // Determine overall connection status from gateway manager (more reliable)
+        const isConnected = gatewayStatus.active && (
+            (gatewayStatus.active === 'baileys' && gatewayStatus.baileys.connected) ||
+            (gatewayStatus.active === 'fonnte' && gatewayStatus.fonnte.connected)
+        ) || (
+            gatewayStatus.baileys.connected || gatewayStatus.fonnte.connected
+        );
+        
         res.json({
-            connected: status.connected || false,
+            connected: isConnected || baileysStatus.connected || false,
             qr: qrCode,
-            phoneNumber: status.phoneNumber || null,
-            status: status.status || 'disconnected',
-            connectedSince: status.connectedSince || null
+            phoneNumber: gatewayStatus.baileys.phoneNumber || gatewayStatus.fonnte.phoneNumber || baileysStatus.phoneNumber || null,
+            status: gatewayStatus.baileys.status || gatewayStatus.fonnte.status || baileysStatus.status || 'disconnected',
+            connectedSince: baileysStatus.connectedSince || null,
+            qrGeneratedAt: baileysStatus.qrGeneratedAt || null,
+            gateway: {
+                primary: gatewayStatus.primary,
+                fallback: gatewayStatus.fallback,
+                active: gatewayStatus.active,
+                isFallback: gatewayStatus.isFallback,
+                baileys: gatewayStatus.baileys,
+                fonnte: gatewayStatus.fonnte
+            }
         });
     } catch (e) {
         console.error('Error getting WhatsApp status:', e);
         res.status(500).json({ 
             connected: false, 
             qr: null, 
+            status: 'error',
             error: e.message 
+        });
+    }
+});
+
+// POST: Test Fonnte Connection
+router.post('/test-fonnte', async (req, res) => {
+    try {
+        const { fonnte_api_key, fonnte_api_url } = req.body;
+        
+        if (!fonnte_api_key) {
+            return res.status(400).json({
+                success: false,
+                error: 'Fonnte API key tidak boleh kosong'
+            });
+        }
+        
+        const fonnteGateway = require('../config/fonnte-gateway');
+        
+        // Set temporary API key untuk test
+        fonnteGateway.apiKey = fonnte_api_key;
+        if (fonnte_api_url) {
+            fonnteGateway.apiUrl = fonnte_api_url;
+        }
+        
+        // Test connection
+        const testResult = await fonnteGateway.testConnection();
+        
+        if (testResult.success) {
+            let message = 'Koneksi Fonnte berhasil!';
+            if (testResult.warning) {
+                message += ' ' + testResult.warning;
+            }
+            res.json({
+                success: true,
+                message: message,
+                phoneNumber: testResult.phoneNumber || null,
+                warning: testResult.warning || null
+            });
+        } else {
+            res.json({
+                success: false,
+                error: testResult.error || 'Gagal terhubung ke Fonnte'
+            });
+        }
+    } catch (error) {
+        console.error('Error testing Fonnte connection:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Terjadi kesalahan saat test koneksi'
+        });
+    }
+});
+
+// GET: Status Telegram Bot
+router.get('/telegram-status', async (req, res) => {
+    try {
+        const telegramMonitor = require('../config/telegram-monitor');
+        const status = telegramMonitor.getStatus();
+        
+        res.json({
+            success: true,
+            status: status
+        });
+    } catch (error) {
+        console.error('Error getting Telegram status:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Bot tidak dikonfigurasi atau error: ' + error.message,
+            status: {
+                isConnected: false,
+                totalChats: 0,
+                monitoringEnabled: false,
+                pppoeMonitoring: false,
+                rxPowerMonitoring: false,
+                connectionMonitoring: false
+            }
+        });
+    }
+});
+
+// POST: Test Telegram Bot Connection
+router.post('/test-telegram', async (req, res) => {
+    try {
+        const { telegram_bot_token } = req.body;
+        
+        if (!telegram_bot_token) {
+            return res.status(400).json({
+                success: false,
+                error: 'Telegram Bot Token tidak boleh kosong'
+            });
+        }
+        
+        // Test connection dengan Telegram Bot API
+        const TelegramBot = require('node-telegram-bot-api');
+        const testBot = new TelegramBot(telegram_bot_token, { polling: false });
+        
+        try {
+            // Get bot info untuk test koneksi
+            const botInfo = await testBot.getMe();
+            
+            res.json({
+                success: true,
+                message: 'Koneksi Telegram Bot berhasil!',
+                botInfo: {
+                    id: botInfo.id,
+                    first_name: botInfo.first_name,
+                    username: botInfo.username,
+                    is_bot: botInfo.is_bot
+                }
+            });
+        } catch (apiError) {
+            // Jika error dari Telegram API
+            if (apiError.response && apiError.response.statusCode === 401) {
+                res.json({
+                    success: false,
+                    error: 'Bot Token tidak valid. Pastikan token sudah benar.'
+                });
+            } else {
+                throw apiError;
+            }
+        }
+    } catch (error) {
+        console.error('Error testing Telegram connection:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message || 'Terjadi kesalahan saat test koneksi Telegram Bot'
         });
     }
 });
@@ -1414,12 +1610,50 @@ router.post('/test-generate-isolation-script', (req, res) => {
 router.post('/api/test-genieacs-connection', async (req, res) => {
     try {
         const result = await runConsoleScript('1');
+        
+        // Log activity - Connect/Disconnect ACS
+        try {
+            const { logActivity } = require('../utils/activityLogger');
+            const username = req.session?.admin?.username || req.session?.adminUser || 'admin';
+            const action = result.success ? 'acs_connect' : 'acs_disconnect';
+            const desc = result.success 
+                ? `Konek ACS (GenieACS): Status Connected - ${result.message || 'Success'}`
+                : `Diskonek ACS (GenieACS): Status Failed - ${result.message || error.message}`;
+            
+            logActivity(
+                username,
+                'admin',
+                action,
+                desc,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => console.error('Failed to log activity:', err));
+        } catch (logErr) {
+            console.error('Error logging ACS connection:', logErr);
+        }
+        
         res.json({
             success: result.success,
             message: result.message,
             output: result.output
         });
     } catch (error) {
+        // Log activity - Disconnect ACS (Error)
+        try {
+            const { logActivity } = require('../utils/activityLogger');
+            const username = req.session?.admin?.username || req.session?.adminUser || 'admin';
+            logActivity(
+                username,
+                'admin',
+                'acs_disconnect',
+                `Diskonek ACS (GenieACS): Error - ${error.message}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => console.error('Failed to log activity:', err));
+        } catch (logErr) {
+            console.error('Error logging ACS disconnection:', logErr);
+        }
+        
         res.status(500).json({
             success: false,
             message: 'Error testing GenieACS connection: ' + error.message

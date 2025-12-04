@@ -15,7 +15,7 @@
 <div class="sidebar-overlay d-md-none" id="sidebarOverlay"></div>
 
 <!-- Billing Sidebar -->
-<nav class="col-md-2 sidebar d-flex flex-column" id="sidebar">
+<nav class="col-md-3 sidebar d-flex flex-column" id="sidebar">
     <!-- Hamburger Button (Desktop) - Inside Sidebar -->
     <button class="hamburger d-none d-md-block" id="hamburgerBtn" aria-label="Toggle Menu">
         <i class="bi bi-list"></i>
@@ -37,7 +37,7 @@
             </h6>
             <div class="version-badge-small">
                 <span class="badge <%= typeof versionBadge !== 'undefined' ? versionBadge.class : 'badge-secondary' %>">
-                    <%= typeof versionInfo !== 'undefined' ? versionInfo.version : 'v2.1.2' %>
+                    <%= typeof versionInfo !== 'undefined' ? versionInfo.version : 'v4.1' %>
                 </span>
             </div>
         </div>
@@ -53,7 +53,7 @@
     
     <!-- Customer Management Section -->
     <div class="sidebar-section-header">
-        <i class="bi bi-people"></i> Manajemen Pelanggan
+        <i class="bi bi-people"></i>Pelanggan
     </div>
     <a href="/admin/billing/customers" class="<%= typeof page !== 'undefined' && page === 'customers' ? 'active' : '' %>">
         <i class="bi bi-person"></i> Pelanggan
@@ -63,70 +63,110 @@
     </a>
     
     <!-- Invoice Management Section -->
-    <div class="sidebar-section-header">
-        <i class="bi bi-receipt"></i> Manajemen Invoice
+    <div class="sidebar-section-header dropdown-header" data-section="invoice-management">
+        <i class="bi bi-receipt"></i> 
+        <span>Invoicing</span>
+        <i class="bi bi-chevron-down dropdown-icon"></i>
     </div>
-    <a href="/admin/billing/invoices" class="<%= typeof page !== 'undefined' && page === 'invoices' ? 'active' : '' %>">
-        <i class="bi bi-file-plus"></i> Buat Invoice
-    </a>
-    <a href="/admin/billing/auto-invoice" class="<%= typeof page !== 'undefined' && page === 'auto-invoice' ? 'active' : '' %>">
-        <i class="bi bi-calendar-check"></i> Auto Invoice
-    </a>
-    <a href="/admin/billing/invoices-by-type" class="<%= typeof page !== 'undefined' && page === 'invoices-by-type' ? 'active' : '' %>">
-        <i class="bi bi-list-ul"></i> Invoice per Tipe
-    </a>
-    <a href="/admin/billing/invoice-list" class="<%= typeof page !== 'undefined' && page === 'invoice-list' ? 'active' : '' %>">
-        <i class="bi bi-receipt"></i> Semua Invoice
-    </a>
+    <div class="sidebar-submenu" id="submenu-invoice-management">
+        <a href="/admin/billing/invoices" class="<%= typeof page !== 'undefined' && page === 'invoices' ? 'active' : '' %>">
+            <i class="bi bi-file-plus"></i> Buat Invoice
+        </a>
+        <a href="/admin/billing/auto-invoice" class="<%= typeof page !== 'undefined' && page === 'auto-invoice' ? 'active' : '' %>">
+            <i class="bi bi-calendar-check"></i> Auto Invoice
+        </a>
+        <a href="/admin/billing/invoices-by-type" class="<%= typeof page !== 'undefined' && page === 'invoices-by-type' ? 'active' : '' %>">
+            <i class="bi bi-list-ul"></i> Invoice per Tipe
+        </a>
+        <a href="/admin/billing/invoice-list" class="<%= typeof page !== 'undefined' && page === 'invoice-list' ? 'active' : '' %>">
+            <i class="bi bi-receipt"></i> Semua Invoice
+        </a>
+    </div>
     
     <!-- Payment & Financial Section -->
-    <div class="sidebar-section-header">
-        <i class="bi bi-credit-card"></i> Pembayaran & Keuangan
+    <div class="sidebar-section-header dropdown-header" data-section="payment-financial">
+        <i class="bi bi-credit-card"></i> 
+        <span>Keuangan</span>
+        <i class="bi bi-chevron-down dropdown-icon"></i>
     </div>
-    <a href="/admin/billing/payments" class="<%= typeof page !== 'undefined' && page === 'payments' ? 'active' : '' %>">
-        <i class="bi bi-person-check"></i> Transaksi Kolektor
-    </a>
-    <a href="/admin/billing/all-payments" class="<%= typeof page !== 'undefined' && page === 'all-payments' ? 'active' : '' %>">
-        <i class="bi bi-credit-card"></i> Riwayat Pembayaran
-    </a>
-    <a href="/admin/collectors" class="<%= typeof page !== 'undefined' && page === 'collectors' ? 'active' : '' %>">
-        <i class="bi bi-people"></i> Tukang Tagih
-    </a>
-    <a href="/admin/billing/collector-reports" class="<%= typeof page !== 'undefined' && page === 'collector-reports' ? 'active' : '' %>">
-        <i class="bi bi-bar-chart"></i> Laporan Kolektor
-    </a>
-    <a href="/admin/billing/collector-remittance" class="<%= typeof page !== 'undefined' && page === 'collector-remittance' ? 'active' : '' %>">
-        <i class="bi bi-cash"></i> Terima Setoran
-    </a>
-    <a href="/admin/billing/financial-report" class="<%= typeof page !== 'undefined' && page === 'financial-report' ? 'active' : '' %>">
-        <i class="bi bi-graph-up"></i> Laporan Keuangan
-    </a>
-    <a href="/admin/billing/reports" class="<%= typeof page !== 'undefined' && page === 'reports' ? 'active' : '' %>">
-        <i class="bi bi-graph-up-arrow"></i> Laporan Analisis
-    </a>
-    <a href="/admin/billing/expenses" class="<%= typeof page !== 'undefined' && page === 'expenses' ? 'active' : '' %>">
-        <i class="bi bi-cash-coin"></i> Manajemen Pengeluaran
-    </a>
+    <div class="sidebar-submenu" id="submenu-payment-financial">
+        <a href="/admin/billing/payments" class="<%= typeof page !== 'undefined' && page === 'payments' ? 'active' : '' %>">
+            <i class="bi bi-person-check"></i> Transaksi Kolektor
+        </a>
+        <a href="/admin/billing/all-payments" class="<%= typeof page !== 'undefined' && page === 'all-payments' ? 'active' : '' %>">
+            <i class="bi bi-credit-card"></i> Riwayat Pembayaran
+        </a>
+        <a href="/admin/collectors" class="<%= typeof page !== 'undefined' && page === 'collectors' ? 'active' : '' %>">
+            <i class="bi bi-people"></i> Tukang Tagih
+        </a>
+        <a href="/admin/billing/collector-reports" class="<%= typeof page !== 'undefined' && page === 'collector-reports' ? 'active' : '' %>">
+            <i class="bi bi-bar-chart"></i> Laporan Kolektor
+        </a>
+        <a href="/admin/billing/collector-remittance" class="<%= typeof page !== 'undefined' && page === 'collector-remittance' ? 'active' : '' %>">
+            <i class="bi bi-cash"></i> Terima Setoran
+        </a>
+        <a href="/admin/billing/financial-report" class="<%= typeof page !== 'undefined' && page === 'financial-report' ? 'active' : '' %>">
+            <i class="bi bi-graph-up"></i> Laporan Keuangan
+        </a>
+        <a href="/admin/billing/reports/voucher" class="<%= typeof page !== 'undefined' && page === 'report-voucher' ? 'active' : '' %>">
+            <i class="bi bi-ticket-perforated"></i> Laporan Voucher
+        </a>
+        <a href="/admin/billing/reports/pppoe" class="<%= typeof page !== 'undefined' && page === 'report-pppoe' ? 'active' : '' %>">
+            <i class="bi bi-router"></i> Laporan PPPoE
+        </a>
+        <a href="/admin/billing/reports" class="<%= typeof page !== 'undefined' && page === 'reports' ? 'active' : '' %>">
+            <i class="bi bi-graph-up-arrow"></i> Laporan Analisis
+        </a>
+        <a href="/admin/billing/expenses" class="<%= typeof page !== 'undefined' && page === 'expenses' ? 'active' : '' %>">
+            <i class="bi bi-cash-coin"></i> Manajemen Pengeluaran
+        </a>
+        <a href="/admin/billing/income" class="<%= typeof page !== 'undefined' && page === 'income' ? 'active' : '' %>">
+            <i class="bi bi-cash-stack"></i> Manajemen Pemasukan
+        </a>
+    </div>
     
     <!-- System & Settings Section -->
-    <div class="sidebar-section-header">
-        <i class="bi bi-gear"></i> Sistem & Pengaturan
+    <div class="sidebar-section-header dropdown-header" data-section="system-settings">
+        <i class="bi bi-gear"></i> 
+        <span>Setting</span>
+        <i class="bi bi-chevron-down dropdown-icon"></i>
     </div>
-    <a href="/admin/billing/payment-settings" class="<%= typeof page !== 'undefined' && page === 'payment-settings' ? 'active' : '' %>">
-        <i class="bi bi-gear"></i> Pengaturan Pembayaran
+    <div class="sidebar-submenu" id="submenu-system-settings">
+        <a href="/admin/billing/payment-settings" class="<%= typeof page !== 'undefined' && page === 'payment-settings' ? 'active' : '' %>">
+            <i class="bi bi-gear"></i> Pengaturan Pembayaran
+        </a>
+        <a href="/admin/billing/whatsapp-settings" class="<%= typeof page !== 'undefined' && page === 'whatsapp-settings' ? 'active' : '' %>">
+            <i class="bi bi-chat-dots"></i> Pengaturan WhatsApp
+        </a>
+        <a href="/admin/billing/email-settings" class="<%= typeof page !== 'undefined' && page === 'email-settings' ? 'active' : '' %>">
+            <i class="bi bi-envelope"></i> Pengaturan Email
+        </a>
+        <a href="/admin/billing/service-suspension" class="<%= typeof page !== 'undefined' && page === 'service-suspension' ? 'active' : '' %>">
+            <i class="bi bi-pause-circle"></i> Penangguhan Layanan
+        </a>
+        <a href="/admin/billing/mapping-new" class="<%= typeof page !== 'undefined' && page === 'mapping-new' ? 'active' : '' %>">
+            <i class="bi bi-map"></i> Network Mapping
+        </a>
+        <a href="/admin/genieacs" class="<%= typeof page !== 'undefined' && page === 'genieacs' ? 'active' : '' %>">
+            <i class="bi bi-wifi"></i> GenieACS
+        </a>
+    </div>
+    
+    <!-- Logout (Outside dropdown) -->
+    <a href="/admin/logout">
+        <i class="bi bi-box-arrow-right"></i> Logout
     </a>
-    <a href="/admin/billing/whatsapp-settings" class="<%= typeof page !== 'undefined' && page === 'whatsapp-settings' ? 'active' : '' %>">
-        <i class="bi bi-chat-dots"></i> Pengaturan WhatsApp
-    </a>
-    <a href="/admin/billing/service-suspension" class="<%= typeof page !== 'undefined' && page === 'service-suspension' ? 'active' : '' %>">
-        <i class="bi bi-pause-circle"></i> Penangguhan Layanan
-    </a>
-    <a href="/admin/billing/mapping-new" class="<%= typeof page !== 'undefined' && page === 'mapping-new' ? 'active' : '' %>">
-        <i class="bi bi-map"></i> Network Mapping
-    </a>
-    <a href="/admin/genieacs" class="<%= typeof page !== 'undefined' && page === 'genieacs' ? 'active' : '' %>">
-        <i class="bi bi-wifi"></i> GenieACS
-    </a>
+
+    <div class="sidebar-utility mt-auto px-4 pb-4 w-100">
+        <button id="btnRestartBilling" class="btn btn-sm btn-primary w-100 mb-2">
+            <i class="bi bi-arrow-repeat"></i> Restart Billing System
+        </button>
+        <div id="billingRestartResult" class="text-light small mb-2" style="display:none;"></div>
+        <div class="server-time-box text-light mb-3">
+            <div class="text-uppercase small opacity-75">Jam Server</div>
+            <div id="serverTimeValue" class="fw-bold fs-6">--:--:--</div>
+        </div>
+    </div>
 </nav>
 
 <style>
@@ -172,6 +212,7 @@
     background: #3498DB;
     color: #fff;
     padding-top: 32px;
+    font-size: 1.1rem;
 }
 
 .sidebar a {
@@ -179,11 +220,14 @@
     text-decoration: none;
     display: flex;
     align-items: center;
-    padding: 12px 24px;
+    padding: 16px 24px;
     border-radius: 4px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
     transition: all 0.3s ease;
     white-space: nowrap;
+    font-size: 1.05rem;
+    font-weight: 500;
+    line-height: 1.5;
 }
 
 .sidebar a.active, 
@@ -197,10 +241,21 @@
     transform: translateX(0); /* No translation when collapsed */
 }
 
-.sidebar a i {
-    margin-right: 8px;
-    width: 16px;
+.sidebar a i,
+.sidebar a .bi,
+.sidebar a [class*="bi-"],
+.sidebar a [class*="bx-"] {
+    margin-right: 14px;
+    width: 22px;
+    min-width: 22px;
     flex-shrink: 0;
+    font-size: 1.2rem;
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: #fff !important;
+    line-height: 1.5;
+    vertical-align: middle;
 }
 
 /* Sidebar Header */
@@ -226,11 +281,11 @@
 }
 
 .company-name {
-    font-size: 0.9rem;
+    font-size: 1rem;
     font-weight: 600;
     margin: 0;
     color: #fff;
-    line-height: 1.2;
+    line-height: 1.3;
 }
 
 .version-badge-small .badge {
@@ -242,20 +297,118 @@
 
 /* Sidebar Section Headers */
 .sidebar-section-header {
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 0.75rem;
-    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.05rem;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 12px 24px;
-    margin: 8px 0;
+    padding: 18px 24px;
+    margin: 12px 0 8px 0;
     display: flex;
     align-items: center;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    position: relative;
+    z-index: 10;
+    pointer-events: auto;
 }
 
-.sidebar-section-header i {
-    margin-right: 8px;
-    font-size: 0.9rem;
+.sidebar-section-header.dropdown-header {
+    cursor: pointer !important;
+    pointer-events: auto !important;
+}
+
+.sidebar-section-header:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    transform: translateX(3px);
+}
+
+.sidebar-section-header.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.sidebar-section-header i:first-child {
+    margin-right: 14px;
+    font-size: 1.2rem;
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: #fff !important;
+}
+
+.sidebar-section-header.dropdown-header span {
+    flex: 1;
+    margin-left: 0;
+    margin-right: auto;
+}
+
+.sidebar-section-header .dropdown-icon {
+    margin-left: auto;
+    margin-right: 0;
+    font-size: 0.8rem;
+    transition: transform 0.3s ease;
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: #fff !important;
+}
+
+.sidebar-section-header.active .dropdown-icon {
+    transform: rotate(180deg);
+}
+
+/* Sidebar Submenu */
+.sidebar-submenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, opacity 0.4s ease, padding 0.4s ease;
+    opacity: 0;
+    padding: 0;
+    visibility: hidden;
+    display: block !important;
+    margin: 0;
+}
+
+.sidebar-submenu.show {
+    max-height: 3000px !important;
+    opacity: 1 !important;
+    padding: 8px 0 !important;
+    display: block !important;
+    visibility: visible !important;
+    margin: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+.sidebar-submenu a {
+    padding-left: 52px;
+    font-size: 1rem;
+    font-weight: 500;
+    padding-top: 14px;
+    padding-bottom: 14px;
+}
+
+/* Ensure icons in submenu are always visible */
+.sidebar-submenu a i,
+.sidebar-submenu a .bi,
+.sidebar-submenu a [class*="bi-"],
+.sidebar-submenu a [class*="bx-"] {
+    margin-right: 14px;
+    width: 22px;
+    flex-shrink: 0;
+    font-size: 1.2rem;
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: #fff !important;
+}
+
+.sidebar.collapsed .sidebar-submenu {
+    display: none !important;
 }
 
 /* Hamburger Button (Desktop) - Integrated with Sidebar */
@@ -305,6 +458,17 @@
     }
 }
 
+/* Global rule to ensure all icons are always visible */
+.sidebar i,
+.sidebar .bi,
+.sidebar [class*="bi-"],
+.sidebar [class*="bx-"] {
+    display: inline-block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    color: #fff !important;
+}
+
 /* Sidebar scrolling */
 .sidebar {
     scrollbar-width: thin;
@@ -328,11 +492,26 @@
     background: rgba(255, 255, 255, 0.5);
 }
 
+.sidebar-utility {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: auto;
+}
+
+.server-time-box {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+.server-time-box #serverTimeValue {
+    letter-spacing: 0.5px;
+}
+
 /* Desktop sidebar toggle state */
 @media (min-width: 768px) {
     .sidebar {
         transition: width 0.3s ease, transform 0.3s ease;
-        width: 16.666667%; /* col-md-2 width */
+        width: 280px; /* Fixed width untuk lebih lebar */
+        min-width: 280px;
         position: fixed;
         height: 100vh;
         left: 0;
@@ -344,6 +523,7 @@
     
     .sidebar.collapsed {
         width: 70px !important; /* Narrow width untuk icon saja */
+        min-width: 70px !important;
         transform: translateX(0) !important; /* Tidak hilang, tetap terlihat */
         overflow: hidden !important;
     }
@@ -368,27 +548,61 @@
     /* Hide text content in links, keep only icons */
     .sidebar.collapsed a {
         justify-content: center !important;
-        padding: 12px 8px !important;
-        text-align: center;
+        padding: 14px 8px !important;
+        text-align: center !important;
         position: relative;
-        font-size: 0 !important; /* Hide text by making font size 0 */
-        line-height: 0 !important;
         overflow: hidden;
+        font-size: 0 !important; /* Hide text */
+        line-height: 0 !important;
+        display: flex !important;
+        align-items: center !important;
     }
     
-    .sidebar.collapsed a i {
+    /* Ensure icons are always visible and properly sized */
+    .sidebar.collapsed a i,
+    .sidebar.collapsed a .bi,
+    .sidebar.collapsed a [class*="bi-"],
+    .sidebar.collapsed a [class*="bx-"] {
         margin-right: 0 !important;
         margin-left: 0 !important;
-        font-size: 1.3rem !important;
+        font-size: 1.5rem !important;
         width: auto !important;
+        min-width: 24px !important;
         display: inline-block !important;
-        line-height: normal !important;
-        vertical-align: middle;
+        line-height: 1.5 !important;
+        vertical-align: middle !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        color: #fff !important;
+        flex-shrink: 0 !important;
     }
     
-    /* Hide any text nodes inside links */
-    .sidebar.collapsed a *:not(i) {
+    /* Hide all text nodes and spans but keep icons */
+    .sidebar.collapsed a > span,
+    .sidebar.collapsed a > *:not(i):not([class*="bi-"]):not([class*="bx-"]) {
         display: none !important;
+        font-size: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Override any rule that might hide icons */
+    .sidebar.collapsed a i,
+    .sidebar.collapsed a .bi,
+    .sidebar.collapsed a [class*="bi-"],
+    .sidebar.collapsed a [class*="bx-"] {
+        display: inline-block !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        width: auto !important;
+        min-width: 24px !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     
     /* Hide sidebar header text when collapsed */
@@ -418,8 +632,8 @@
     }
     
     .main-content.sidebar-expanded {
-        margin-left: 16.666667%; /* col-md-2 width */
-        width: 83.333333%; /* 100% - sidebar width */
+        margin-left: 280px; /* Sidebar width */
+        width: calc(100% - 280px);
     }
     
     .main-content.sidebar-collapsed {
@@ -429,8 +643,8 @@
     
     /* Default state: sidebar expanded */
     .main-content:not(.sidebar-collapsed):not(.sidebar-expanded) {
-        margin-left: 16.666667%;
-        width: 83.333333%;
+        margin-left: 280px;
+        width: calc(100% - 280px);
     }
 }
 
@@ -533,8 +747,8 @@
 /* Desktop specific */
 @media (min-width: 768px) {
     .main-content {
-        margin-left: 16.666667%; /* col-md-2 width */
-        width: 83.333333%; /* 100% - sidebar width */
+        margin-left: 280px; /* Sidebar width */
+        width: calc(100% - 280px);
     }
     
     .sidebar {
@@ -545,6 +759,8 @@
         left: 0;
         top: 0;
         z-index: 1000;
+        width: 280px;
+        min-width: 280px;
     }
 }
 
@@ -720,7 +936,213 @@
 </style>
 
 <script>
+// Dropdown functionality - menggunakan event delegation global
+(function() {
+    let dropdownInitialized = false;
+    
+    function initDropdowns() {
+        if (dropdownInitialized) return;
+        
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar) {
+            setTimeout(initDropdowns, 100);
+            return;
+        }
+        
+        // Setup event delegation pada sidebar
+        function handleDropdownClick(e) {
+            // Check if clicked element or its parent is dropdown-header
+            let dropdownHeader = e.target.closest('.dropdown-header');
+            
+            // If clicked on icon or span inside dropdown-header
+            if (!dropdownHeader) {
+                const parent = e.target.parentElement;
+                if (parent && parent.classList.contains('dropdown-header')) {
+                    dropdownHeader = parent;
+                }
+            }
+            
+            if (!dropdownHeader) return;
+            
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const sectionId = dropdownHeader.getAttribute('data-section');
+            if (!sectionId) {
+                console.warn('No data-section found on dropdown header');
+                return;
+            }
+            
+            const submenu = document.getElementById(`submenu-${sectionId}`);
+            if (!submenu) {
+                console.error('Submenu not found:', `submenu-${sectionId}`);
+                return;
+            }
+            
+            const isActive = dropdownHeader.classList.contains('active');
+            
+            // Close all other dropdowns
+            document.querySelectorAll('.dropdown-header').forEach(h => {
+                if (h !== dropdownHeader) {
+                    h.classList.remove('active');
+                    const otherSectionId = h.getAttribute('data-section');
+                    if (otherSectionId) {
+                        const otherSubmenu = document.getElementById(`submenu-${otherSectionId}`);
+                        if (otherSubmenu) {
+                            otherSubmenu.classList.remove('show');
+                        }
+                    }
+                }
+            });
+            
+            // Toggle current dropdown
+            if (isActive) {
+                dropdownHeader.classList.remove('active');
+                submenu.classList.remove('show');
+                console.log('Dropdown closed:', sectionId);
+            } else {
+                dropdownHeader.classList.add('active');
+                submenu.classList.add('show');
+                console.log('Dropdown opened:', sectionId);
+            }
+        }
+        
+        sidebar.addEventListener('click', handleDropdownClick);
+        
+        // Auto-expand dropdown if current page is in submenu
+        document.querySelectorAll('.dropdown-header').forEach(header => {
+            const sectionId = header.getAttribute('data-section');
+            if (!sectionId) return;
+            
+            const submenu = document.getElementById(`submenu-${sectionId}`);
+            if (submenu) {
+                const activeLink = submenu.querySelector('a.active');
+                if (activeLink) {
+                    header.classList.add('active');
+                    submenu.classList.add('show');
+                }
+            }
+        });
+        
+        dropdownInitialized = true;
+    }
+    
+    // Initialize
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDropdowns);
+    } else {
+        initDropdowns();
+    }
+    
+    // Fallback
+    setTimeout(initDropdowns, 200);
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
+    const restartBillingBtn = document.getElementById('btnRestartBilling');
+    const restartResultBox = document.getElementById('billingRestartResult');
+    const serverTimeValue = document.getElementById('serverTimeValue');
+    let serverTimeOffset = null;
+
+    function showRestartResult(text, success = true) {
+        if (!restartResultBox) return;
+        restartResultBox.style.display = 'block';
+        restartResultBox.style.color = success ? '#c8e6c9' : '#ffcdd2';
+        restartResultBox.textContent = text;
+    }
+
+    function renderServerTime() {
+        if (serverTimeOffset === null || !serverTimeValue) return;
+        
+        // Hitung waktu server saat ini dengan offset
+        // serverTimeOffset adalah selisih antara waktu server UTC dengan waktu client UTC
+        // Server timezone adalah WIB (UTC+7)
+        const serverTimeUTCNow = Date.now() + serverTimeOffset;
+        const wibOffset = 7 * 60 * 60 * 1000; // 7 jam dalam milliseconds (WIB = UTC+7)
+        const serverTimeWIB = new Date(serverTimeUTCNow + wibOffset);
+        
+        // Format waktu WIB menggunakan UTC methods (karena sudah ditambahkan offset WIB)
+        const day = String(serverTimeWIB.getUTCDate()).padStart(2, '0');
+        const month = String(serverTimeWIB.getUTCMonth() + 1).padStart(2, '0');
+        const year = serverTimeWIB.getUTCFullYear();
+        const hour = String(serverTimeWIB.getUTCHours()).padStart(2, '0');
+        const minute = String(serverTimeWIB.getUTCMinutes()).padStart(2, '0');
+        const second = String(serverTimeWIB.getUTCSeconds()).padStart(2, '0');
+        
+        serverTimeValue.textContent = `${day}/${month}/${year} ${hour}:${minute}:${second} WIB`;
+    }
+
+    async function fetchServerInfo() {
+        try {
+            const fetchStartTime = Date.now(); // Waktu saat request dimulai
+            const res = await fetch('/admin/billing/system/server-info');
+            const fetchEndTime = Date.now(); // Waktu saat response diterima
+            const fetchDuration = fetchEndTime - fetchStartTime; // Durasi fetch (untuk kompensasi latency)
+            
+            const data = await res.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Gagal mengambil info server');
+            }
+            
+            // Server mengirim waktu dalam UTC (serverTimeUnix)
+            // Server timezone adalah WIB (UTC+7), jadi waktu server = UTC + 7 jam
+            // Untuk mendapatkan waktu server saat ini, kita perlu:
+            // 1. Ambil waktu server UTC saat ini
+            // 2. Tambahkan 7 jam untuk WIB
+            // 3. Hitung offset dengan waktu client
+            if (data.serverTimeUnix) {
+                // Waktu server UTC saat ini (dengan kompensasi latency)
+                const serverTimeUTCNow = data.serverTimeUnix + (fetchDuration / 2);
+                // Waktu client UTC saat ini
+                const clientTimeUTCNow = fetchEndTime;
+                // Offset = selisih waktu server UTC dengan client UTC
+                serverTimeOffset = serverTimeUTCNow - clientTimeUTCNow;
+                renderServerTime();
+            } else if (data.serverTimeIso) {
+                // Fallback ke ISO jika serverTimeUnix tidak ada
+                const serverTimeUTC = new Date(data.serverTimeIso).getTime();
+                const estimatedServerTimeNow = serverTimeUTC + (fetchDuration / 2);
+                const clientTimeUTC = fetchEndTime;
+                serverTimeOffset = estimatedServerTimeNow - clientTimeUTC;
+                renderServerTime();
+            }
+        } catch (error) {
+            // Fallback: gunakan waktu client dengan offset 0
+            console.warn('Failed to fetch server time, using client time:', error);
+            serverTimeOffset = 0;
+            if (serverTimeValue) {
+                // Tampilkan waktu client dalam format WIB
+                renderServerTime();
+            }
+        }
+    }
+
+    if (restartBillingBtn) {
+        restartBillingBtn.addEventListener('click', async () => {
+            if (!confirm('Restart layanan billing sekarang?')) return;
+            try {
+                restartBillingBtn.disabled = true;
+                restartBillingBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Restarting...';
+                showRestartResult('Memproses restart...', true);
+                const res = await fetch('/admin/billing/system/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                const data = await res.json();
+                if (!data.success) {
+                    showRestartResult('Restart gagal: ' + (data.message || 'Unknown error') + '\n' + (data.error || ''), false);
+                } else {
+                    showRestartResult('Restart berhasil dijalankan.', true);
+                    await fetchServerInfo();
+                }
+            } catch (error) {
+                showRestartResult('Restart error: ' + error.message, false);
+            } finally {
+                restartBillingBtn.disabled = false;
+                restartBillingBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Restart Billing System';
+            }
+        });
+    }
+
+    fetchServerInfo();
+    setInterval(renderServerTime, 1000);
     const sidebarToggle = document.getElementById('sidebarToggle'); // Mobile
     const hamburgerBtn = document.getElementById('hamburgerBtn'); // Desktop
     const sidebarClose = document.getElementById('sidebarClose');
@@ -807,6 +1229,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateSidebarCollapsedState();
     hamburgerBtn?.addEventListener('click', updateSidebarCollapsedState);
     
+    
     // Close sidebar functions
     function closeSidebar() {
         sidebar.classList.remove('show');
@@ -848,4 +1271,4 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
-</script> 
+</script>

@@ -876,7 +876,7 @@ async function refreshDevice(deviceId) {
         // Ambil konfigurasi GenieACS dari helper
         const configDetails = await getGenieacsConfig();
         if (configDetails.error) {
-            return { success: false, message: 'GenieACS belum dikonfigurasi di /admin/genieacs-servers' };
+            return { success: false, message: 'GenieACS belum dikonfigurasi di /admin/routers' };
         }
         const { genieacsUrl, genieacsUsername, genieacsPassword } = configDetails;
         // 2. Coba mendapatkan device terlebih dahulu untuk memastikan ID valid
@@ -1588,7 +1588,7 @@ async function handleChangeSSID(senderNumber, remoteJid, params) {
         const genieacsConfig = await getGenieacsConfig();
         if (genieacsConfig.error) {
             console.error('GenieACS not configured:', genieacsConfig.error.message);
-            await sock.sendMessage(remoteJid, { text: '❌ GenieACS belum dikonfigurasi. Hubungi admin untuk mengatur server di /admin/genieacs-servers.' });
+                await sock.sendMessage(remoteJid, { text: '❌ GenieACS belum dikonfigurasi. Hubungi admin untuk mengatur server di /admin/routers.' });
             return;
         }
         const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
@@ -1754,7 +1754,7 @@ async function handleAdminEditPassword(adminJid, customerNumber, newPassword) {
         const genieacsConfig = await getGenieacsConfig();
         if (genieacsConfig.error) {
             console.error('GenieACS not configured:', genieacsConfig.error.message);
-            await sock.sendMessage(adminJid, { text: '❌ GenieACS belum dikonfigurasi. Atur server di /admin/genieacs-servers sebelum menggunakan perintah ini.' });
+                await sock.sendMessage(adminJid, { text: '❌ GenieACS belum dikonfigurasi. Atur server di /admin/routers sebelum menggunakan perintah ini.' });
             return;
         }
         const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
@@ -1968,7 +1968,7 @@ async function handleAdminEditSSID(adminJid, customerNumber, newSSID) {
         const genieacsConfig = await getGenieacsConfig();
         if (genieacsConfig.error) {
             console.error('GenieACS not configured:', genieacsConfig.error.message);
-            await sock.sendMessage(adminJid, { text: '❌ GenieACS belum dikonfigurasi. Atur server di /admin/genieacs-servers sebelum menggunakan perintah ini.' });
+                await sock.sendMessage(adminJid, { text: '❌ GenieACS belum dikonfigurasi. Atur server di /admin/routers sebelum menggunakan perintah ini.' });
             return;
         }
         const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
@@ -2298,7 +2298,7 @@ async function changePassword(deviceId, newPassword) {
         const genieacsConfig = await getGenieacsConfig();
         if (genieacsConfig.error) {
             console.error('GenieACS not configured:', genieacsConfig.error.message);
-            throw new Error('GenieACS belum dikonfigurasi di /admin/genieacs-servers');
+                throw new Error('GenieACS belum dikonfigurasi di /admin/routers');
         }
         const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log(`Changing password for device: ${deviceId}`);
@@ -2394,7 +2394,7 @@ async function handleAdminEditPassword(remoteJid, customerNumber, newPassword) {
         const genieacsConfig = await getGenieacsConfig();
         if (genieacsConfig.error) {
             console.error('GenieACS not configured:', genieacsConfig.error.message);
-            throw new Error('GenieACS belum dikonfigurasi di /admin/genieacs-servers');
+                throw new Error('GenieACS belum dikonfigurasi di /admin/routers');
         }
         const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log(`Handling admin edit password request`);
@@ -2870,7 +2870,7 @@ async function changeSSID(deviceId, newSSID) {
         const genieacsConfig = await getGenieacsConfig();
         if (genieacsConfig.error) {
             console.error('GenieACS not configured:', genieacsConfig.error.message);
-            throw new Error('GenieACS belum dikonfigurasi di /admin/genieacs-servers');
+                throw new Error('GenieACS belum dikonfigurasi di /admin/routers');
         }
         const { genieacsUrl, genieacsUsername, genieacsPassword } = genieacsConfig;
         console.log(`Changing SSID for device ${deviceId} to "${newSSID}"`);

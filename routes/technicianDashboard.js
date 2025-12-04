@@ -371,25 +371,43 @@ router.post('/customers/add', technicianAuth, async (req, res) => {
         // Tambah customer via billing manager
         const newCustomer = await billingManager.createCustomer(customerData);
 
-        // Opsional: buat PPPoE secret langsung di Mikrotik (terima create_pppoe_user atau create_pppoe_now)
-        const createNow = String(create_pppoe_now).toLowerCase() === 'true' || String(create_pppoe_user).toLowerCase() === 'true';
-        if (createNow) {
-            try {
-                const pppUser = (pppoe_username && pppoe_username.trim()) ? pppoe_username.trim() : username;
+        // Selalu buat PPPoE secret langsung di Mikrotik saat create customer
+        try {
+            // Get customer_id dari newCustomer (sudah di-generate dengan format yy-mm-dd hh:mm)
+            const customerId = newCustomer.customer_id || newCustomer.pppoe_username;
+            if (!customerId) {
+                console.warn(`[TECHNICIAN] Cannot create PPPoE: customer_id not found for customer ${name}`);
+            } else {
+                const pppUser = (pppoe_username && pppoe_username.trim()) ? pppoe_username.trim() : customerId;
                 const pppProfile = (customerData.pppoe_profile && String(customerData.pppoe_profile).trim()) ? String(customerData.pppoe_profile).trim() : 'default';
-                // Password: pakai isian atau samakan dengan username
-                const pppPass = (pppoe_password && String(pppoe_password).trim().length >= 6) ? String(pppoe_password).trim() : pppUser;
-                const mkResult = await addPPPoESecret(pppUser, pppPass, pppProfile, '');
+                // Password sama dengan username (customer_id)
+                const pppPass = pppUser;
+                // Comment dengan nama customer
+                const customerName = name || 'Customer';
+                
+                console.log(`[TECHNICIAN] Creating PPPoE user: ${pppUser}, profile: ${pppProfile}, comment: ${customerName}`);
+                
+                const mkResult = await addPPPoESecret(pppUser, pppPass, pppProfile, '', null, customerName);
+                
+                console.log(`[TECHNICIAN] PPPoE creation result:`, JSON.stringify(mkResult, null, 2));
+                
                 await authManager.logActivity(
                     req.technician.id,
                     'pppoe_create',
                     `Create PPPoE secret ${pppUser} (profile: ${pppProfile})`,
                     { customer_id: newCustomer.id, pppoe_username: pppUser, profile: pppProfile, mikrotik: mkResult?.success }
                 );
-            } catch (mkErr) {
-                // Jangan gagal total jika Mikrotik gagal
-                console.warn('Failed to create PPPoE secret on Mikrotik:', mkErr.message);
+                
+                if (mkResult && mkResult.success) {
+                    console.log(`[TECHNICIAN] ✅ PPPoE user ${pppUser} successfully created in Mikrotik`);
+                } else {
+                    console.error(`[TECHNICIAN] ❌ Failed to create PPPoE user ${pppUser}: ${mkResult?.message || 'Unknown error'}`);
+                }
             }
+        } catch (mkErr) {
+            // Jangan gagal total jika Mikrotik gagal, tapi log error dengan detail
+            console.error(`[TECHNICIAN] ❌ Exception creating PPPoE secret on Mikrotik: ${mkErr.message}`);
+            console.error(`[TECHNICIAN] Stack trace:`, mkErr.stack);
         }
 
         // Log activity

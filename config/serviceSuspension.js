@@ -192,14 +192,12 @@ class ServiceSuspensionManager {
                 }
             }
 
-            // 3. Update status di billing database
+            // 3. Update status di billing database (PENTING: Selalu update status meskipun mikrotik/genieacs gagal)
             try {
-                if (customer.id) {
-                    logger.info(`[SUSPEND] Updating billing status by id=${customer.id} to 'suspended' (username=${customer.username||customer.pppoe_username||'-'})`);
-                    await billingManager.setCustomerStatusById(customer.id, 'suspended');
-                    results.billing = true;
-                } else {
-                    // Resolve by username first, then phone, to obtain reliable id
+                let customerIdToUpdate = customer.id;
+                
+                // Jika customer.id tidak ada, coba resolve dari username/phone
+                if (!customerIdToUpdate) {
                     let resolved = null;
                     if (customer.pppoe_username) {
                         try { resolved = await billingManager.getCustomerByUsername(customer.pppoe_username); } catch (_) {}
@@ -211,19 +209,30 @@ class ServiceSuspensionManager {
                         try { resolved = await billingManager.getCustomerByPhone(customer.phone); } catch (_) {}
                     }
                     if (resolved && resolved.id) {
-                        logger.info(`[SUSPEND] Resolved customer id=${resolved.id} (username=${resolved.pppoe_username||resolved.username||'-'}) → set 'suspended'`);
-                        await billingManager.setCustomerStatusById(resolved.id, 'suspended');
-                        results.billing = true;
-                    } else if (customer.phone) {
-                        logger.warn(`[SUSPEND] Falling back to update by phone=${customer.phone} (no id resolved)`);
-                        await billingManager.updateCustomer(customer.phone, { ...customer, status: 'suspended' });
-                        results.billing = true;
-                    } else {
-                        logger.error(`[SUSPEND] Unable to resolve customer identifier for status update`);
+                        customerIdToUpdate = resolved.id;
+                        logger.info(`[SUSPEND] Resolved customer id=${customerIdToUpdate} from username/phone`);
                     }
                 }
+                
+                // Update status menggunakan ID yang sudah ditemukan
+                if (customerIdToUpdate) {
+                    logger.info(`[SUSPEND] Updating billing status by id=${customerIdToUpdate} to 'suspended' (username=${customer.username||customer.pppoe_username||'-'})`);
+                    await billingManager.setCustomerStatusById(customerIdToUpdate, 'suspended');
+                    results.billing = true;
+                    logger.info(`[SUSPEND] ✅ Successfully updated customer status to 'suspended' in database`);
+                } else if (customer.phone) {
+                    // Fallback: update by phone jika ID tidak ditemukan
+                    logger.warn(`[SUSPEND] Falling back to update by phone=${customer.phone} (no id resolved)`);
+                    await billingManager.updateCustomer(customer.phone, { ...customer, status: 'suspended' });
+                    results.billing = true;
+                    logger.info(`[SUSPEND] ✅ Successfully updated customer status to 'suspended' via phone fallback`);
+                } else {
+                    logger.error(`[SUSPEND] ❌ Unable to resolve customer identifier for status update - customer: ${JSON.stringify({username: customer.username, pppoe_username: customer.pppoe_username, phone: customer.phone})}`);
+                }
             } catch (billingError) {
-                logger.error(`Billing update failed for ${customer.username}:`, billingError.message);
+                logger.error(`[SUSPEND] ❌ Billing update failed for ${customer.username}:`, billingError);
+                logger.error(`[SUSPEND] Error stack:`, billingError.stack);
+                // Jangan throw error, biarkan proses lanjut meskipun update billing gagal
             }
 
             // 4. Send WhatsApp notification
@@ -234,11 +243,22 @@ class ServiceSuspensionManager {
                 logger.error(`WhatsApp notification failed for ${customer.username}:`, notificationError.message);
             }
 
+            // Pastikan success = true jika billing berhasil diupdate (status sudah diubah ke suspended)
+            // Ini penting karena status di database harus selalu diupdate meskipun mikrotik/genieacs gagal
+            const success = results.billing || results.mikrotik || results.genieacs;
+            
+            if (results.billing) {
+                logger.info(`[SUSPEND] ✅ Customer ${customer.username || customer.pppoe_username || customer.phone} status successfully updated to 'suspended' in database`);
+            } else {
+                logger.error(`[SUSPEND] ❌ Failed to update customer status in database - customer may still show as active!`);
+            }
+            
             return {
-                success: results.mikrotik || results.genieacs || results.billing,
+                success: success,
                 results,
                 customer: customer.username,
-                reason
+                reason,
+                message: results.billing ? 'Customer status updated to suspended' : 'Failed to update customer status'
             };
 
         } catch (error) {
@@ -447,26 +467,29 @@ class ServiceSuspensionManager {
      */
     async checkAndSuspendOverdueCustomers() {
         if (this.isRunning) {
-            logger.info('Service suspension check already running, skipping...');
-            return;
+            logger.info('[SUSPENSION CHECK] Service suspension check already running, skipping...');
+            return { checked: 0, suspended: 0, errors: 0, details: [], message: 'Already running' };
         }
 
         try {
             this.isRunning = true;
-            logger.info('Starting automatic service suspension check...');
+            logger.info('[SUSPENSION CHECK] ========================================');
+            logger.info('[SUSPENSION CHECK] Starting automatic service suspension check...');
 
             // Ambil pengaturan grace period
             const gracePeriodDays = parseInt(getSetting('suspension_grace_period_days', '7'));
             const autoSuspensionEnabled = getSetting('auto_suspension_enabled', true) === true || getSetting('auto_suspension_enabled', 'true') === 'true';
 
+            logger.info(`[SUSPENSION CHECK] Settings - Auto suspension enabled: ${autoSuspensionEnabled}, Grace period: ${gracePeriodDays} days`);
+
             if (!autoSuspensionEnabled) {
-                logger.info('Auto suspension is disabled in settings');
-                return;
+                logger.info('[SUSPENSION CHECK] Auto suspension is disabled in settings - exiting');
+                return { checked: 0, suspended: 0, errors: 0, details: [], message: 'Auto suspension disabled' };
             }
 
             // Ambil tagihan yang overdue
             const overdueInvoices = await billingManager.getOverdueInvoices();
-            logger.info(`Found ${overdueInvoices.length} overdue invoices to check`);
+            logger.info(`[SUSPENSION CHECK] Found ${overdueInvoices.length} overdue invoices to check`);
             
             if (overdueInvoices.length === 0) {
                 logger.info('No overdue invoices found, skipping suspension check');
@@ -522,9 +545,14 @@ class ServiceSuspensionManager {
                     }
 
                     // Suspend layanan
+                    logger.info(`[SUSPENSION CHECK] Attempting to suspend customer ${customer.username} (${daysOverdue} days overdue, invoice: ${invoice.invoice_number})`);
                     const suspensionResult = await this.suspendCustomerService(customer, `Telat bayar ${daysOverdue} hari`);
                     
-                    if (suspensionResult.success) {
+                    // Cek apakah status benar-benar berubah di database setelah suspend
+                    const customerAfterSuspend = await billingManager.getCustomerById(customer.id);
+                    const statusUpdated = customerAfterSuspend && customerAfterSuspend.status === 'suspended';
+                    
+                    if (suspensionResult.success && statusUpdated) {
                         results.suspended++;
                         results.details.push({
                             customer: customer.username,
@@ -532,16 +560,19 @@ class ServiceSuspensionManager {
                             daysOverdue,
                             status: 'suspended'
                         });
-                        logger.info(`Successfully suspended service for ${customer.username} (${daysOverdue} days overdue)`);
+                        logger.info(`[SUSPENSION CHECK] ✅ Successfully suspended service for ${customer.username} (${daysOverdue} days overdue) - Status confirmed: ${customerAfterSuspend.status}`);
                     } else {
                         results.errors++;
+                        const errorMsg = statusUpdated ? suspensionResult.message || 'Suspension partially failed' : 'Status not updated in database';
                         results.details.push({
                             customer: customer.username,
                             invoice: invoice.invoice_number,
                             daysOverdue,
-                            status: 'failed'
+                            status: statusUpdated ? 'suspended' : 'failed',
+                            error: errorMsg
                         });
-                        logger.error(`Failed to suspend service for ${customer.username}`);
+                        logger.error(`[SUSPENSION CHECK] ❌ Failed to suspend service for ${customer.username}: ${errorMsg}`);
+                        logger.error(`[SUSPENSION CHECK] Suspension result: success=${suspensionResult.success}, billing=${suspensionResult.results?.billing}, status in DB=${customerAfterSuspend?.status}`);
                     }
 
                 } catch (customerError) {

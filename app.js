@@ -163,6 +163,10 @@ app.use('/admin', blockTechnicianAccess, adminDashboardRouter);
 const adminGenieacsRouter = require('./routes/adminGenieacs');
 app.use('/admin', blockTechnicianAccess, adminGenieacsRouter);
 
+// Import dan gunakan route adminGenieacsMonitor
+const adminGenieacsMonitorRouter = require('./routes/adminGenieacsMonitor');
+app.use('/admin', blockTechnicianAccess, adminGenieacsMonitorRouter);
+
 // Import dan gunakan route adminMappingNew
 const adminMappingNewRouter = require('./routes/adminMappingNew');
 app.use('/admin', blockTechnicianAccess, adminMappingNewRouter);
@@ -171,17 +175,9 @@ app.use('/admin', blockTechnicianAccess, adminMappingNewRouter);
 const adminMikrotikRouter = require('./routes/adminMikrotik');
 app.use('/admin', blockTechnicianAccess, adminMikrotikRouter);
 
-// Import dan gunakan route adminRadius (Setting RADIUS)
-const adminRadiusRouter = require('./routes/adminRadius');
-app.use('/admin', blockTechnicianAccess, adminRadiusRouter);
-
-// Import dan gunakan route adminRouters (NAS management)
+// Import dan gunakan route adminRouters (Router management - Full API Mikrotik)
 const adminRoutersRouter = require('./routes/adminRouters');
 app.use('/admin', blockTechnicianAccess, adminRoutersRouter);
-
-// Import dan gunakan route adminGenieacsServers
-const adminGenieacsServersRouter = require('./routes/adminGenieacsServers');
-app.use('/admin', blockTechnicianAccess, adminGenieacsServersRouter);
 
 // Import dan gunakan route adminHotspot
 const adminHotspotRouter = require('./routes/adminHotspot');
@@ -190,6 +186,10 @@ app.use('/admin/hotspot', blockTechnicianAccess, adminHotspotRouter);
 // Import dan gunakan route adminSetting
 const { router: adminSettingRouter } = require('./routes/adminSetting');
 app.use('/admin/settings', blockTechnicianAccess, adminAuth, adminSettingRouter);
+
+// Import dan gunakan route adminBackupLogs
+const adminBackupLogsRouter = require('./routes/adminBackupLogs');
+app.use('/admin/backup-logs', blockTechnicianAccess, adminAuth, adminBackupLogsRouter);
 
 // Import dan gunakan route configValidation
 const configValidationRouter = require('./routes/configValidation');
@@ -282,6 +282,64 @@ if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
     logger.info(`Direktori sesi WhatsApp dibuat: ${sessionDir}`);
 }
+
+// Internal API: Resend payment notification (localhost only) - MUST be before other routes
+app.post('/api/internal/payments/:paymentId/resend-notification', async (req, res) => {
+    // Only allow from localhost (check various ways)
+    const clientIp = req.ip || req.connection?.remoteAddress || req.socket?.remoteAddress || '';
+    const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1' ||
+                       req.headers.host?.includes('localhost') || req.headers.host?.includes('127.0.0.1') ||
+                       req.headers['x-forwarded-for']?.includes('127.0.0.1') || !clientIp;
+    
+    // Log for debugging
+    logger.info(`[RESEND] Request from IP: ${clientIp}, Host: ${req.headers.host}, isLocalhost: ${isLocalhost}`);
+    
+    if (!isLocalhost) {
+        logger.warn(`[RESEND] Access denied from non-localhost IP: ${clientIp}`);
+        return res.status(403).json({
+            success: false,
+            message: 'This endpoint is only accessible from localhost'
+        });
+    }
+    
+    try {
+        const paymentId = parseInt(req.params.paymentId);
+        
+        if (!paymentId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment ID is required'
+            });
+        }
+        
+        const whatsappNotifications = require('./config/whatsapp-notifications');
+        const result = await whatsappNotifications.sendPaymentReceivedNotification(paymentId);
+        
+        if (result.success) {
+            logger.info(`Payment notification resent for payment ID: ${paymentId}`);
+            res.json({
+                success: true,
+                message: 'Notification sent successfully',
+                withDocument: result.withDocument || false
+            });
+        } else {
+            logger.error(`Failed to resend payment notification for payment ID: ${paymentId}`, result.error);
+            res.status(500).json({
+                success: false,
+                message: result.error || 'Failed to send notification',
+                skipped: result.skipped || false,
+                reason: result.reason || null
+            });
+        }
+    } catch (error) {
+        logger.error('Error resending payment notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error resending notification',
+            error: error.message
+        });
+    }
+});
 
 // Route untuk health check
 app.get('/health', (req, res) => {
@@ -528,6 +586,22 @@ try {
     }
 } catch (error) {
     logger.error('Error initializing services:', error);
+}
+
+// Inisialisasi Telegram Bot untuk monitoring
+try {
+    const telegramMonitor = require('./config/telegram-monitor');
+    telegramMonitor.initialize().then(result => {
+        if (result.success) {
+            logger.info('✅ Telegram Monitoring Bot initialized successfully');
+        } else {
+            logger.warn(`⚠️ Telegram Monitoring Bot: ${result.message}`);
+        }
+    }).catch(err => {
+        logger.error('Error initializing Telegram Bot:', err);
+    });
+} catch (error) {
+    logger.error('Error initializing Telegram Bot:', error);
 }
 
 // Tambahkan delay yang lebih lama untuk reconnect WhatsApp

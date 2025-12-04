@@ -22,7 +22,7 @@ class SimpleGenieACSDNS {
         if (!this.axiosInstance) {
             const serverDetails = await genieacs.getGenieacsCredentials();
             if (!serverDetails || !serverDetails.url) {
-                throw new Error('GenieACS belum dikonfigurasi. Tambahkan server di /admin/genieacs-servers');
+                throw new Error('GenieACS belum dikonfigurasi. Tambahkan server di /admin/routers');
             }
             this.genieacsUrl = serverDetails.url;
             this.genieacsUsername = serverDetails.username || '';

@@ -531,9 +531,19 @@ router.get('/api/payment-methods', async (req, res) => {
         
         const methods = await paymentGateway.getAvailablePaymentMethods();
         
+        // Group by gateway
+        const methodsByGateway = {};
+        methods.forEach(m => {
+            if (!methodsByGateway[m.gateway]) {
+                methodsByGateway[m.gateway] = [];
+            }
+            methodsByGateway[m.gateway].push(m);
+        });
+        
         res.json({
             success: true,
-            methods: methods
+            methods: methods,
+            methodsByGateway: methodsByGateway
         });
     } catch (error) {
         logger.error('Error getting payment methods:', error);

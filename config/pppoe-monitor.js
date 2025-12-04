@@ -33,6 +33,15 @@ async function startPPPoEMonitoring() {
         logger.info(`PPPoE monitoring started with interval ${interval}ms`);
 
         try {
+            // Initialize lastActivePPPoE dengan user yang aktif saat ini
+            // Ini penting agar logout bisa terdeteksi dengan benar
+            const initialConnectionsResult = await pppoeNotifications.getActivePPPoEConnections();
+            if (initialConnectionsResult.success && initialConnectionsResult.data) {
+                lastActivePPPoE = initialConnectionsResult.data.map(conn => conn.name);
+                logger.info(`[PPPOE] Initialized monitoring with ${lastActivePPPoE.length} active users`);
+            }
+            
+            // Run first check (ini akan mendeteksi login/logout dari state awal)
             await checkPPPoEChanges();
         } catch (initialError) {
             logger.error(`Error in initial PPPoE monitoring check: ${initialError.message}`);
@@ -113,6 +122,11 @@ async function checkPPPoEChanges() {
         // Detect login/logout events
         const loginUsers = activeNow.filter(user => !lastActivePPPoE.includes(user));
         const logoutUsers = lastActivePPPoE.filter(user => !activeNow.includes(user));
+        
+        // Log untuk debugging
+        if (loginUsers.length > 0 || logoutUsers.length > 0) {
+            logger.debug(`[PPPOE] Detection: ${loginUsers.length} login, ${logoutUsers.length} logout. Last active: ${lastActivePPPoE.length}, Current active: ${activeNow.length}`);
+        }
 
         // Handle login notifications
         if (loginUsers.length > 0 && settings.loginNotifications) {
@@ -121,21 +135,59 @@ async function checkPPPoEChanges() {
             // Get offline users for the notification
             const offlineUsers = await pppoeNotifications.getOfflinePPPoEUsers(activeNow);
             
-            // Format and send login notification
+            // Format and send login notification (WhatsApp)
             const message = pppoeNotifications.formatLoginMessage(loginUsers, connections, offlineUsers);
             await pppoeNotifications.sendNotification(message);
+            
+            // Send to Telegram Bot (monitoring only)
+            try {
+                const telegramMonitor = require('./telegram-monitor');
+                const telegramResult = await telegramMonitor.sendPPPoELogin(loginUsers, connections, offlineUsers);
+                if (telegramResult && !telegramResult.success) {
+                    if (telegramResult.message === 'Tidak ada chat terdaftar') {
+                        logger.warn(`[PPPOE] Telegram notification skipped: ${telegramResult.message}. Silakan kirim /start ke bot untuk mendaftarkan chat ID.`);
+                    } else {
+                        logger.warn(`[PPPOE] Telegram notification failed: ${telegramResult.message || 'Unknown error'}`);
+                    }
+                } else if (telegramResult && telegramResult.success) {
+                    logger.info(`[PPPOE] Telegram notification sent: ${telegramResult.sent} success, ${telegramResult.failed} failed`);
+                }
+            } catch (telegramError) {
+                logger.warn(`[PPPOE] Failed to send Telegram notification: ${telegramError.message}`);
+            }
         }
 
         // Handle logout notifications
-        if (logoutUsers.length > 0 && settings.logoutNotifications) {
-            logger.info(`PPPoE LOGOUT detected: ${logoutUsers.join(', ')}`);
+        if (logoutUsers.length > 0) {
+            logger.info(`[PPPOE] LOGOUT detected: ${logoutUsers.join(', ')} (logoutNotifications: ${settings.logoutNotifications})`);
             
-            // Get offline users for the notification
-            const offlineUsers = await pppoeNotifications.getOfflinePPPoEUsers(activeNow);
-            
-            // Format and send logout notification
-            const message = pppoeNotifications.formatLogoutMessage(logoutUsers, offlineUsers);
-            await pppoeNotifications.sendNotification(message);
+            if (settings.logoutNotifications) {
+                // Get offline users for the notification
+                const offlineUsers = await pppoeNotifications.getOfflinePPPoEUsers(activeNow);
+                
+                // Format and send logout notification (WhatsApp)
+                const message = pppoeNotifications.formatLogoutMessage(logoutUsers, offlineUsers);
+                await pppoeNotifications.sendNotification(message);
+                
+                // Send to Telegram Bot (monitoring only)
+                try {
+                    const telegramMonitor = require('./telegram-monitor');
+                    const telegramResult = await telegramMonitor.sendPPPoELogout(logoutUsers, offlineUsers);
+                    if (telegramResult && !telegramResult.success) {
+                        if (telegramResult.message === 'Tidak ada chat terdaftar') {
+                            logger.warn(`[PPPOE] Telegram notification skipped: ${telegramResult.message}. Silakan kirim /start ke bot untuk mendaftarkan chat ID.`);
+                        } else {
+                            logger.warn(`[PPPOE] Telegram notification failed: ${telegramResult.message || 'Unknown error'}`);
+                        }
+                    } else if (telegramResult && telegramResult.success) {
+                        logger.info(`[PPPOE] Telegram notification sent: ${telegramResult.sent} success, ${telegramResult.failed} failed`);
+                    }
+                } catch (telegramError) {
+                    logger.warn(`[PPPOE] Failed to send Telegram notification: ${telegramError.message}`);
+                }
+            } else {
+                logger.debug(`[PPPOE] Logout notifications are disabled, skipping notification for: ${logoutUsers.join(', ')}`);
+            }
         }
 
         // Update last active users
@@ -184,9 +236,11 @@ function getMonitoringStatus() {
         loginNotifications: settings.loginNotifications,
         logoutNotifications: settings.logoutNotifications,
         interval: settings.monitorInterval,
+        intervalSeconds: (settings.monitorInterval || 60000) / 1000,
         adminNumbers: adminNumbers,
         technicianNumbers: technicianNumbers,
-        activeConnections: lastActivePPPoE.length
+        activeConnections: lastActivePPPoE.length,
+        lastActiveUsers: lastActivePPPoE
     };
 }
 

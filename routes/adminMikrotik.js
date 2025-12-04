@@ -15,7 +15,9 @@ const {
     editHotspotProfile,
     deleteHotspotProfile,
     getHotspotProfileDetail,
-    getMikrotikConnectionForRouter
+    getHotspotServers,
+    getMikrotikConnectionForRouter,
+    getIPPools
 } = require('../config/mikrotik');
 const { kickPPPoEUser } = require('../config/mikrotik2');
 const fs = require('fs');
@@ -696,6 +698,113 @@ router.post('/mikrotik/restart', adminAuth, async (req, res) => {
     }
   } catch (err) {
     res.json({ success: false, message: err.message });
+  }
+});
+
+// GET: List Server Hotspot
+router.get('/mikrotik/hotspot-server-profiles', adminAuth, async (req, res) => {
+  try {
+    const sqlite3 = require('sqlite3').verbose();
+    const db = new sqlite3.Database(path.join(process.cwd(), 'data/billing.db'));
+    const routers = await new Promise((resolve) => db.all('SELECT * FROM routers ORDER BY id', (err, rows) => resolve(rows || [])));
+    db.close();
+
+    const { getHotspotServers } = require('../config/mikrotik');
+    
+    let combined = [];
+    let errorMessages = [];
+    
+    for (const r of routers) {
+      try {
+        const result = await getHotspotServers(r);
+        if (result.success && Array.isArray(result.data)) {
+          result.data.forEach(server => {
+            const serverObj = {
+              ...server,
+              nas_id: r.id,
+              nas_name: r.name,
+              nas_ip: r.nas_ip
+            };
+            combined.push(serverObj);
+          });
+        } else {
+          errorMessages.push(`${r.name}: ${result.message}`);
+        }
+      } catch (e) {
+        console.error(`Error getting servers from ${r.name}:`, e.message);
+        errorMessages.push(`${r.name}: ${e.message}`);
+      }
+    }
+
+    const settings = getSettingsWithCache();
+    res.render('adminMikrotikHotspotServerProfiles', { 
+      servers: combined, 
+      routers,
+      settings,
+      error: errorMessages.length > 0 ? `Beberapa router gagal: ${errorMessages.join('; ')}` : null,
+      versionInfo: getVersionInfo(),
+      versionBadge: getVersionBadge()
+    });
+  } catch (err) {
+    console.error('Error in hotspot server profiles GET route:', err);
+    const settings = getSettingsWithCache();
+    res.render('adminMikrotikHotspotServerProfiles', { 
+      servers: [], 
+      routers: [],
+      error: `Gagal mengambil data server Hotspot: ${err.message}`, 
+      settings,
+      versionInfo: getVersionInfo(),
+      versionBadge: getVersionBadge()
+    });
+  }
+});
+
+// GET: API untuk mendapatkan IP Pools dari semua router
+router.get('/mikrotik/ip-pools', adminAuth, async (req, res) => {
+  try {
+    const sqlite3 = require('sqlite3').verbose();
+    const db = new sqlite3.Database(path.join(process.cwd(), 'data/billing.db'));
+    const routers = await new Promise((resolve) => db.all('SELECT * FROM routers ORDER BY id', (err, rows) => resolve(rows || [])));
+    db.close();
+
+    let allPools = [];
+    const poolNames = new Set(); // Untuk menghindari duplikasi nama pool
+
+    for (const router of routers) {
+      try {
+        const result = await getIPPools(router);
+        if (result.success && Array.isArray(result.data)) {
+          result.data.forEach(pool => {
+            // Hanya tambahkan jika nama pool belum ada
+            if (pool.name && !poolNames.has(pool.name)) {
+              poolNames.add(pool.name);
+              allPools.push({
+                name: pool.name,
+                ranges: pool.ranges,
+                nas_name: pool.nas_name,
+                nas_ip: pool.nas_ip
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.error(`Error getting IP pools from ${router.name}:`, e.message);
+        // Continue dengan router berikutnya
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Ditemukan ${allPools.length} IP pool dari ${routers.length} router`,
+      data: allPools.sort((a, b) => a.name.localeCompare(b.name)) // Sort by name
+    });
+  } catch (err) {
+    console.error('Error in IP pools API route:', err);
+    res.status(500).json({
+      success: false,
+      message: `Gagal mengambil data IP pool: ${err.message}`,
+      data: []
+    });
   }
 });
 

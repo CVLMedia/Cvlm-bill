@@ -136,6 +136,22 @@ router.post('/webhook/tripay', async (req, res) => {
     }
 });
 
+// Duitku webhook handler
+router.post('/webhook/duitku', async (req, res) => {
+    try {
+        console.log('🔍 Duitku webhook received:', JSON.stringify(req.body, null, 2));
+        const result = await billingManager.handlePaymentWebhook({ body: req.body, headers: req.headers }, 'duitku');
+        console.log('✅ Duitku webhook processed successfully:', result);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error('❌ Duitku webhook error:', error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+});
+
 // Manual payment processing (fallback for failed webhooks)
 router.post('/manual-process', async (req, res) => {
     try {
@@ -181,12 +197,12 @@ router.post('/manual-process', async (req, res) => {
             // Update invoice status
             await billingManager.updateInvoiceStatus(invoice_id, 'paid', payment_method || 'manual');
             
-            // Get customer info for notification
-            const customer = await billingManager.getCustomerById(invoice.customer_id);
-            
-            // Send WhatsApp notification
+            // Send WhatsApp notification with PDF attachment
             try {
-                await billingManager.sendPaymentSuccessNotification(customer, invoice);
+                const whatsappNotifications = require('../config/whatsapp-notifications');
+                if (paymentResult.id) {
+                    await whatsappNotifications.sendPaymentReceivedNotification(paymentResult.id);
+                }
             } catch (notificationError) {
                 console.error('Error sending notification:', notificationError);
             }

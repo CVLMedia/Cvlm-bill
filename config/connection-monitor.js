@@ -21,12 +21,28 @@ function startWhatsAppMonitoring() {
                 logger.warn('WhatsApp connection lost, attempting to reconnect...');
                 isRestarting = true;
                 
+                // Send Telegram notification
+                try {
+                    const telegramMonitor = require('./telegram-monitor');
+                    await telegramMonitor.sendConnectionAlert('WhatsApp', 'disconnected', 'Koneksi WhatsApp terputus. Mencoba reconnect...');
+                } catch (telegramError) {
+                    logger.warn(`[CONNECTION] Failed to send Telegram notification: ${telegramError.message}`);
+                }
+                
                 // Coba reconnect WhatsApp
                 await whatsapp.connectToWhatsApp();
                 
                 setTimeout(() => {
                     isRestarting = false;
                 }, 10000);
+            } else if (status.connected && isRestarting) {
+                // Connection restored
+                try {
+                    const telegramMonitor = require('./telegram-monitor');
+                    await telegramMonitor.sendConnectionAlert('WhatsApp', 'connected', 'Koneksi WhatsApp berhasil dipulihkan.');
+                } catch (telegramError) {
+                    logger.warn(`[CONNECTION] Failed to send Telegram notification: ${telegramError.message}`);
+                }
             }
         } catch (error) {
             logger.error('Error in WhatsApp monitoring:', error);
@@ -48,6 +64,14 @@ function startMikrotikMonitoring() {
             const connection = await mikrotik.getMikrotikConnection();
             if (!connection) {
                 logger.warn('Mikrotik connection lost, attempting to reconnect...');
+                
+                // Send Telegram notification
+                try {
+                    const telegramMonitor = require('./telegram-monitor');
+                    await telegramMonitor.sendConnectionAlert('Mikrotik', 'disconnected', 'Koneksi Mikrotik terputus. Mencoba reconnect...');
+                } catch (telegramError) {
+                    logger.warn(`[CONNECTION] Failed to send Telegram notification: ${telegramError.message}`);
+                }
                 
                 // Coba reconnect Mikrotik
                 await mikrotik.connectToMikrotik();

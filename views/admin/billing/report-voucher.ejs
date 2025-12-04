@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laporan Keuangan Voucher - <%= appSettings.companyHeader %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.0.7/css/boxicons.min.css" rel="stylesheet">
+    <link href="/css/admin-mobile.css" rel="stylesheet">
+    <style>
+        .stat-card {
+            border-left: 4px solid #007bff;
+        }
+        .stat-card.revenue {
+            border-left-color: #28a745;
+        }
+        .stat-card.unpaid {
+            border-left-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <%- include('../../partials/billing-sidebar') %>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">
+                        <i class="bi bi-ticket-perforated"></i> Laporan Keuangan Voucher
+                    </h1>
+                    <div>
+                        <a href="/admin/billing/reports/pppoe" class="btn btn-secondary">
+                            <i class="bi bi-router"></i> Laporan PPPoE
+                        </a>
+                        <a href="/admin/billing/dashboard" class="btn btn-primary">
+                            <i class="bi bi-house"></i> Dashboard
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Filter Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-funnel"></i> Filter Laporan</h5>
+                    </div>
+                    <div class="card-body">
+                        <form method="GET" action="/admin/billing/reports/voucher" class="row g-3">
+                            <div class="col-md-4">
+                                <label for="start_date" class="form-label">Tanggal Mulai</label>
+                                <input type="date" class="form-control" id="start_date" name="start_date" value="<%= startDate %>" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="end_date" class="form-label">Tanggal Akhir</label>
+                                <input type="date" class="form-control" id="end_date" name="end_date" value="<%= endDate %>" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="all" <%= status === 'all' ? 'selected' : '' %>>Semua</option>
+                                    <option value="paid" <%= status === 'paid' ? 'selected' : '' %>>Sudah Digunakan (Lunas)</option>
+                                    <option value="unpaid" <%= status === 'unpaid' ? 'selected' : '' %>>Belum Digunakan</option>
+                                </select>
+                            </div>
+                            <div class="col-md-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-search"></i> Filter
+                                </button>
+                                <a href="/admin/billing/reports/voucher" class="btn btn-secondary">
+                                    <i class="bi bi-arrow-clockwise"></i> Reset
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Statistik Cards -->
+                <div class="row mb-4">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stat-card">
+                            <div class="card-body">
+                                <h5 class="text-muted mb-3">Total Voucher</h5>
+                                <h2 class="mb-0"><%= stats.total_vouchers || 0 %></h2>
+                                <small class="text-muted">voucher dibuat</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stat-card revenue">
+                            <div class="card-body">
+                                <h5 class="text-muted mb-3">Pendapatan</h5>
+                                <h2 class="mb-0 text-success">Rp <%= (stats.total_revenue || 0).toLocaleString('id-ID') %></h2>
+                                <small class="text-muted"><%= stats.paid_vouchers || 0 %> voucher sudah digunakan</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stat-card">
+                            <div class="card-body">
+                                <h5 class="text-muted mb-3">Rata-rata Harga</h5>
+                                <h2 class="mb-0">Rp <%= (stats.average_price || 0).toLocaleString('id-ID') %></h2>
+                                <small class="text-muted">per voucher</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stat-card unpaid">
+                            <div class="card-body">
+                                <h5 class="text-muted mb-3">Belum Digunakan</h5>
+                                <h2 class="mb-0 text-muted">Rp <%= (stats.unpaid_amount || 0).toLocaleString('id-ID') %></h2>
+                                <small class="text-muted"><%= stats.unpaid_vouchers || 0 %> voucher (tidak dihitung pemasukan)</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grafik Visualisasi -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Distribusi Voucher</h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="voucherChart" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Ringkasan Bulanan</h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td>Total Voucher Dibuat:</td>
+                                        <td class="text-end"><strong><%= stats.total_vouchers || 0 %></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Sudah Digunakan:</td>
+                                        <td class="text-end text-success"><strong><%= stats.paid_vouchers || 0 %></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Belum Digunakan:</td>
+                                        <td class="text-end text-muted"><strong><%= stats.unpaid_vouchers || 0 %></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Pendapatan dari Voucher:</td>
+                                        <td class="text-end text-success"><strong>Rp <%= (stats.total_revenue || 0).toLocaleString('id-ID') %></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Potensi Pendapatan:</td>
+                                        <td class="text-end text-warning"><strong>Rp <%= (stats.unpaid_amount || 0).toLocaleString('id-ID') %></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Rata-rata Harga:</td>
+                                        <td class="text-end"><strong>Rp <%= (stats.average_price || 0).toLocaleString('id-ID') %></strong></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabel Invoice Voucher -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-list-ul"></i> Daftar Invoice Voucher
+                            <span class="badge bg-primary ms-2"><%= invoices.length %></span>
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-success" onclick="exportToExcel()">
+                                <i class="bi bi-file-earmark-excel"></i> Export Excel
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="exportToPDF()">
+                                <i class="bi bi-file-earmark-pdf"></i> Export PDF
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="updateVoucherInvoices()">
+                                <i class="bi bi-arrow-clockwise"></i> Update Status
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover" id="voucherTable">
+                                <thead>
+                                    <tr>
+                                        <th>No</th>
+                                        <th>Invoice Number</th>
+                                        <th>Voucher Username</th>
+                                        <th>Tanggal Dibuat</th>
+                                        <th>Tanggal Digunakan</th>
+                                        <th>Jumlah</th>
+                                        <th>Status Penggunaan</th>
+                                        <th>Total Penggunaan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <% if (invoices.length === 0) { %>
+                                        <tr>
+                                            <td colspan="8" class="text-center text-muted py-4">
+                                                <i class="bi bi-inbox"></i> Tidak ada data invoice voucher
+                                            </td>
+                                        </tr>
+                                    <% } else { %>
+                                        <% invoices.forEach((invoice, index) => { %>
+                                            <% 
+                                                // Extract username from notes atau gunakan voucher_username jika ada
+                                                const voucherUsername = invoice.voucher_username || (invoice.notes ? invoice.notes.match(/Voucher Hotspot\s+(\S+)/i)?.[1] : 'N/A');
+                                                
+                                                // Format tanggal penggunaan
+                                                let usedDateDisplay = '-';
+                                                if (invoice.first_used_at) {
+                                                    try {
+                                                        // Handle jika first_used_at adalah ISO string atau Unix timestamp
+                                                        let usedDate;
+                                                        if (typeof invoice.first_used_at === 'number') {
+                                                            // Jika Unix timestamp (detik), konversi ke milliseconds
+                                                            usedDate = new Date(invoice.first_used_at * 1000);
+                                                        } else if (typeof invoice.first_used_at === 'string') {
+                                                            // Jika string, parse sebagai Date
+                                                            usedDate = new Date(invoice.first_used_at);
+                                                        } else {
+                                                            usedDate = new Date(invoice.first_used_at);
+                                                        }
+                                                        
+                                                        if (!isNaN(usedDate.getTime())) {
+                                                            // Konversi ke timezone Asia/Jakarta
+                                                            usedDateDisplay = usedDate.toLocaleString('id-ID', { 
+                                                                timeZone: 'Asia/Jakarta',
+                                                                year: 'numeric',
+                                                                month: '2-digit',
+                                                                day: '2-digit',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: false
+                                                            });
+                                                        }
+                                                    } catch (e) {
+                                                        console.error('Error formatting used date:', e, invoice.first_used_at);
+                                                        usedDateDisplay = '-';
+                                                    }
+                                                }
+                                                
+                                                // Format tanggal dibuat
+                                                let createdDateDisplay = '-';
+                                                if (invoice.created_at) {
+                                                    try {
+                                                        const createdDate = new Date(invoice.created_at);
+                                                        if (!isNaN(createdDate.getTime())) {
+                                                            createdDateDisplay = createdDate.toLocaleString('id-ID', { 
+                                                                timeZone: 'Asia/Jakarta',
+                                                                year: 'numeric',
+                                                                month: '2-digit',
+                                                                day: '2-digit',
+                                                                hour: '2-digit',
+                                                                minute: '2-digit',
+                                                                hour12: false
+                                                            });
+                                                        }
+                                                    } catch (e) {
+                                                        console.error('Error formatting created date:', e, invoice.created_at);
+                                                        createdDateDisplay = '-';
+                                                    }
+                                                }
+                                            %>
+                                            <tr>
+                                                <td><%= index + 1 %></td>
+                                                <td><%= invoice.invoice_number || `VCHR-${voucherUsername}` %></td>
+                                                <td><code><%= voucherUsername %></code></td>
+                                                <td><%= createdDateDisplay %></td>
+                                                <td>
+                                                    <% if (invoice.first_used_at) { %>
+                                                        <span class="text-success"><%= usedDateDisplay %></span>
+                                                    <% } else { %>
+                                                        <span class="text-muted">-</span>
+                                                    <% } %>
+                                                </td>
+                                                <td><strong>Rp <%= parseFloat(invoice.amount || 0).toLocaleString('id-ID') %></strong></td>
+                                                <td>
+                                                    <span class="badge bg-<%= invoice.usage_status_badge || 'secondary' %>">
+                                                        <%= invoice.usage_status_label || (invoice.status === 'paid' ? 'Sudah Digunakan' : 'Belum Digunakan') %>
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <% if (invoice.usage_count > 0) { %>
+                                                        <span class="badge bg-info"><%= invoice.usage_count %> kali</span>
+                                                    <% } else { %>
+                                                        <span class="text-muted">-</span>
+                                                    <% } %>
+                                                </td>
+                                            </tr>
+                                        <% }); %>
+                                    <% } %>
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-info">
+                                        <th colspan="5" class="text-end">Total:</th>
+                                        <th>Rp <%= invoices.reduce((sum, inv) => sum + (parseFloat(inv.amount || inv.price || 0) || 0), 0).toLocaleString('id-ID') %></th>
+                                        <th>
+                                            <span class="badge bg-success"><%= invoices.filter(i => (i.computed_status || '').toLowerCase() === 'paid').length %> Sudah Digunakan</span>
+                                            <span class="badge bg-secondary"><%= invoices.filter(i => (i.computed_status || '').toLowerCase() !== 'paid').length %> Belum Digunakan</span>
+                                        </th>
+                                        <th>
+                                            <span class="badge bg-primary"><%= invoices.reduce((sum, inv) => sum + (inv.usage_count || 0), 0) %> Total Penggunaan</span>
+                                        </th>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script>
+        // Fungsi untuk update invoice voucher menjadi paid saat voucher digunakan
+        async function updateVoucherInvoices() {
+            if (!confirm('Update status invoice voucher berdasarkan penggunaan? Ini akan mengupdate invoice menjadi "paid" jika voucher sudah digunakan di RADIUS.')) {
+                return;
+            }
+            
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Memproses...';
+            
+            try {
+                const response = await fetch('/admin/billing/api/update-voucher-invoices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Berhasil! ' + result.message);
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+        
+        // Fungsi untuk export ke Excel
+        function exportToExcel() {
+            const table = document.getElementById('voucherTable');
+            let csv = [];
+            
+            // Header
+            const headers = [];
+            table.querySelectorAll('thead th').forEach(th => {
+                headers.push(th.textContent.trim());
+            });
+            csv.push(headers.join(','));
+            
+            // Data
+            table.querySelectorAll('tbody tr').forEach(tr => {
+                const row = [];
+                tr.querySelectorAll('td').forEach(td => {
+                    let text = td.textContent.trim();
+                    // Remove badge/span HTML jika ada
+                    text = text.replace(/[\n\r]/g, ' ').replace(/,/g, ';');
+                    row.push('"' + text + '"');
+                });
+                csv.push(row.join(','));
+            });
+            
+            // Download
+            const csvContent = csv.join('\n');
+            const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `laporan_voucher_${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Fungsi untuk export ke PDF
+        function exportToPDF() {
+            window.print();
+        }
+        
+        // Chart untuk visualisasi pendapatan voucher
+        document.addEventListener('DOMContentLoaded', function() {
+            const paidVouchers = <%= stats.paid_vouchers || 0 %>;
+            const unpaidVouchers = <%= stats.unpaid_vouchers || 0 %>;
+            const totalRevenue = <%= stats.total_revenue || 0 %>;
+            
+            if (paidVouchers > 0 || unpaidVouchers > 0) {
+                const ctx = document.getElementById('voucherChart');
+                if (ctx) {
+                    new Chart(ctx.getContext('2d'), {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Sudah Digunakan', 'Belum Digunakan'],
+                            datasets: [{
+                                data: [paidVouchers, unpaidVouchers],
+                                backgroundColor: ['#28a745', '#6c757d'],
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom'
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Distribusi Voucher'
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+

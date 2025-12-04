@@ -3,11 +3,17 @@ const router = express.Router();
 const { adminAuth } = require('./adminAuth');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
 const { getAllDevicesFromAllServers } = require('../config/genieacs');
-const { getMikrotikConnectionForRouter } = require('../config/mikrotik');
+const { getMikrotikConnectionForRouter, getRadiusStatistics, getUserAuthModeAsync } = require('../config/mikrotik');
 const { getSettingsWithCache } = require('../config/settingsManager');
 const { getVersionInfo, getVersionBadge } = require('../config/version-utils');
+const { getRadiusConfigValue } = require('../config/radiusConfig');
+const { checkLicenseStatus } = require('../config/licenseManager');
 
 // GET: Dashboard admin
 router.get('/dashboard', adminAuth, async (req, res) => {
@@ -42,44 +48,68 @@ router.get('/dashboard', adminAuth, async (req, res) => {
       // Dashboard tetap bisa dimuat meskipun GenieACS bermasalah
     }
     
-    // Mikrotik agregasi seluruh NAS
+    // Check auth mode - RADIUS atau Mikrotik API
+    let authMode = 'mikrotik';
     try {
-      const sqlite3 = require('sqlite3').verbose();
-      const db = new sqlite3.Database(path.join(process.cwd(), 'data/billing.db'));
-      const routers = await new Promise((resolve) => {
-        db.all('SELECT * FROM routers ORDER BY id', (err, rows) => resolve(rows || []));
-      });
-      db.close();
+      authMode = await getUserAuthModeAsync();
+    } catch (e) {
+      console.warn('⚠️ [DASHBOARD] Could not determine auth mode, defaulting to mikrotik');
+    }
+    
+    // Mikrotik agregasi seluruh NAS (jika mode Mikrotik API)
+    if (authMode === 'mikrotik') {
+      try {
+        const sqlite3 = require('sqlite3').verbose();
+        const db = new sqlite3.Database(path.join(process.cwd(), 'data/billing.db'));
+        const routers = await new Promise((resolve) => {
+          db.all('SELECT * FROM routers ORDER BY id', (err, rows) => resolve(rows || []));
+        });
+        db.close();
 
-      let totalSecrets = 0, totalActive = 0;
-      await Promise.all((routers || []).map(async (r) => {
-        try {
-          const conn = await Promise.race([
-            getMikrotikConnectionForRouter(r),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('connect timeout')), 5000))
-          ]);
-          const [active, secrets] = await Promise.all([
-            conn.write('/ppp/active/print'),
-            conn.write('/ppp/secret/print')
-          ]);
-          totalActive += Array.isArray(active) ? active.length : 0;
-          totalSecrets += Array.isArray(secrets) ? secrets.length : 0;
-        } catch (e) {
-          console.warn('⚠️ [DASHBOARD] Skip router', r && r.nas_ip, e.message);
-        }
-      }));
+        let totalSecrets = 0, totalActive = 0;
+        await Promise.all((routers || []).map(async (r) => {
+          try {
+            const conn = await Promise.race([
+              getMikrotikConnectionForRouter(r),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('connect timeout')), 5000))
+            ]);
+            const [active, secrets] = await Promise.all([
+              conn.write('/ppp/active/print'),
+              conn.write('/ppp/secret/print')
+            ]);
+            totalActive += Array.isArray(active) ? active.length : 0;
+            totalSecrets += Array.isArray(secrets) ? secrets.length : 0;
+          } catch (e) {
+            console.warn('⚠️ [DASHBOARD] Skip router', r && r.nas_ip, e.message);
+          }
+        }));
 
-      mikrotikAktif = totalActive;
-      mikrotikTotal = totalSecrets;
-      mikrotikOffline = Math.max(totalSecrets - totalActive, 0);
-      console.log('✅ [DASHBOARD] Mikrotik aggregated across NAS');
-    } catch (mikrotikError) {
-      console.warn('⚠️ [DASHBOARD] Mikrotik tidak dapat diakses - menggunakan data default:', mikrotikError.message);
-      // Set default values jika Mikrotik tidak bisa diakses
-      mikrotikTotal = 0;
-      mikrotikAktif = 0;
-      mikrotikOffline = 0;
-      // Dashboard tetap bisa dimuat meskipun Mikrotik bermasalah
+        mikrotikAktif = totalActive;
+        mikrotikTotal = totalSecrets;
+        mikrotikOffline = Math.max(totalSecrets - totalActive, 0);
+        console.log('✅ [DASHBOARD] Mikrotik aggregated across NAS');
+      } catch (mikrotikError) {
+        console.warn('⚠️ [DASHBOARD] Mikrotik tidak dapat diakses - menggunakan data default:', mikrotikError.message);
+        // Set default values jika Mikrotik tidak bisa diakses
+        mikrotikTotal = 0;
+        mikrotikAktif = 0;
+        mikrotikOffline = 0;
+        // Dashboard tetap bisa dimuat meskipun Mikrotik bermasalah
+      }
+    } else {
+      // Mode RADIUS - ambil dari database RADIUS
+      try {
+        const stats = await getRadiusStatistics();
+        mikrotikTotal = stats.total;
+        mikrotikAktif = stats.active;
+        mikrotikOffline = stats.offline;
+        console.log('✅ [DASHBOARD] RADIUS statistics loaded:', stats);
+      } catch (radiusError) {
+        console.warn('⚠️ [DASHBOARD] RADIUS tidak dapat diakses - menggunakan data default:', radiusError.message);
+        mikrotikTotal = 0;
+        mikrotikAktif = 0;
+        mikrotikOffline = 0;
+      }
     }
   } catch (e) {
     console.error('❌ [DASHBOARD] Error in dashboard route:', e);
@@ -101,7 +131,7 @@ router.get('/dashboard', adminAuth, async (req, res) => {
         
         const validationResults = await validateConfiguration();
         const summary = getValidationSummary();
-        const defaultSettingsWarnings = await checkForDefaultSettings();
+        const defaultSettingsWarnings = checkForDefaultSettings();
         
         // Update session dengan hasil validasi terbaru
         req.session.configValidation = {
@@ -119,6 +149,14 @@ router.get('/dashboard', adminAuth, async (req, res) => {
     });
   }
 
+  // Check license status untuk ditampilkan di dashboard
+  let licenseStatus = null;
+  try {
+    licenseStatus = await checkLicenseStatus();
+  } catch (error) {
+    console.error('⚠️ [DASHBOARD] Error checking license status:', error);
+  }
+
   res.render('adminDashboard', {
     title: 'Dashboard Admin',
     page: 'dashboard',
@@ -131,8 +169,354 @@ router.get('/dashboard', adminAuth, async (req, res) => {
     settings, // Sertakan settings di sini
     versionInfo: getVersionInfo(),
     versionBadge: getVersionBadge(),
-    configValidation: req.session.configValidation || null // Sertakan hasil validasi konfigurasi
+    configValidation: req.session.configValidation || null, // Sertakan hasil validasi konfigurasi
+    licenseStatus: licenseStatus // Sertakan status license
   });
 });
+
+// GET: System Information API
+router.get('/dashboard/api/system-info', adminAuth, async (req, res) => {
+  try {
+    const hostname = os.hostname();
+    const platform = os.platform();
+    const arch = os.arch();
+    const cpus = os.cpus();
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const uptime = os.uptime();
+    
+    // Get CPU load averages (Linux only)
+    let loadAvg = [0, 0, 0];
+    try {
+      if (platform === 'linux') {
+        const { stdout } = await execAsync('cat /proc/loadavg');
+        const parts = stdout.trim().split(' ');
+        loadAvg = [parseFloat(parts[0]), parseFloat(parts[1]), parseFloat(parts[2])];
+      }
+    } catch (e) {
+      console.warn('Could not get load average:', e.message);
+    }
+    
+    // Get running processes count
+    let processCount = 0;
+    try {
+      if (platform === 'linux') {
+        const { stdout } = await execAsync('ps aux | wc -l');
+        processCount = parseInt(stdout.trim()) - 1; // Subtract header line
+      }
+    } catch (e) {
+      console.warn('Could not get process count:', e.message);
+    }
+    
+    // Get CPU usage percentage - using top command for more accurate reading
+    let cpuUsage = 0;
+    try {
+      // Try using top command first (most accurate)
+      const { stdout: topOutput } = await execAsync("top -bn1 | grep 'Cpu(s)'");
+      const cpuMatch = topOutput.match(/(\d+\.?\d*)%us,\s*(\d+\.?\d*)%sy,\s*(\d+\.?\d*)%ni,\s*(\d+\.?\d*)%id/);
+      
+      if (cpuMatch) {
+        const user = parseFloat(cpuMatch[1]) || 0;
+        const system = parseFloat(cpuMatch[2]) || 0;
+        const nice = parseFloat(cpuMatch[3]) || 0;
+        const idle = parseFloat(cpuMatch[4]) || 0;
+        
+        // CPU usage = 100 - idle%
+        cpuUsage = Math.round(100 - idle);
+        cpuUsage = Math.max(0, Math.min(100, cpuUsage));
+      } else {
+        throw new Error('Could not parse top output');
+      }
+    } catch (e) {
+      // Fallback: use /proc/stat method with longer delay
+      try {
+        const { stdout: stat1 } = await execAsync("cat /proc/stat | head -1");
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second for better accuracy
+        const { stdout: stat2 } = await execAsync("cat /proc/stat | head -1");
+        
+        const parseStat = (line) => {
+          const parts = line.trim().split(/\s+/);
+          return {
+            user: parseInt(parts[1]) || 0,
+            nice: parseInt(parts[2]) || 0,
+            system: parseInt(parts[3]) || 0,
+            idle: parseInt(parts[4]) || 0,
+            iowait: parseInt(parts[5]) || 0,
+            irq: parseInt(parts[6]) || 0,
+            softirq: parseInt(parts[7]) || 0
+          };
+        };
+        
+        const cpu1 = parseStat(stat1);
+        const cpu2 = parseStat(stat2);
+        
+        // Calculate total CPU time
+        const total1 = cpu1.user + cpu1.nice + cpu1.system + cpu1.idle + cpu1.iowait + cpu1.irq + cpu1.softirq;
+        const total2 = cpu2.user + cpu2.nice + cpu2.system + cpu2.idle + cpu2.iowait + cpu2.irq + cpu2.softirq;
+        
+        // Calculate idle time (idle + iowait)
+        const idle1 = cpu1.idle + cpu1.iowait;
+        const idle2 = cpu2.idle + cpu2.iowait;
+        
+        const totalIdle = idle2 - idle1;
+        const total = total2 - total1;
+        
+        if (total > 0) {
+          // CPU usage = (1 - idle/total) * 100
+          cpuUsage = Math.round(((total - totalIdle) / total) * 100);
+          cpuUsage = Math.max(0, Math.min(100, cpuUsage));
+        }
+      } catch (statError) {
+        // Final fallback: use load average as percentage of CPU cores
+        const cpuCount = cpus.length;
+        if (cpuCount > 0 && loadAvg[0] > 0) {
+          cpuUsage = Math.min(Math.round((loadAvg[0] / cpuCount) * 100), 100);
+        }
+        console.warn('Using load average for CPU usage:', cpuUsage + '%');
+      }
+    }
+    
+    // Get disk usage
+    const diskUsage = [];
+    try {
+      if (platform === 'linux') {
+        const { stdout } = await execAsync("df -h | grep -E '^/dev/' | awk '{print $2,$3,$4,$5,$6}'");
+        const lines = stdout.trim().split('\n');
+        for (const line of lines) {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length >= 5) {
+            const total = parseSize(parts[0]);
+            const used = parseSize(parts[1]);
+            const available = parseSize(parts[2]);
+            const percent = parseInt(parts[3].replace('%', ''));
+            const mount = parts.slice(4).join(' '); // Handle mount paths with spaces
+            
+            // Get filesystem type
+            let fsType = 'ext4';
+            try {
+              const { stdout: fsTypeOut } = await execAsync(`df -T "${mount}" 2>/dev/null | tail -1 | awk '{print $2}'`);
+              fsType = fsTypeOut.trim() || 'ext4';
+            } catch (e) {
+              // Use default
+            }
+            
+            diskUsage.push({
+              mounted: mount,
+              total: total,
+              used: used,
+              free: available,
+              percent: percent,
+              type: fsType
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get disk usage:', e.message);
+    }
+    
+    // Get network interfaces
+    const networkInterfaces = [];
+    try {
+      const interfaces = os.networkInterfaces();
+      for (const [name, addrs] of Object.entries(interfaces)) {
+        if (!addrs) continue;
+        // Skip loopback interface
+        if (name === 'lo') continue;
+        
+        const ipv4 = addrs.find(addr => addr.family === 'IPv4');
+        const ipv6 = addrs.filter(addr => addr.family === 'IPv6');
+        
+        if (ipv4) {
+          // Try to get interface speed (Linux only)
+          let interfaceSpeed = 'N/A';
+          try {
+            if (platform === 'linux') {
+              const { stdout: speedOut } = await execAsync(`cat /sys/class/net/${name}/speed 2>/dev/null || echo "N/A"`);
+              const speed = speedOut.trim();
+              if (speed && speed !== 'N/A' && !isNaN(speed)) {
+                interfaceSpeed = speed + 'Mb/s';
+              }
+            }
+          } catch (e) {
+            // Use default
+          }
+          
+          networkInterfaces.push({
+            name: name,
+            type: 'Ethernet',
+            interfaceSpeed: interfaceSpeed,
+            ipv4: ipv4.address,
+            ipv6: ipv6.map(addr => addr.address),
+            netmask: ipv4.netmask,
+            broadcast: calculateBroadcast(ipv4.address, ipv4.netmask),
+            active: true
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get network interfaces:', e.message);
+    }
+    
+    // Get kernel version
+    let kernel = 'N/A';
+    try {
+      if (platform === 'linux') {
+        const { stdout } = await execAsync('uname -r');
+        kernel = stdout.trim();
+      }
+    } catch (e) {
+      console.warn('Could not get kernel version:', e.message);
+    }
+    
+    // Get OS version
+    let osVersion = 'N/A';
+    try {
+      if (platform === 'linux') {
+        const { stdout } = await execAsync('lsb_release -d 2>/dev/null | cut -f2 || cat /etc/os-release | grep PRETTY_NAME | cut -d "=" -f2 | tr -d \'"\'');
+        osVersion = stdout.trim() || 'Linux';
+      }
+    } catch (e) {
+      osVersion = platform;
+    }
+    
+    // Format uptime
+    const days = Math.floor(uptime / 86400);
+    const hours = Math.floor((uptime % 86400) / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const uptimeFormatted = `${days}d ${hours}h ${minutes}m`;
+    
+    // Get version info
+    const versionInfo = getVersionInfo();
+    
+    const systemInfo = {
+      hostname: hostname,
+      os: osVersion,
+      kernel: kernel,
+      platform: platform,
+      arch: arch,
+      cpu: {
+        model: cpus[0]?.model || 'Unknown',
+        cores: cpus.length,
+        usage: Math.round(cpuUsage),
+        loadAvg: {
+          '1min': loadAvg[0].toFixed(2),
+          '5min': loadAvg[1].toFixed(2),
+          '15min': loadAvg[2].toFixed(2)
+        }
+      },
+      memory: {
+        total: totalMem,
+        used: usedMem,
+        free: freeMem,
+        cached: 0, // Would need more complex parsing
+        percent: Math.round((usedMem / totalMem) * 100)
+      },
+      virtualMemory: {
+        total: totalMem, // Simplified
+        used: 0,
+        percent: 0
+      },
+      disk: diskUsage,
+      network: networkInterfaces,
+      processes: processCount,
+      uptime: uptime,
+      uptimeFormatted: uptimeFormatted,
+      time: new Date().toLocaleString('id-ID', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric', 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      }),
+      version: versionInfo.version || 'N/A',
+      // Disk I/O - get from /proc/diskstats
+      diskIO: await getDiskIO(),
+      // Network I/O - get from /proc/net/dev
+      networkIO: await getNetworkIO()
+    };
+    
+    res.json({ success: true, data: systemInfo });
+  } catch (error) {
+    console.error('Error getting system info:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message,
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// Helper function to parse size strings like "20G", "500M"
+function parseSize(sizeStr) {
+  const units = { 'K': 1024, 'M': 1024*1024, 'G': 1024*1024*1024, 'T': 1024*1024*1024*1024 };
+  const match = sizeStr.match(/^([\d.]+)([KMGT])?/i);
+  if (!match) return 0;
+  const value = parseFloat(match[1]);
+  const unit = (match[2] || '').toUpperCase();
+  return Math.round(value * (units[unit] || 1));
+}
+
+// Helper function to calculate broadcast address
+function calculateBroadcast(ip, netmask) {
+  const ipParts = ip.split('.').map(Number);
+  const maskParts = netmask.split('.').map(Number);
+  const broadcast = ipParts.map((part, i) => part | (~maskParts[i] & 255));
+  return broadcast.join('.');
+}
+
+// Get Disk I/O statistics
+async function getDiskIO() {
+  try {
+    if (os.platform() === 'linux') {
+      // Read /proc/diskstats - format: major minor name reads reads_merged reads_sectors reads_ms writes writes_merged writes_sectors writes_ms
+      const { stdout } = await execAsync("cat /proc/diskstats | grep -E 'sd[a-z] |nvme|vd[a-z] ' | head -1");
+      const parts = stdout.trim().split(/\s+/);
+      if (parts.length >= 14) {
+        // sectors_read = parts[5], sectors_written = parts[9]
+        // Each sector is typically 512 bytes
+        const sectorsRead = parseInt(parts[5]) || 0;
+        const sectorsWritten = parseInt(parts[9]) || 0;
+        const bytesRead = sectorsRead * 512;
+        const bytesWritten = sectorsWritten * 512;
+        // Convert to MiB
+        return {
+          read: Math.round(bytesRead / 1024 / 1024),
+          write: Math.round(bytesWritten / 1024 / 1024)
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Could not get disk I/O:', e.message);
+  }
+  return { read: 0, write: 0 };
+}
+
+// Get Network I/O statistics
+async function getNetworkIO() {
+  try {
+    if (os.platform() === 'linux') {
+      // Read /proc/net/dev - get total RX and TX bytes
+      const { stdout } = await execAsync("cat /proc/net/dev | grep -E 'eth|ens|enp|wlan' | awk '{rx+=$2; tx+=$10} END {print rx, tx}'");
+      const parts = stdout.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const bytesRx = parseInt(parts[0]) || 0;
+        const bytesTx = parseInt(parts[1]) || 0;
+        // Convert to Mbps (assuming this is total since boot, we'd need delta for real-time)
+        // For now, return as is - client will calculate delta
+        return {
+          rx: Math.round((bytesRx / 1024 / 1024) * 8), // Convert to Mbps
+          tx: Math.round((bytesTx / 1024 / 1024) * 8)
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('Could not get network I/O:', e.message);
+  }
+  return { rx: 0, tx: 0 };
+}
 
 module.exports = router;

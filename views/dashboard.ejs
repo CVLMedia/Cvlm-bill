@@ -603,6 +603,14 @@
                       <i class="bi bi-person-circle me-2"></i>Data Pelanggan
                     </h6>
                     <div class="mb-2">
+                      <strong>ID Pelanggan:</strong> 
+                      <% if (billingData.customer.customer_id) { %>
+                        <span class="badge bg-primary" style="font-size: 0.9rem; font-family: monospace;"><%= billingData.customer.customer_id %></span>
+                      <% } else { %>
+                        <span class="text-muted">-</span>
+                      <% } %>
+                    </div>
+                    <div class="mb-2">
                       <strong>Nama:</strong> <%= billingData.customer.name %>
                     </div>
                     <div class="mb-2">
@@ -616,6 +624,20 @@
                         </span>
                       <% } else { %>
                         <span class="text-muted">Belum ada paket</span>
+                      <% } %>
+                    </div>
+                    <div class="mb-2">
+                      <strong>Status Pelanggan:</strong>
+                      <% if (billingData.customer.status === 'active') { %>
+                        <span class="badge bg-success">Aktif</span>
+                      <% } else if (billingData.customer.status === 'suspended') { %>
+                        <span class="badge bg-warning">Suspend</span>
+                      <% } else if (billingData.customer.status === 'inactive') { %>
+                        <span class="badge bg-secondary">Tidak Aktif</span>
+                      <% } else if (billingData.customer.status && billingData.customer.status.toLowerCase() === 'register') { %>
+                        <span class="badge bg-info">Register</span>
+                      <% } else { %>
+                        <span class="badge bg-secondary"><%= billingData.customer.status || 'Tidak Diketahui' %></span>
                       <% } %>
                     </div>
                     <div class="mb-2">

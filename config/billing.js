@@ -28,16 +28,29 @@ class BillingManager {
         return new Promise(async (resolve, reject) => {
             try {
                 const existing = await this.getCustomerById(id);
-                if (!existing) return reject(new Error('Customer not found'));
+                if (!existing) {
+                    logger.error(`[BILLING] setCustomerStatusById: Customer not found with id=${id}`);
+                    return reject(new Error('Customer not found'));
+                }
+                
                 const sql = `UPDATE customers SET status = ? WHERE id = ?`;
                 this.db.run(sql, [status, id], function(err) {
-                    if (err) return reject(err);
-                    try {
-                        logger.info(`[BILLING] setCustomerStatusById: id=${id}, username=${existing.username}, from=${existing.status} -> to=${status}`);
-                    } catch (_) {}
-                    resolve({ id, status });
+                    if (err) {
+                        logger.error(`[BILLING] setCustomerStatusById: Database error updating status: ${err.message}`);
+                        return reject(err);
+                    }
+                    
+                    // Verifikasi bahwa update benar-benar terjadi
+                    const changes = this.changes;
+                    if (changes === 0) {
+                        logger.warn(`[BILLING] setCustomerStatusById: No rows updated for id=${id} - customer may not exist or status already set`);
+                    }
+                    
+                    logger.info(`[BILLING] setCustomerStatusById: id=${id}, username=${existing.username}, from=${existing.status} -> to=${status}, rows affected: ${changes}`);
+                    resolve({ id, status, changes });
                 });
             } catch (e) {
+                logger.error(`[BILLING] setCustomerStatusById: Error: ${e.message}`);
                 reject(e);
             }
         });
@@ -356,7 +369,21 @@ class BillingManager {
                 description TEXT NOT NULL,
                 amount REAL NOT NULL,
                 category TEXT NOT NULL,
+                account_expenses TEXT,
                 expense_date DATE NOT NULL,
+                payment_method TEXT,
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`,
+            
+            // Tabel income untuk pemasukan
+            `CREATE TABLE IF NOT EXISTS income (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT NOT NULL,
+                amount REAL NOT NULL,
+                category TEXT NOT NULL,
+                income_date DATE NOT NULL,
                 payment_method TEXT,
                 notes TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -827,22 +854,123 @@ class BillingManager {
             // Simpan reference database untuk digunakan di callback
             const db = this.db;
             
-            const { name, username, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, status, auto_suspension, billing_day, static_ip, assigned_ip, mac_address, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes } = customerData;
+            const { name, username, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, status, auto_suspension, billing_day, static_ip, assigned_ip, mac_address, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes, ktp_photo_path, house_photo_path } = customerData;
             
             // Use provided username, fallback to auto-generate if not provided
             const finalUsername = username || this.generateUsername(phone);
-            const autoPPPoEUsername = pppoe_username || this.generatePPPoEUsername(phone);
+            
+            // Generate customer_id dulu (akan digunakan untuk PPPoE username/password)
+            // Generate customer_id dengan format yy-mm-dd hh:mm (contoh: 2512021009)
+            let generatedCustomerId = null;
+            if (!customerData.customer_id) {
+                const now = new Date();
+                const yy = now.getFullYear().toString().slice(-2);
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                const hh = String(now.getHours()).padStart(2, '0');
+                const min = String(now.getMinutes()).padStart(2, '0');
+                
+                generatedCustomerId = `${dd}${mm}${yy}${hh}${min}`;
+                
+                // Check if customer_id already exists
+                const existing = await new Promise((res) => {
+                    this.db.get('SELECT id FROM customers WHERE customer_id = ?', [generatedCustomerId], (err, row) => {
+                        res(!err && row);
+                    });
+                });
+                
+                if (existing) {
+                    // Jika sudah ada, tambahkan detik
+                    const ss = String(now.getSeconds()).padStart(2, '0');
+                    generatedCustomerId = `${dd}${mm}${yy}${hh}${min}${ss}`;
+                }
+            } else {
+                generatedCustomerId = customerData.customer_id;
+            }
+            
+            // PPPoE username dan password sama dengan customer_id
+            const autoPPPoEUsername = pppoe_username || generatedCustomerId;
             
             // Normalisasi billing_day (1-28)
             const normBillingDay = Math.min(Math.max(parseInt(billing_day ?? 15, 10) || 15, 1), 28);
             
-            const sql = `INSERT INTO customers (username, name, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, status, auto_suspension, billing_day, static_ip, assigned_ip, mac_address, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+            // Check if columns exist, if not, add them dynamically
+            const columns = await new Promise((res, rej) => {
+                this.db.all("PRAGMA table_info(customers)", (err, cols) => {
+                    if (err) rej(err);
+                    else res(cols);
+                });
+            });
+            
+            const hasCustomerId = columns.some(col => col.name === 'customer_id');
+            const hasKtpPhoto = columns.some(col => col.name === 'ktp_photo_path');
+            const hasHousePhoto = columns.some(col => col.name === 'house_photo_path');
+            
+            if (!hasCustomerId) {
+                // SQLite tidak mendukung menambahkan kolom dengan UNIQUE langsung
+                // Tambahkan kolom tanpa UNIQUE dulu, lalu buat index terpisah
+                try {
+                    await new Promise((res, rej) => {
+                        this.db.run(`ALTER TABLE customers ADD COLUMN customer_id TEXT`, (err) => {
+                            if (err && !err.message.includes('duplicate column') && !err.message.includes('already exists')) {
+                                console.error('Error adding customer_id column:', err);
+                                rej(err);
+                            } else {
+                                // Buat index UNIQUE terpisah setelah kolom ditambahkan
+                                // Gunakan partial index untuk menghindari error jika ada NULL values
+                                this.db.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_customer_id ON customers(customer_id) WHERE customer_id IS NOT NULL`, (idxErr) => {
+                                    if (idxErr) {
+                                        console.warn('Warning: Could not create unique index on customer_id:', idxErr.message);
+                                        // Tidak reject, karena kolom sudah ditambahkan
+                                    }
+                                    res();
+                                });
+                            }
+                        });
+                    });
+                } catch (alterErr) {
+                    // Jika error saat menambahkan kolom, log dan lanjutkan (mungkin kolom sudah ada)
+                    console.warn('Warning: Could not add customer_id column (may already exist):', alterErr.message);
+                }
+            }
+            if (!hasKtpPhoto) {
+                try {
+                    await new Promise((res, rej) => {
+                        this.db.run(`ALTER TABLE customers ADD COLUMN ktp_photo_path TEXT`, (err) => {
+                            if (err && !err.message.includes('duplicate column') && !err.message.includes('already exists')) {
+                                rej(err);
+                            } else {
+                                res();
+                            }
+                        });
+                    });
+                } catch (alterErr) {
+                    console.warn('Warning: Could not add ktp_photo_path column (may already exist):', alterErr.message);
+                }
+            }
+            if (!hasHousePhoto) {
+                try {
+                    await new Promise((res, rej) => {
+                        this.db.run(`ALTER TABLE customers ADD COLUMN house_photo_path TEXT`, (err) => {
+                            if (err && !err.message.includes('duplicate column') && !err.message.includes('already exists')) {
+                                rej(err);
+                            } else {
+                                res();
+                            }
+                        });
+                    });
+                } catch (alterErr) {
+                    console.warn('Warning: Could not add house_photo_path column (may already exist):', alterErr.message);
+                }
+            }
+            
+            const sql = `INSERT INTO customers (customer_id, username, name, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, status, auto_suspension, billing_day, static_ip, assigned_ip, mac_address, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes, ktp_photo_path, house_photo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
             
             // Default coordinates untuk Jakarta jika tidak ada koordinat
             const finalLatitude = latitude !== undefined ? parseFloat(latitude) : -6.2088;
             const finalLongitude = longitude !== undefined ? parseFloat(longitude) : 106.8456;
             
-            db.run(sql, [finalUsername, name, phone, autoPPPoEUsername, email, address, package_id, customerData.odp_id || null, pppoe_profile, status || 'active', auto_suspension !== undefined ? auto_suspension : 1, normBillingDay, static_ip || null, assigned_ip || null, mac_address || null, finalLatitude, finalLongitude, cable_type || null, cable_length || null, port_number || null, cable_status || 'connected', cable_notes || null], async function(err) {
+            db.run(sql, [generatedCustomerId, finalUsername, name, phone, autoPPPoEUsername, email, address, package_id, customerData.odp_id || null, pppoe_profile, status || 'active', auto_suspension !== undefined ? auto_suspension : 1, normBillingDay, static_ip || null, assigned_ip || null, mac_address || null, finalLatitude, finalLongitude, cable_type || null, cable_length || null, port_number || null, cable_status || 'connected', cable_notes || null, ktp_photo_path || null, house_photo_path || null], async function(err) {
                 if (err) {
                     reject(err);
                 } else {
@@ -943,7 +1071,7 @@ class BillingManager {
                         }
                     }
                     
-                    resolve(customer);
+                    resolve({ id: this.lastID, customer_id: generatedCustomerId, ...customerData });
                 }
             });
         });
@@ -1056,6 +1184,25 @@ class BillingManager {
             `;
             
             this.db.get(sql, [id], (err, row) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(row || null);
+                }
+            });
+        });
+    }
+
+    async getCustomerByCustomerId(customerId) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT c.*, p.name as package_name, p.price as package_price, p.speed as package_speed, p.image as package_image, p.tax_rate
+                FROM customers c
+                LEFT JOIN packages p ON c.package_id = p.id
+                WHERE c.customer_id = ?
+            `;
+            
+            this.db.get(sql, [customerId], (err, row) => {
                 if (err) {
                     reject(err);
                 } else {
@@ -1266,6 +1413,35 @@ class BillingManager {
             // Simpan reference database untuk digunakan di callback
             const db = this.db;
             
+            // Check and add pppoe_password column if it doesn't exist and password is provided
+            if (customerData.pppoe_password !== undefined) {
+                try {
+                    const columns = await new Promise((res, rej) => {
+                        db.all("PRAGMA table_info(customers)", (err, cols) => {
+                            if (err) rej(err);
+                            else res(cols);
+                        });
+                    });
+                    
+                    const hasPppoePassword = columns.some(col => col.name === 'pppoe_password');
+                    if (!hasPppoePassword) {
+                        await new Promise((res, rej) => {
+                            db.run(`ALTER TABLE customers ADD COLUMN pppoe_password TEXT`, (err) => {
+                                if (err && !err.message.includes('duplicate column')) {
+                                    console.error('Error adding pppoe_password column:', err);
+                                    rej(err);
+                                } else {
+                                    if (!err) console.log('✅ Column pppoe_password added to customers table');
+                                    res();
+                                }
+                            });
+                        });
+                    }
+                } catch (err) {
+                    console.warn('Warning: Could not check/add pppoe_password column:', err.message);
+                }
+            }
+            
             const { name, username, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, status, auto_suspension, billing_day, renewal_type, fix_date, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes } = customerData;
             
             // Dapatkan data customer lama untuk membandingkan nomor telepon
@@ -1273,6 +1449,25 @@ class BillingManager {
                 const oldCustomer = await this.getCustomerByPhone(oldPhone);
                 if (!oldCustomer) {
                     return reject(new Error('Pelanggan tidak ditemukan'));
+                }
+                
+                // PROTEKSI: Jika status customer saat ini adalah "register", PASTIKAN status tetap "register"
+                // Status hanya bisa diubah dari "register" ke "active" melalui endpoint /accept
+                // Bypass proteksi jika _bypassRegisterProtection = true (untuk endpoint /accept)
+                const currentStatus = (oldCustomer.status || '').toLowerCase();
+                let finalStatus;
+                
+                if (currentStatus === 'register' && !customerData._bypassRegisterProtection) {
+                    // Jika status saat ini register dan TIDAK ada bypass flag, SELALU pertahankan status register
+                    // Tidak peduli apa yang dikirim dari customerData
+                    finalStatus = 'register';
+                    console.log(`[BILLING] Customer ${oldCustomer.username} has status 'register', forcing status to remain 'register' (attempted: ${status || 'none'})`);
+                } else {
+                    // Jika status bukan register ATAU ada bypass flag, gunakan status dari customerData atau tetap status saat ini
+                    finalStatus = status || oldCustomer.status;
+                    if (customerData._bypassRegisterProtection && currentStatus === 'register' && status === 'active') {
+                        console.log(`[BILLING] Bypassing register protection for customer ${oldCustomer.username}, changing status from 'register' to 'active'`);
+                    }
                 }
                 
                 const oldPPPoE = oldCustomer ? oldCustomer.pppoe_username : null;
@@ -1286,32 +1481,66 @@ class BillingManager {
                     (fix_date !== undefined ? Math.min(Math.max(parseInt(fix_date, 10) || 15, 1), 28) : (oldCustomer.fix_date || 15)) : 
                     null;
                 
-                const sql = `UPDATE customers SET name = ?, username = ?, phone = ?, pppoe_username = ?, email = ?, address = ?, package_id = ?, odp_id = ?, pppoe_profile = ?, status = ?, auto_suspension = ?, billing_day = ?, renewal_type = ?, fix_date = ?, latitude = ?, longitude = ?, cable_type = ?, cable_length = ?, port_number = ?, cable_status = ?, cable_notes = ? WHERE id = ?`;
+                // Check if pppoe_password column exists and include it in update if provided
+                const hasPppoePassword = customerData.pppoe_password !== undefined;
+                let sql, params;
                 
-                db.run(sql, [
-                    name, 
-                    username || oldCustomer.username, 
-                    phone || oldPhone, 
-                    pppoe_username, 
-                    email, 
-                    address, 
-                    package_id, 
-                    odp_id !== undefined ? odp_id : oldCustomer.odp_id,
-                    pppoe_profile, 
-                    status, 
-                    auto_suspension !== undefined ? auto_suspension : oldCustomer.auto_suspension, 
-                    normBillingDay,
-                    normRenewalType,
-                    normFixDate,
-                    latitude !== undefined ? parseFloat(latitude) : oldCustomer.latitude,
-                    longitude !== undefined ? parseFloat(longitude) : oldCustomer.longitude,
-                    cable_type !== undefined ? cable_type : oldCustomer.cable_type,
-                    cable_length !== undefined ? cable_length : oldCustomer.cable_length,
-                    port_number !== undefined ? port_number : oldCustomer.port_number,
-                    cable_status !== undefined ? cable_status : oldCustomer.cable_status,
-                    cable_notes !== undefined ? cable_notes : oldCustomer.cable_notes,
-                    oldCustomer.id
-                ], async function(err) {
+                if (hasPppoePassword) {
+                    sql = `UPDATE customers SET name = ?, username = ?, phone = ?, pppoe_username = ?, pppoe_password = ?, email = ?, address = ?, package_id = ?, odp_id = ?, pppoe_profile = ?, status = ?, auto_suspension = ?, billing_day = ?, renewal_type = ?, fix_date = ?, latitude = ?, longitude = ?, cable_type = ?, cable_length = ?, port_number = ?, cable_status = ?, cable_notes = ? WHERE id = ?`;
+                    params = [
+                        name || oldCustomer.name, 
+                        username || oldCustomer.username, 
+                        phone || oldPhone, 
+                        pppoe_username !== undefined ? pppoe_username : oldCustomer.pppoe_username, 
+                        customerData.pppoe_password,
+                        email !== undefined ? email : oldCustomer.email, 
+                        address !== undefined ? address : oldCustomer.address, 
+                        package_id !== undefined ? package_id : oldCustomer.package_id,
+                        odp_id !== undefined ? odp_id : oldCustomer.odp_id,
+                        pppoe_profile !== undefined ? pppoe_profile : oldCustomer.pppoe_profile,
+                        finalStatus, // Gunakan finalStatus yang sudah diproteksi
+                        auto_suspension !== undefined ? auto_suspension : oldCustomer.auto_suspension, 
+                        normBillingDay,
+                        normRenewalType,
+                        normFixDate,
+                        latitude !== undefined ? parseFloat(latitude) : oldCustomer.latitude,
+                        longitude !== undefined ? parseFloat(longitude) : oldCustomer.longitude,
+                        cable_type !== undefined ? cable_type : oldCustomer.cable_type,
+                        cable_length !== undefined ? cable_length : oldCustomer.cable_length,
+                        port_number !== undefined ? port_number : oldCustomer.port_number,
+                        cable_status !== undefined ? cable_status : oldCustomer.cable_status,
+                        cable_notes !== undefined ? cable_notes : oldCustomer.cable_notes,
+                        oldCustomer.id
+                    ];
+                } else {
+                    sql = `UPDATE customers SET name = ?, username = ?, phone = ?, pppoe_username = ?, email = ?, address = ?, package_id = ?, odp_id = ?, pppoe_profile = ?, status = ?, auto_suspension = ?, billing_day = ?, renewal_type = ?, fix_date = ?, latitude = ?, longitude = ?, cable_type = ?, cable_length = ?, port_number = ?, cable_status = ?, cable_notes = ? WHERE id = ?`;
+                    params = [
+                        name || oldCustomer.name, 
+                        username || oldCustomer.username, 
+                        phone || oldPhone, 
+                        pppoe_username !== undefined ? pppoe_username : oldCustomer.pppoe_username, 
+                        email !== undefined ? email : oldCustomer.email, 
+                        address !== undefined ? address : oldCustomer.address, 
+                        package_id !== undefined ? package_id : oldCustomer.package_id,
+                        odp_id !== undefined ? odp_id : oldCustomer.odp_id,
+                        pppoe_profile !== undefined ? pppoe_profile : oldCustomer.pppoe_profile,
+                        finalStatus, // Gunakan finalStatus yang sudah diproteksi
+                        auto_suspension !== undefined ? auto_suspension : oldCustomer.auto_suspension, 
+                        normBillingDay,
+                        normRenewalType,
+                        normFixDate,
+                        latitude !== undefined ? parseFloat(latitude) : oldCustomer.latitude,
+                        longitude !== undefined ? parseFloat(longitude) : oldCustomer.longitude,
+                        cable_type !== undefined ? cable_type : oldCustomer.cable_type,
+                        cable_length !== undefined ? cable_length : oldCustomer.cable_length,
+                        port_number !== undefined ? port_number : oldCustomer.port_number,
+                        cable_status !== undefined ? cable_status : oldCustomer.cable_status,
+                        cable_notes !== undefined ? cable_notes : oldCustomer.cable_notes,
+                        oldCustomer.id
+                    ];
+                }
+                
+                db.run(sql, params, async function(err) {
                     if (err) {
                         reject(err);
                     } else {
@@ -2917,10 +3146,33 @@ class BillingManager {
                 reference_number: result.order_id,
                 notes: `Payment via ${gateway} - ${result.payment_type || 'online'}`
             };
-            await this.recordPayment(paymentData);
+            const paymentResult = await this.recordPayment(paymentData);
+            logger.info(`[WEBHOOK] Direct payment processed successfully for invoice: ${invoice.id}, Payment ID: ${paymentResult.id}`);
 
-            logger.info(`[WEBHOOK] Direct payment processed successfully for invoice: ${invoice.id}`);
-            return { success: true, message: 'Payment processed successfully' };
+            // Send notification - CRITICAL: Always send notification for online payments
+            if (paymentResult && paymentResult.id) {
+                try {
+                    const whatsappNotifications = require('./whatsapp-notifications');
+                    logger.info(`[WEBHOOK] Attempting to send payment notification (fallback) for payment ID: ${paymentResult.id}`);
+                    const notificationResult = await whatsappNotifications.sendPaymentReceivedNotification(paymentResult.id);
+                    if (notificationResult && notificationResult.success) {
+                        logger.info(`[WEBHOOK] Payment notification sent successfully (fallback) for payment ID: ${paymentResult.id}`);
+                    } else {
+                        logger.warn(`[WEBHOOK] Payment notification returned non-success (fallback):`, notificationResult);
+                    }
+                } catch (notificationError) {
+                    logger.error(`[WEBHOOK] Failed to send notification (fallback) for payment ID ${paymentResult.id}:`, notificationError);
+                    logger.error(`[WEBHOOK] Notification error stack (fallback):`, notificationError.stack);
+                }
+            } else {
+                logger.error(`[WEBHOOK] Cannot send notification (fallback) - paymentResult missing or no ID:`, { 
+                    hasPaymentResult: !!paymentResult, 
+                    paymentId: paymentResult?.id,
+                    invoiceId: invoice.id 
+                });
+            }
+
+            return { success: true, message: 'Payment processed successfully', paymentId: paymentResult.id };
         } catch (error) {
             logger.error(`[WEBHOOK] Error processing direct payment:`, error);
             throw error;
@@ -2947,82 +3199,189 @@ class BillingManager {
     }
 
     async getBillingStats() {
-        return new Promise((resolve, reject) => {
-            // Get current month date range
-            const currentDate = new Date();
-            const currentMonth = currentDate.getMonth();
-            const currentYear = currentDate.getFullYear();
-            const currentMonthStart = new Date(currentYear, currentMonth, 1);
-            const currentMonthStartStr = currentMonthStart.toISOString().split('T')[0];
-            
-            // Query yang lebih aman dan terpisah untuk menghindari duplikasi data
-            // Hanya menghitung data bulan berjalan untuk pendapatan
-            const sql = `
-                SELECT 
-                    (SELECT COUNT(*) FROM customers) as total_customers,
-                    (SELECT COUNT(*) FROM customers WHERE status = 'active') as active_customers,
-                    (SELECT COUNT(*) FROM invoices WHERE DATE(created_at) >= ?) as monthly_invoices,
-                    (SELECT COUNT(*) FROM invoices WHERE invoice_type = 'voucher') as voucher_invoices,
-                    (SELECT COUNT(*) FROM invoices WHERE DATE(created_at) >= ? AND status = 'paid') as paid_monthly_invoices,
-                    (SELECT COUNT(*) FROM invoices WHERE DATE(created_at) >= ? AND status = 'unpaid') as unpaid_monthly_invoices,
-                    (SELECT COUNT(*) FROM invoices WHERE invoice_type = 'voucher' AND status = 'paid') as paid_voucher_invoices,
-                    (SELECT COUNT(*) FROM invoices WHERE invoice_type = 'voucher' AND status = 'unpaid') as unpaid_voucher_invoices,
-                    (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE DATE(created_at) >= ? AND status = 'paid') as monthly_revenue,
-                    (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE invoice_type = 'voucher' AND status = 'paid') as voucher_revenue,
-                    (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE DATE(created_at) >= ? AND status = 'unpaid') as monthly_unpaid,
-                    (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE invoice_type = 'voucher' AND status = 'unpaid') as voucher_unpaid
-            `;
-            
-            const params = [currentMonthStartStr, currentMonthStartStr, currentMonthStartStr, currentMonthStartStr, currentMonthStartStr];
-            
-            this.db.get(sql, params, (err, row) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    // Pastikan semua nilai adalah angka dan tidak null
-                    const stats = {
-                        // Customer stats
-                        total_customers: parseInt(row.total_customers) || 0,
-                        active_customers: parseInt(row.active_customers) || 0,
-                        
-                        // Invoice counts by type
-                        monthly_invoices: parseInt(row.monthly_invoices) || 0,
-                        voucher_invoices: parseInt(row.voucher_invoices) || 0,
-                        
-                        // Paid invoices by type
-                        paid_monthly_invoices: parseInt(row.paid_monthly_invoices) || 0,
-                        paid_voucher_invoices: parseInt(row.paid_voucher_invoices) || 0,
-                        
-                        // Unpaid invoices by type
-                        unpaid_monthly_invoices: parseInt(row.unpaid_monthly_invoices) || 0,
-                        unpaid_voucher_invoices: parseInt(row.unpaid_voucher_invoices) || 0,
-                        
-                        // Revenue by type
-                        monthly_revenue: parseFloat(row.monthly_revenue) || 0,
-                        voucher_revenue: parseFloat(row.voucher_revenue) || 0,
-                        
-                        // Unpaid amounts by type
-                        monthly_unpaid: parseFloat(row.monthly_unpaid) || 0,
-                        voucher_unpaid: parseFloat(row.voucher_unpaid) || 0,
-                        
-                        // Legacy fields for backward compatibility
-                        total_invoices: (parseInt(row.monthly_invoices) || 0) + (parseInt(row.voucher_invoices) || 0),
-                        paid_invoices: (parseInt(row.paid_monthly_invoices) || 0) + (parseInt(row.paid_voucher_invoices) || 0),
-                        unpaid_invoices: (parseInt(row.unpaid_monthly_invoices) || 0) + (parseInt(row.unpaid_voucher_invoices) || 0),
-                        total_revenue: (parseFloat(row.monthly_revenue) || 0) + (parseFloat(row.voucher_revenue) || 0),
-                        total_unpaid: (parseFloat(row.monthly_unpaid) || 0) + (parseFloat(row.voucher_unpaid) || 0)
-                    };
-                    
-                    // Validasi logika: active_customers tidak boleh lebih dari total_customers
-                    if (stats.active_customers > stats.total_customers) {
-                        console.warn('Warning: Active customers count is higher than total customers. This indicates data inconsistency.');
-                        // Set active_customers to total_customers as fallback
-                        stats.active_customers = stats.total_customers;
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Get current month date range
+                const currentDate = new Date();
+                const currentMonth = currentDate.getMonth();
+                const currentYear = currentDate.getFullYear();
+                const currentMonthStart = new Date(currentYear, currentMonth, 1);
+                const currentMonthStartStr = currentMonthStart.toISOString().split('T')[0];
+                
+                // Query untuk data dari invoices
+                const sql = `
+                    SELECT 
+                        (SELECT COUNT(*) FROM customers) as total_customers,
+                        (SELECT COUNT(*) FROM customers WHERE status = 'active') as active_customers,
+                        (SELECT COUNT(*) FROM invoices WHERE DATE(created_at) >= ?) as monthly_invoices,
+                        (SELECT COUNT(*) FROM invoices WHERE invoice_type = 'voucher' OR invoice_number LIKE 'VCHR-%') as voucher_invoices_from_invoices,
+                        (SELECT COUNT(*) FROM invoices WHERE DATE(created_at) >= ? AND status = 'paid') as paid_monthly_invoices,
+                        (SELECT COUNT(*) FROM invoices WHERE DATE(created_at) >= ? AND status = 'unpaid') as unpaid_monthly_invoices,
+                        (SELECT COUNT(*) FROM invoices WHERE (invoice_type = 'voucher' OR invoice_number LIKE 'VCHR-%') AND status = 'paid') as paid_voucher_invoices_from_invoices,
+                        (SELECT COUNT(*) FROM invoices WHERE (invoice_type = 'voucher' OR invoice_number LIKE 'VCHR-%') AND status = 'unpaid') as unpaid_voucher_invoices_from_invoices,
+                        (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE DATE(created_at) >= ? AND status = 'paid') as monthly_revenue,
+                        (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE (invoice_type = 'voucher' OR invoice_number LIKE 'VCHR-%') AND status = 'paid') as voucher_revenue_from_invoices,
+                        (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE DATE(created_at) >= ? AND status = 'unpaid') as monthly_unpaid,
+                        (SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE (invoice_type = 'voucher' OR invoice_number LIKE 'VCHR-%') AND status = 'unpaid') as voucher_unpaid_from_invoices
+                `;
+                
+                const params = [currentMonthStartStr, currentMonthStartStr, currentMonthStartStr, currentMonthStartStr, currentMonthStartStr];
+                
+                this.db.get(sql, params, async (err, row) => {
+                    if (err) {
+                        reject(err);
+                        return;
                     }
                     
-                    resolve(stats);
-                }
-            });
+                    // Ambil data voucher dari voucher_data untuk bulan berjalan
+                    let voucherDataStats = {
+                        total: 0,
+                        paid: 0,
+                        unpaid: 0,
+                        revenue: 0,
+                        unpaid_amount: 0
+                    };
+                    
+                    // Cek apakah tabel voucher_data ada
+                    this.db.all("SELECT name FROM sqlite_master WHERE type='table' AND name='voucher_data'", async (tableErr, tables) => {
+                        if (!tableErr && tables && tables.length > 0) {
+                            // Ambil data dari voucher_data untuk bulan berjalan
+                            const voucherDataSql = `
+                                SELECT 
+                                    COUNT(*) as total,
+                                    SUM(CASE WHEN (first_login IS NOT NULL AND first_login > 0) OR status = 'used' THEN 1 ELSE 0 END) as paid,
+                                    SUM(CASE WHEN (first_login IS NULL OR first_login = 0) AND status != 'used' THEN 1 ELSE 0 END) as unpaid,
+                                    SUM(CASE WHEN (first_login IS NOT NULL AND first_login > 0) OR status = 'used' THEN COALESCE(price, 0) ELSE 0 END) as revenue,
+                                    SUM(CASE WHEN (first_login IS NULL OR first_login = 0) AND status != 'used' THEN COALESCE(price, 0) ELSE 0 END) as unpaid_amount
+                                FROM voucher_data
+                                WHERE DATE(created_at) >= date(?)
+                                AND DATE(created_at) <= date(?)
+                                AND voucher_code NOT IN (
+                                    SELECT REPLACE(invoice_number, 'VCHR-', '') 
+                                    FROM invoices 
+                                    WHERE invoice_number LIKE 'VCHR-%'
+                                )
+                            `;
+                            
+                            const currentMonthEnd = new Date(currentYear, currentMonth + 1, 0);
+                            const currentMonthEndStr = currentMonthEnd.toISOString().split('T')[0];
+                            
+                            this.db.get(voucherDataSql, [currentMonthStartStr, currentMonthEndStr], (voucherDataErr, voucherDataRow) => {
+                                if (!voucherDataErr && voucherDataRow) {
+                                    voucherDataStats = {
+                                        total: parseInt(voucherDataRow.total) || 0,
+                                        paid: parseInt(voucherDataRow.paid) || 0,
+                                        unpaid: parseInt(voucherDataRow.unpaid) || 0,
+                                        revenue: parseFloat(voucherDataRow.revenue) || 0,
+                                        unpaid_amount: parseFloat(voucherDataRow.unpaid_amount) || 0
+                                    };
+                                }
+                                
+                                // Gabungkan data dari invoices dan voucher_data
+                                const invoiceVoucherCount = parseInt(row.voucher_invoices_from_invoices) || 0;
+                                const invoiceVoucherPaid = parseInt(row.paid_voucher_invoices_from_invoices) || 0;
+                                const invoiceVoucherUnpaid = parseInt(row.unpaid_voucher_invoices_from_invoices) || 0;
+                                const invoiceVoucherRevenue = parseFloat(row.voucher_revenue_from_invoices) || 0;
+                                const invoiceVoucherUnpaidAmount = parseFloat(row.voucher_unpaid_from_invoices) || 0;
+                                
+                                const totalVoucherInvoices = invoiceVoucherCount + voucherDataStats.total;
+                                const totalPaidVoucherInvoices = invoiceVoucherPaid + voucherDataStats.paid;
+                                const totalUnpaidVoucherInvoices = invoiceVoucherUnpaid + voucherDataStats.unpaid;
+                                const totalVoucherRevenue = invoiceVoucherRevenue + voucherDataStats.revenue;
+                                const totalVoucherUnpaid = invoiceVoucherUnpaidAmount + voucherDataStats.unpaid_amount;
+                                
+                                // Pastikan semua nilai adalah angka dan tidak null
+                                const stats = {
+                                    // Customer stats
+                                    total_customers: parseInt(row.total_customers) || 0,
+                                    active_customers: parseInt(row.active_customers) || 0,
+                                    
+                                    // Invoice counts by type
+                                    monthly_invoices: parseInt(row.monthly_invoices) || 0,
+                                    voucher_invoices: totalVoucherInvoices,
+                                    
+                                    // Paid invoices by type
+                                    paid_monthly_invoices: parseInt(row.paid_monthly_invoices) || 0,
+                                    paid_voucher_invoices: totalPaidVoucherInvoices,
+                                    
+                                    // Unpaid invoices by type
+                                    unpaid_monthly_invoices: parseInt(row.unpaid_monthly_invoices) || 0,
+                                    unpaid_voucher_invoices: totalUnpaidVoucherInvoices,
+                                    
+                                    // Revenue by type
+                                    monthly_revenue: parseFloat(row.monthly_revenue) || 0,
+                                    voucher_revenue: totalVoucherRevenue,
+                                    
+                                    // Unpaid amounts by type
+                                    monthly_unpaid: parseFloat(row.monthly_unpaid) || 0,
+                                    voucher_unpaid: totalVoucherUnpaid,
+                                    
+                                    // Legacy fields for backward compatibility
+                                    total_invoices: (parseInt(row.monthly_invoices) || 0) + totalVoucherInvoices,
+                                    paid_invoices: (parseInt(row.paid_monthly_invoices) || 0) + totalPaidVoucherInvoices,
+                                    unpaid_invoices: (parseInt(row.unpaid_monthly_invoices) || 0) + totalUnpaidVoucherInvoices,
+                                    total_revenue: (parseFloat(row.monthly_revenue) || 0) + totalVoucherRevenue,
+                                    total_unpaid: (parseFloat(row.monthly_unpaid) || 0) + totalVoucherUnpaid
+                                };
+                                
+                                // Validasi logika: active_customers tidak boleh lebih dari total_customers
+                                if (stats.active_customers > stats.total_customers) {
+                                    console.warn('Warning: Active customers count is higher than total customers. This indicates data inconsistency.');
+                                    // Set active_customers to total_customers as fallback
+                                    stats.active_customers = stats.total_customers;
+                                }
+                                
+                                resolve(stats);
+                            });
+                        } else {
+                            // Tabel voucher_data tidak ada, gunakan data dari invoices saja
+                            const stats = {
+                                // Customer stats
+                                total_customers: parseInt(row.total_customers) || 0,
+                                active_customers: parseInt(row.active_customers) || 0,
+                                
+                                // Invoice counts by type
+                                monthly_invoices: parseInt(row.monthly_invoices) || 0,
+                                voucher_invoices: parseInt(row.voucher_invoices_from_invoices) || 0,
+                                
+                                // Paid invoices by type
+                                paid_monthly_invoices: parseInt(row.paid_monthly_invoices) || 0,
+                                paid_voucher_invoices: parseInt(row.paid_voucher_invoices_from_invoices) || 0,
+                                
+                                // Unpaid invoices by type
+                                unpaid_monthly_invoices: parseInt(row.unpaid_monthly_invoices) || 0,
+                                unpaid_voucher_invoices: parseInt(row.unpaid_voucher_invoices_from_invoices) || 0,
+                                
+                                // Revenue by type
+                                monthly_revenue: parseFloat(row.monthly_revenue) || 0,
+                                voucher_revenue: parseFloat(row.voucher_revenue_from_invoices) || 0,
+                                
+                                // Unpaid amounts by type
+                                monthly_unpaid: parseFloat(row.monthly_unpaid) || 0,
+                                voucher_unpaid: parseFloat(row.voucher_unpaid_from_invoices) || 0,
+                                
+                                // Legacy fields for backward compatibility
+                                total_invoices: (parseInt(row.monthly_invoices) || 0) + (parseInt(row.voucher_invoices_from_invoices) || 0),
+                                paid_invoices: (parseInt(row.paid_monthly_invoices) || 0) + (parseInt(row.paid_voucher_invoices_from_invoices) || 0),
+                                unpaid_invoices: (parseInt(row.unpaid_monthly_invoices) || 0) + (parseInt(row.unpaid_voucher_invoices_from_invoices) || 0),
+                                total_revenue: (parseFloat(row.monthly_revenue) || 0) + (parseFloat(row.voucher_revenue_from_invoices) || 0),
+                                total_unpaid: (parseFloat(row.monthly_unpaid) || 0) + (parseFloat(row.voucher_unpaid_from_invoices) || 0)
+                            };
+                            
+                            // Validasi logika: active_customers tidak boleh lebih dari total_customers
+                            if (stats.active_customers > stats.total_customers) {
+                                console.warn('Warning: Active customers count is higher than total customers. This indicates data inconsistency.');
+                                // Set active_customers to total_customers as fallback
+                                stats.active_customers = stats.total_customers;
+                            }
+                            
+                            resolve(stats);
+                        }
+                    });
+                });
+            } catch (error) {
+                reject(error);
+            }
         });
     }
 
@@ -3039,9 +3398,10 @@ class BillingManager {
                  )`,
                 
                 // 2. Update status customers yang tidak valid
+                // Catatan: 'register' adalah status valid yang menunggu persetujuan admin
                 `UPDATE customers 
                  SET status = 'inactive' 
-                 WHERE status NOT IN ('active', 'inactive', 'suspended')`,
+                 WHERE status NOT IN ('active', 'inactive', 'suspended', 'register', 'Register')`,
                 
                 // 3. Update status invoices yang tidak valid
                 `UPDATE invoices 
@@ -3515,6 +3875,176 @@ class BillingManager {
         });
     }
 
+    async getReportsStats() {
+        return new Promise((resolve, reject) => {
+            try {
+                // Get all stats in parallel with error handling for each query
+                Promise.all([
+                    // Active customers
+                    new Promise((res, rej) => {
+                        this.db.get(`SELECT COUNT(*) as count FROM customers WHERE status = 'active'`, [], (err, row) => {
+                            if (err) {
+                                console.error('Error getting active customers:', err);
+                                res(0); // Return 0 on error instead of rejecting
+                            } else {
+                                res(row?.count || 0);
+                            }
+                        });
+                    }),
+                    // Inactive customers
+                    new Promise((res, rej) => {
+                        this.db.get(`SELECT COUNT(*) as count FROM customers WHERE status IN ('inactive', 'suspended')`, [], (err, row) => {
+                            if (err) {
+                                console.error('Error getting inactive customers:', err);
+                                res(0);
+                            } else {
+                                res(row?.count || 0);
+                            }
+                        });
+                    }),
+                    // New customers this month
+                    new Promise((res, rej) => {
+                        this.db.get(`
+                            SELECT COUNT(*) as count 
+                            FROM customers 
+                            WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+                        `, [], (err, row) => {
+                            if (err) {
+                                console.error('Error getting new customers this month:', err);
+                                res(0);
+                            } else {
+                                res(row?.count || 0);
+                            }
+                        });
+                    }),
+                    // Invoices this month
+                    new Promise((res, rej) => {
+                        this.db.get(`
+                            SELECT COUNT(*) as count 
+                            FROM invoices 
+                            WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+                        `, [], (err, row) => {
+                            if (err) {
+                                console.error('Error getting invoices this month:', err);
+                                res(0);
+                            } else {
+                                res(row?.count || 0);
+                            }
+                        });
+                    }),
+                    // Paid invoices
+                    new Promise((res, rej) => {
+                        this.db.get(`SELECT COUNT(*) as count FROM invoices WHERE status = 'paid'`, [], (err, row) => {
+                            if (err) {
+                                console.error('Error getting paid invoices:', err);
+                                res(0);
+                            } else {
+                                res(row?.count || 0);
+                            }
+                        });
+                    }),
+                    // Unpaid invoices
+                    new Promise((res, rej) => {
+                        this.db.get(`SELECT COUNT(*) as count FROM invoices WHERE status = 'unpaid'`, [], (err, row) => {
+                            if (err) {
+                                console.error('Error getting unpaid invoices:', err);
+                                res(0);
+                            } else {
+                                res(row?.count || 0);
+                            }
+                        });
+                    }),
+                    // Successful payments
+                    new Promise((res, rej) => {
+                        this.db.get(`SELECT COUNT(*) as count FROM payments WHERE status = 'completed'`, [], (err, row) => {
+                            if (err) {
+                                console.error('Error getting successful payments:', err);
+                                res(0);
+                            } else {
+                                res(row?.count || 0);
+                            }
+                        });
+                    }),
+                    // Failed payments
+                    new Promise((res, rej) => {
+                        this.db.get(`SELECT COUNT(*) as count FROM payments WHERE status = 'failed'`, [], (err, row) => {
+                            if (err) {
+                                console.error('Error getting failed payments:', err);
+                                res(0);
+                            } else {
+                                res(row?.count || 0);
+                            }
+                        });
+                    })
+                ]).then(([
+                    activeCustomers,
+                    inactiveCustomers,
+                    newCustomersThisMonth,
+                    invoicesThisMonth,
+                    paidInvoices,
+                    unpaidInvoices,
+                    successfulPayments,
+                    failedPayments
+                ]) => {
+                    // Calculate retention rate
+                    const totalCustomers = activeCustomers + inactiveCustomers;
+                    const retentionRate = totalCustomers > 0 
+                        ? Math.round((activeCustomers / totalCustomers) * 100) 
+                        : 0;
+                    
+                    // Calculate payment rate
+                    const totalInvoices = paidInvoices + unpaidInvoices;
+                    const paymentRate = totalInvoices > 0 
+                        ? Math.round((paidInvoices / totalInvoices) * 100) 
+                        : 0;
+                    
+                    resolve({
+                        activeCustomers: activeCustomers || 0,
+                        inactiveCustomers: inactiveCustomers || 0,
+                        newCustomersThisMonth: newCustomersThisMonth || 0,
+                        invoicesThisMonth: invoicesThisMonth || 0,
+                        paidInvoices: paidInvoices || 0,
+                        unpaidInvoices: unpaidInvoices || 0,
+                        successfulPayments: successfulPayments || 0,
+                        failedPayments: failedPayments || 0,
+                        retentionRate: retentionRate || 0,
+                        paymentRate: paymentRate || 0
+                    });
+                }).catch((err) => {
+                    console.error('Error in getReportsStats Promise.all:', err);
+                    // Return default values instead of rejecting
+                    resolve({
+                        activeCustomers: 0,
+                        inactiveCustomers: 0,
+                        newCustomersThisMonth: 0,
+                        invoicesThisMonth: 0,
+                        paidInvoices: 0,
+                        unpaidInvoices: 0,
+                        successfulPayments: 0,
+                        failedPayments: 0,
+                        retentionRate: 0,
+                        paymentRate: 0
+                    });
+                });
+            } catch (error) {
+                console.error('Error in getReportsStats:', error);
+                // Return default values instead of rejecting
+                resolve({
+                    activeCustomers: 0,
+                    inactiveCustomers: 0,
+                    newCustomersThisMonth: 0,
+                    invoicesThisMonth: 0,
+                    paidInvoices: 0,
+                    unpaidInvoices: 0,
+                    successfulPayments: 0,
+                    failedPayments: 0,
+                    retentionRate: 0,
+                    paymentRate: 0
+                });
+            }
+        });
+    }
+
     async getOverdueInvoices() {
         return new Promise((resolve, reject) => {
             const sql = `
@@ -3744,7 +4274,32 @@ async handlePaymentWebhook(payload, gateway) {
                             return reject(new Error('Transaction and invoice not found'));
                         }
                         // Process direct payment with idempotency check
-                        await this.processDirectPaymentWithIdempotency(invoice, result, gateway);
+                        const paymentResult = await this.processDirectPaymentWithIdempotency(invoice, result, gateway);
+                        logger.info(`[WEBHOOK] Fallback payment processed:`, { paymentId: paymentResult?.paymentId, duplicate: paymentResult?.duplicate });
+                        
+                        // Send notification if payment was created
+                        if (paymentResult && paymentResult.paymentId && !paymentResult.duplicate) {
+                            try {
+                                const whatsappNotifications = require('./whatsapp-notifications');
+                                logger.info(`[WEBHOOK] Attempting to send payment notification (fallback) for payment ID: ${paymentResult.paymentId}`);
+                                const notificationResult = await whatsappNotifications.sendPaymentReceivedNotification(paymentResult.paymentId);
+                                if (notificationResult && notificationResult.success) {
+                                    logger.info(`[WEBHOOK] Payment notification sent successfully (fallback) for payment ID: ${paymentResult.paymentId}`);
+                                } else {
+                                    logger.warn(`[WEBHOOK] Payment notification returned non-success (fallback):`, notificationResult);
+                                }
+                            } catch (notificationError) {
+                                logger.error(`[WEBHOOK] Failed to send notification (fallback) for payment ID ${paymentResult.paymentId}:`, notificationError);
+                                logger.error(`[WEBHOOK] Notification error stack (fallback):`, notificationError.stack);
+                            }
+                        } else {
+                            logger.warn(`[WEBHOOK] Skipping notification (fallback) - paymentResult:`, { 
+                                hasPaymentResult: !!paymentResult, 
+                                paymentId: paymentResult?.paymentId,
+                                duplicate: paymentResult?.duplicate 
+                            });
+                        }
+                        
                         // Immediate restore for fallback path
                         try {
                             const customer = await this.getCustomerById(invoice.customer_id);
@@ -3816,17 +4371,63 @@ async handlePaymentWebhook(payload, gateway) {
                             reference_number: result.order_id,
                             notes: `Payment via ${gateway} - ${result.payment_type || 'online'}`
                         };
-                        await this.recordPayment(paymentData);
+                        const paymentResult = await this.recordPayment(paymentData);
+                        logger.info(`[WEBHOOK] Payment recorded:`, { paymentId: paymentResult?.id, invoiceId: transaction.invoice_id });
+                        
+                        // Log activity - Pembayaran masuk
+                        try {
+                            const { logActivity } = require('../utils/activityLogger');
+                            const invoice = await this.getInvoiceById(transaction.invoice_id);
+                            const customer = invoice ? await this.getCustomerById(invoice.customer_id) : null;
+                            logActivity(
+                                'system',
+                                'system',
+                                'payment_received',
+                                `Pembayaran masuk: ${gateway} - Invoice ${invoice?.invoice_number || transaction.invoice_id} - Pelanggan: ${customer?.name || 'N/A'} - Rp ${paymentData.amount.toLocaleString('id-ID')}`,
+                                null,
+                                null
+                            ).catch(err => logger.error('Failed to log payment activity:', err));
+                        } catch (logErr) {
+                            logger.error('Error logging payment activity:', logErr);
+                        }
 
                         // Notify and restore
                         const invoice = await this.getInvoiceById(transaction.invoice_id);
+                        if (!invoice) {
+                            logger.error(`[WEBHOOK] Invoice not found: ${transaction.invoice_id}`);
+                            return resolve({ success: true, message: 'Payment processed but invoice not found', invoice_id: transaction.invoice_id });
+                        }
+
                         const customer = await this.getCustomerById(invoice.customer_id);
-                        if (customer) {
+                        if (!customer) {
+                            logger.error(`[WEBHOOK] Customer not found for invoice: ${transaction.invoice_id}, customer_id: ${invoice.customer_id}`);
+                        }
+
+                        // Send notification - try to send even if some data is missing
+                        if (paymentResult && paymentResult.id) {
                             try {
-                                await this.sendPaymentSuccessNotification(customer, invoice);
+                                const whatsappNotifications = require('./whatsapp-notifications');
+                                logger.info(`[WEBHOOK] Attempting to send payment notification for payment ID: ${paymentResult.id}`);
+                                const notificationResult = await whatsappNotifications.sendPaymentReceivedNotification(paymentResult.id);
+                                if (notificationResult && notificationResult.success) {
+                                    logger.info(`[WEBHOOK] Payment notification sent successfully for payment ID: ${paymentResult.id}`);
+                                } else {
+                                    logger.warn(`[WEBHOOK] Payment notification returned non-success:`, notificationResult);
+                                }
                             } catch (notificationError) {
-                                logger.error(`[WEBHOOK] Failed send notification:`, notificationError);
+                                logger.error(`[WEBHOOK] Failed to send notification for payment ID ${paymentResult.id}:`, notificationError);
+                                logger.error(`[WEBHOOK] Notification error stack:`, notificationError.stack);
                             }
+                        } else {
+                            logger.error(`[WEBHOOK] Cannot send notification - paymentResult missing or no ID:`, { 
+                                hasPaymentResult: !!paymentResult, 
+                                paymentId: paymentResult?.id,
+                                invoiceId: transaction.invoice_id 
+                            });
+                        }
+
+                        // Attempt service restore if customer exists and is suspended
+                        if (customer) {
                             try {
                                 const refreshed = await this.getCustomerById(invoice.customer_id);
                                 if (refreshed && refreshed.status === 'suspended') {
@@ -3835,18 +4436,41 @@ async handlePaymentWebhook(payload, gateway) {
                                     if (unpaid.length === 0) {
                                         const serviceSuspension = require('./serviceSuspension');
                                         await serviceSuspension.restoreCustomerService(refreshed);
+                                        logger.info(`[WEBHOOK] Service restored for customer: ${refreshed.id}`);
                                     }
                                 }
                             } catch (restoreErr) {
                                 logger.error('[WEBHOOK] Immediate restore failed:', restoreErr);
                             }
-                        } else {
-                            logger.error(`[WEBHOOK] Customer not found for invoice: ${transaction.invoice_id}`);
                         }
 
                         return resolve({ success: true, message: 'Payment processed successfully', invoice_id: transaction.invoice_id });
                     } catch (processingError) {
                         logger.error(`[WEBHOOK] Error in payment processing:`, processingError);
+                        logger.error(`[WEBHOOK] Error stack:`, processingError.stack);
+                        
+                        // Try to send notification even if there was an error, if payment was recorded
+                        try {
+                            const lastPaymentSql = `SELECT id FROM payments WHERE invoice_id = ? AND payment_method = 'online' ORDER BY id DESC LIMIT 1`;
+                            const lastPayment = await new Promise((resolve, reject) => {
+                                this.db.get(lastPaymentSql, [transaction.invoice_id], (err, row) => {
+                                    if (err) reject(err);
+                                    else resolve(row);
+                                });
+                            });
+                            
+                            if (lastPayment && lastPayment.id) {
+                                logger.info(`[WEBHOOK] Attempting to send notification after error for payment ID: ${lastPayment.id}`);
+                                const whatsappNotifications = require('./whatsapp-notifications');
+                                const notificationResult = await whatsappNotifications.sendPaymentReceivedNotification(lastPayment.id);
+                                if (notificationResult && notificationResult.success) {
+                                    logger.info(`[WEBHOOK] Notification sent successfully after error for payment ID: ${lastPayment.id}`);
+                                }
+                            }
+                        } catch (notificationRetryError) {
+                            logger.error(`[WEBHOOK] Failed to send notification after error:`, notificationRetryError);
+                        }
+                        
                         return resolve({ success: true, message: 'Payment processed successfully', invoice_id: transaction.invoice_id });
                     }
                 });
@@ -3897,9 +4521,27 @@ async handlePaymentWebhook(payload, gateway) {
                         WHERE DATE(p.payment_date) BETWEEN ? AND ?
                         AND p.payment_type IN ('direct', 'collector', 'online', 'manual')
                         
+                        UNION ALL
+                        
+                        SELECT 
+                            'income' as type,
+                            inc.created_at as date,
+                            inc.amount as amount,
+                            inc.payment_method,
+                            CONCAT('Pendapatan - ', inc.category) as gateway_name,
+                            '' as invoice_number,
+                            '' as customer_name,
+                            '' as customer_phone,
+                            inc.description as description,
+                            inc.notes,
+                            '' as collector_name,
+                            0 as commission_amount
+                        FROM income inc
+                        WHERE DATE(inc.income_date) BETWEEN ? AND ?
+                        
                         ORDER BY date DESC
                     `;
-                    params.push(startDate, endDate);
+                    params.push(startDate, endDate, startDate, endDate);
                 } else if (type === 'expense') {
                     // Laporan pengeluaran dari tabel expenses
                     sql = `
@@ -3957,6 +4599,24 @@ async handlePaymentWebhook(payload, gateway) {
                         UNION ALL
                         
                         SELECT 
+                            'income' as type,
+                            inc.created_at as date,
+                            inc.amount as amount,
+                            inc.payment_method,
+                            CONCAT('Pendapatan - ', inc.category) as gateway_name,
+                            '' as invoice_number,
+                            '' as customer_name,
+                            '' as customer_phone,
+                            inc.description as description,
+                            inc.notes,
+                            '' as collector_name,
+                            0 as commission_amount
+                        FROM income inc
+                        WHERE DATE(inc.income_date) BETWEEN ? AND ?
+                        
+                        UNION ALL
+                        
+                        SELECT 
                             'expense' as type,
                             e.expense_date as date,
                             e.amount as amount,
@@ -3974,51 +4634,94 @@ async handlePaymentWebhook(payload, gateway) {
                         
                         ORDER BY date DESC
                     `;
-                    params.push(startDate, endDate, startDate, endDate);
+                    params.push(startDate, endDate, startDate, endDate, startDate, endDate);
                 }
 
-                this.db.all(sql, params, (err, rows) => {
+                this.db.all(sql, params, async (err, rows) => {
                     if (err) {
                         reject(err);
                     } else {
-                        // Hitung total dan statistik
-                        const totalIncome = rows.filter(r => r.type === 'income')
-                            .reduce((sum, r) => sum + (r.amount || 0), 0);
-                        const totalExpense = rows.filter(r => r.type === 'expense')
-                            .reduce((sum, r) => sum + (r.amount || 0), 0);
-                        const totalCommission = rows.filter(r => r.type === 'income')
-                            .reduce((sum, r) => sum + (r.commission_amount || 0), 0);
-                        const netProfit = totalIncome - totalExpense;
-                        
-                        // Statistik per tipe pembayaran
-                        const incomeByType = rows.filter(r => r.type === 'income')
-                            .reduce((acc, r) => {
-                                const gateway = r.gateway_name || 'Unknown';
-                                if (!acc[gateway]) {
-                                    acc[gateway] = { count: 0, amount: 0, commission: 0 };
+                        try {
+                            let transactions = Array.isArray(rows) ? [...rows] : [];
+                            let voucherSummary = {
+                                total_vouchers: 0,
+                                recognized_vouchers: 0,
+                                recognized_revenue: 0,
+                                pending_vouchers: 0,
+                                pending_revenue: 0
+                            };
+                            
+                            if (type !== 'expense') {
+                                const voucherInvoices = await this.getVoucherInvoices(startDate, endDate);
+                                const voucherStats = this.calculateVoucherStats(voucherInvoices);
+                                
+                                voucherSummary = {
+                                    total_vouchers: voucherStats.total_vouchers,
+                                    recognized_vouchers: voucherStats.paid_vouchers,
+                                    recognized_revenue: voucherStats.total_revenue,
+                                    pending_vouchers: voucherStats.unpaid_vouchers,
+                                    pending_revenue: voucherStats.unpaid_amount
+                                };
+                                
+                                const voucherTransactions = this.buildVoucherTransactions(voucherInvoices);
+                                if (voucherTransactions.length > 0) {
+                                    transactions = transactions.concat(voucherTransactions);
                                 }
-                                acc[gateway].count++;
-                                acc[gateway].amount += (r.amount || 0);
-                                acc[gateway].commission += (r.commission_amount || 0);
-                                return acc;
-                            }, {});
-                        
-                        const result = {
-                            transactions: rows,
-                            summary: {
-                                totalIncome,
-                                totalExpense,
-                                totalCommission,
-                                netProfit,
-                                transactionCount: rows.length,
-                                incomeCount: rows.filter(r => r.type === 'income').length,
-                                expenseCount: rows.filter(r => r.type === 'expense').length,
-                                incomeByType
-                            },
-                            dateRange: { startDate, endDate }
-                        };
-                        
-                        resolve(result);
+                            }
+                            
+                            // Urutkan transaksi dari terbaru
+                            transactions.sort((a, b) => {
+                                const dateA = new Date(a.date || a.payment_date || 0).getTime();
+                                const dateB = new Date(b.date || b.payment_date || 0).getTime();
+                                return dateB - dateA;
+                            });
+                            
+                            // Hitung total dan statistik
+                            const totalIncome = transactions.filter(r => r.type === 'income')
+                                .reduce((sum, r) => sum + (r.amount || 0), 0);
+                            const totalExpense = transactions.filter(r => r.type === 'expense')
+                                .reduce((sum, r) => sum + (r.amount || 0), 0);
+                            const totalCommission = transactions.filter(r => r.type === 'income')
+                                .reduce((sum, r) => sum + (r.commission_amount || 0), 0);
+                            const netProfit = totalIncome - totalExpense;
+                            
+                            // Statistik per tipe pembayaran
+                            const incomeByType = transactions.filter(r => r.type === 'income')
+                                .reduce((acc, r) => {
+                                    const gateway = r.gateway_name || 'Unknown';
+                                    if (!acc[gateway]) {
+                                        acc[gateway] = { count: 0, amount: 0, commission: 0 };
+                                    }
+                                    acc[gateway].count++;
+                                    acc[gateway].amount += (r.amount || 0);
+                                    acc[gateway].commission += (r.commission_amount || 0);
+                                    return acc;
+                                }, {});
+                            
+                            // Calculate profit and loss details
+                            const profitLossData = await this.calculateProfitLoss(startDate, endDate);
+                            
+                            const result = {
+                                transactions,
+                                summary: {
+                                    totalIncome,
+                                    totalExpense,
+                                    totalCommission,
+                                    netProfit,
+                                    transactionCount: transactions.length,
+                                    incomeCount: transactions.filter(r => r.type === 'income').length,
+                                    expenseCount: transactions.filter(r => r.type === 'expense').length,
+                                    incomeByType
+                                },
+                                voucherSummary,
+                                profitLossData,
+                                dateRange: { startDate, endDate }
+                            };
+                            
+                            resolve(result);
+                        } catch (processError) {
+                            reject(processError);
+                        }
                     }
                 });
             } catch (error) {
@@ -4030,15 +4733,18 @@ async handlePaymentWebhook(payload, gateway) {
     // Method untuk mengelola expenses
     async addExpense(expenseData) {
         return new Promise((resolve, reject) => {
-            const { description, amount, category, expense_date, payment_method, notes } = expenseData;
+            const { amount, category, account_expenses, expense_date, payment_method, notes } = expenseData;
             
-            const sql = `INSERT INTO expenses (description, amount, category, expense_date, payment_method, notes) VALUES (?, ?, ?, ?, ?, ?)`;
+            // Description dibuat dari account_expenses jika ada, atau dari category
+            const description = account_expenses || category || '';
             
-            this.db.run(sql, [description, amount, category, expense_date, payment_method, notes], function(err) {
+            const sql = `INSERT INTO expenses (description, amount, category, account_expenses, expense_date, payment_method, notes) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+            
+            this.db.run(sql, [description, amount, category, account_expenses || null, expense_date, payment_method || null, notes || null], function(err) {
                 if (err) {
                     reject(err);
                 } else {
-                    resolve({ id: this.lastID, ...expenseData });
+                    resolve({ id: this.lastID, ...expenseData, description });
                 }
             });
         });
@@ -4046,6 +4752,11 @@ async handlePaymentWebhook(payload, gateway) {
 
     async getExpenses(startDate = null, endDate = null) {
         return new Promise((resolve, reject) => {
+            // Pastikan kolom account_expenses ada di tabel
+            this.db.run(`ALTER TABLE expenses ADD COLUMN account_expenses TEXT`, (err) => {
+                // Ignore error jika kolom sudah ada
+            });
+            
             let sql = 'SELECT * FROM expenses';
             const params = [];
             
@@ -4068,15 +4779,18 @@ async handlePaymentWebhook(payload, gateway) {
 
     async updateExpense(id, expenseData) {
         return new Promise((resolve, reject) => {
-            const { description, amount, category, expense_date, payment_method, notes } = expenseData;
+            const { amount, category, account_expenses, expense_date, payment_method, notes } = expenseData;
             
-            const sql = `UPDATE expenses SET description = ?, amount = ?, category = ?, expense_date = ?, payment_method = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+            // Description dibuat dari account_expenses jika ada, atau dari category
+            const description = account_expenses || category || '';
             
-            this.db.run(sql, [description, amount, category, expense_date, payment_method, notes, id], function(err) {
+            const sql = `UPDATE expenses SET description = ?, amount = ?, category = ?, account_expenses = ?, expense_date = ?, payment_method = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+            
+            this.db.run(sql, [description, amount, category, account_expenses || null, expense_date, payment_method || null, notes || null, id], function(err) {
                 if (err) {
                     reject(err);
                 } else {
-                    resolve({ id, ...expenseData });
+                    resolve({ id, ...expenseData, description });
                 }
             });
         });
@@ -4093,6 +4807,475 @@ async handlePaymentWebhook(payload, gateway) {
                     resolve({ id, deleted: true });
                 }
             });
+        });
+    }
+
+    // Method untuk mengelola income (pemasukan)
+    async addIncome(incomeData) {
+        return new Promise((resolve, reject) => {
+            const { description, amount, category, income_date, payment_method, notes } = incomeData;
+            
+            const sql = `INSERT INTO income (description, amount, category, income_date, payment_method, notes) VALUES (?, ?, ?, ?, ?, ?)`;
+            
+            this.db.run(sql, [description, amount, category, income_date, payment_method || null, notes || null], function(err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve({ id: this.lastID, ...incomeData });
+                }
+            });
+        });
+    }
+
+    async getIncomes(startDate = null, endDate = null) {
+        return new Promise((resolve, reject) => {
+            let sql = 'SELECT * FROM income';
+            const params = [];
+            
+            if (startDate && endDate) {
+                sql += ' WHERE income_date BETWEEN ? AND ?';
+                params.push(startDate, endDate);
+            }
+            
+            sql += ' ORDER BY income_date DESC';
+            
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows);
+                }
+            });
+        });
+    }
+
+    async updateIncome(id, incomeData) {
+        return new Promise((resolve, reject) => {
+            const { description, amount, category, income_date, payment_method, notes } = incomeData;
+            
+            const sql = `UPDATE income SET description = ?, amount = ?, category = ?, income_date = ?, payment_method = ?, notes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+            
+            this.db.run(sql, [description, amount, category, income_date, payment_method || null, notes || null, id], function(err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve({ id, ...incomeData });
+                }
+            });
+        });
+    }
+
+    async deleteIncome(id) {
+        return new Promise((resolve, reject) => {
+            const sql = 'DELETE FROM income WHERE id = ?';
+            
+            this.db.run(sql, [id], function(err) {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve({ id, deleted: true });
+                }
+            });
+        });
+    }
+
+    // Method untuk mendapatkan voucher invoices
+    async getVoucherInvoices(startDate, endDate) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                logger.info(`getVoucherInvoices called: startDate=${startDate}, endDate=${endDate}`);
+                
+                // Dapatkan semua voucher dari tabel invoices dengan filter voucher
+                // Check if invoice_type column exists
+                this.db.all("PRAGMA table_info(invoices)", (pragmaErr, columns) => {
+                    if (pragmaErr) {
+                        reject(pragmaErr);
+                        return;
+                    }
+                    
+                    const hasInvoiceType = columns.some(col => col.name === 'invoice_type');
+                    
+                    let sql;
+                    if (hasInvoiceType) {
+                        sql = `
+                            SELECT 
+                                i.id,
+                                i.invoice_number,
+                                i.amount,
+                                i.status,
+                                i.created_at,
+                                i.payment_date as used_at,
+                                i.notes,
+                                '' as profile,
+                                0 as usage_count
+                            FROM invoices i
+                            WHERE (i.invoice_type = 'voucher' OR i.invoice_number LIKE 'VCHR-%')
+                            AND date(i.created_at) >= date(?)
+                            AND date(i.created_at) <= date(?)
+                            ORDER BY i.created_at DESC
+                        `;
+                    } else {
+                        // If invoice_type column doesn't exist, filter by invoice_number pattern
+                        sql = `
+                            SELECT 
+                                i.id,
+                                i.invoice_number,
+                                i.amount,
+                                i.status,
+                                i.created_at,
+                                i.payment_date as used_at,
+                                i.notes,
+                                '' as profile,
+                                0 as usage_count
+                            FROM invoices i
+                            WHERE i.invoice_number LIKE 'VCHR-%'
+                            AND date(i.created_at) >= date(?)
+                            AND date(i.created_at) <= date(?)
+                            ORDER BY i.created_at DESC
+                        `;
+                    }
+                    
+                    const params = [startDate, endDate];
+                    
+                    logger.info(`Executing SQL: ${sql} with params: [${params.join(', ')}]`);
+                    
+                    this.db.all(sql, params, async (err, voucherRows) => {
+                        if (err) {
+                            logger.error(`Error getting voucher invoices: ${err.message}`);
+                            reject(err);
+                            return;
+                        }
+                        
+                        logger.info(`Found ${voucherRows ? voucherRows.length : 0} voucher invoice rows from database`);
+                        
+                        // Fungsi untuk memproses dan menggabungkan data
+                        const processVoucherData = (invoiceRows, voucherDataRows) => {
+                            // Extract voucher username dari invoice
+                            const invoiceVouchers = (invoiceRows || []).map(voucher => {
+                                // Extract username from invoice_number (format: VCHR-username)
+                                let voucherUsername = '';
+                                if (voucher.invoice_number && voucher.invoice_number.startsWith('VCHR-')) {
+                                    voucherUsername = voucher.invoice_number.replace('VCHR-', '');
+                                } else if (voucher.notes) {
+                                    // Try to extract from notes
+                                    const match = voucher.notes.match(/Voucher Hotspot\s+(\S+)/i);
+                                    if (match) {
+                                        voucherUsername = match[1];
+                                    }
+                                }
+                                
+                                const fallbackFirstUsed = (voucher.used_at && voucher.used_at !== '0000-00-00 00:00:00') ? voucher.used_at : null;
+                                const numericUsage = parseInt(voucher.usage_count || 0, 10) || 0;
+                                const hasUsage = numericUsage > 0 || Boolean(fallbackFirstUsed);
+                                const isPaid = (voucher.status || '').toLowerCase() === 'paid' || hasUsage;
+                                
+                                return {
+                                    ...voucher,
+                                    voucher_username: voucherUsername,
+                                    first_used_at: fallbackFirstUsed,
+                                    last_used_at: fallbackFirstUsed,
+                                    usage_count: numericUsage,
+                                    computed_status: isPaid ? 'paid' : 'unpaid',
+                                    usage_status_label: isPaid ? 'Sudah Digunakan' : 'Belum Digunakan',
+                                    usage_status_badge: isPaid ? 'success' : 'secondary',
+                                    source: 'invoice'
+                                };
+                            });
+                            
+                            // Buat set voucher_code yang sudah ada di invoice
+                            const invoiceVoucherCodes = new Set(invoiceVouchers.map(v => v.voucher_username).filter(Boolean));
+                            
+                            // Convert voucher_data ke format invoice
+                            const voucherDataInvoices = (voucherDataRows || [])
+                                .filter(vd => !invoiceVoucherCodes.has(vd.voucher_code)) // Hanya voucher yang belum ada di invoice
+                                .map(vd => {
+                                    const invoiceNumber = `VCHR-${vd.voucher_code}`;
+                                    
+                                    // Konversi first_login (Unix timestamp) ke ISO string
+                                    let firstUsedAt = null;
+                                    if (vd.first_login && vd.first_login > 0) {
+                                        // first_login adalah Unix timestamp (detik), konversi ke milliseconds
+                                        const dateObj = new Date(vd.first_login * 1000);
+                                        // Gunakan format ISO string (akan dikonversi ke timezone lokal di view)
+                                        firstUsedAt = dateObj.toISOString();
+                                    }
+                                    
+                                    const hasUsage = vd.first_login !== null && vd.first_login > 0;
+                                    const isPaid = hasUsage || vd.voucher_status === 'used';
+                                    const voucherPrice = parseFloat(vd.price) || 0;
+                                    
+                                    return {
+                                        id: null, // Tidak ada ID karena bukan dari invoice
+                                        invoice_number: invoiceNumber,
+                                        amount: voucherPrice, // Harga dari voucher_data
+                                        status: isPaid ? 'paid' : 'unpaid',
+                                        created_at: vd.created_at || new Date().toISOString(),
+                                        used_at: firstUsedAt,
+                                        notes: `Voucher Hotspot ${vd.voucher_code} - ${vd.profile || 'N/A'}`,
+                                        profile: vd.profile || '',
+                                        usage_count: Math.floor((vd.total_usage || 0) / 60), // Convert detik ke menit
+                                        voucher_username: vd.voucher_code,
+                                        first_used_at: firstUsedAt,
+                                        last_used_at: firstUsedAt,
+                                        computed_status: isPaid ? 'paid' : 'unpaid',
+                                        usage_status_label: isPaid ? 'Sudah Digunakan' : 'Belum Digunakan',
+                                        usage_status_badge: isPaid ? 'success' : 'secondary',
+                                        source: 'voucher_data',
+                                        nas_name: vd.nas_name || '',
+                                        nas_ip: vd.nas_ip || '',
+                                        voucher_status: vd.voucher_status || 'active',
+                                        total_usage: vd.total_usage || 0,
+                                        remaining_time: vd.remaining_time || 0
+                                    };
+                                });
+                            
+                            // Gabungkan data invoice dan voucher_data
+                            const allVouchers = [...invoiceVouchers, ...voucherDataInvoices];
+                            
+                            // Sort by created_at DESC
+                            allVouchers.sort((a, b) => {
+                                const dateA = new Date(a.created_at || 0);
+                                const dateB = new Date(b.created_at || 0);
+                                return dateB - dateA;
+                            });
+                            
+                            logger.info(`Returning ${allVouchers.length} vouchers (${invoiceVouchers.length} from invoices, ${voucherDataInvoices.length} from voucher_data)`);
+                            resolve(allVouchers || []);
+                        };
+                        
+                        // Ambil data voucher dari voucher_data yang tidak ada di invoices
+                        // Cek apakah tabel voucher_data ada
+                        this.db.all("SELECT name FROM sqlite_master WHERE type='table' AND name='voucher_data'", async (tableErr, tables) => {
+                            if (tableErr) {
+                                logger.error(`Error checking voucher_data table: ${tableErr.message}`);
+                                // Lanjutkan dengan data invoice saja
+                                return processVoucherData(voucherRows || [], []);
+                            }
+                            
+                            if (!tables || tables.length === 0) {
+                                logger.info('Table voucher_data tidak ditemukan, hanya menggunakan data invoice');
+                                return processVoucherData(voucherRows || [], []);
+                            }
+                            
+                            // Ambil data dari voucher_data dalam range tanggal
+                            const voucherDataSql = `
+                                SELECT 
+                                    vd.voucher_code,
+                                    vd.created_at,
+                                    vd.first_login,
+                                    vd.total_usage,
+                                    vd.remaining_time,
+                                    vd.status as voucher_status,
+                                    vd.nas_name,
+                                    vd.nas_ip,
+                                    vd.profile,
+                                    vd.uptime_limit,
+                                    vd.validity_limit,
+                                    COALESCE(vd.price, 0) as price
+                                FROM voucher_data vd
+                                WHERE date(vd.created_at) >= date(?)
+                                AND date(vd.created_at) <= date(?)
+                                ORDER BY vd.created_at DESC
+                            `;
+                            
+                            this.db.all(voucherDataSql, params, (voucherDataErr, voucherDataRows) => {
+                                if (voucherDataErr) {
+                                    logger.error(`Error getting voucher_data: ${voucherDataErr.message}`);
+                                    // Lanjutkan dengan data invoice saja
+                                    return processVoucherData(voucherRows || [], []);
+                                }
+                                
+                                logger.info(`Found ${voucherDataRows ? voucherDataRows.length : 0} vouchers from voucher_data table`);
+                                
+                                // Gabungkan data invoice dan voucher_data
+                                processVoucherData(voucherRows || [], voucherDataRows || []);
+                            });
+                        });
+                    });
+                });
+            } catch (error) {
+                logger.error(`Error in getVoucherInvoices: ${error.message}`);
+                reject(error);
+            }
+        });
+    }
+
+    // Method untuk mendapatkan statistik laporan PPPoE
+    async getPPPoEReportStats(startDate, endDate) {
+        return new Promise((resolve, reject) => {
+            const sql = `
+                SELECT 
+                    COUNT(*) as total_invoices,
+                    SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) as paid_invoices,
+                    SUM(CASE WHEN status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_invoices,
+                    COALESCE(SUM(CASE WHEN status = 'paid' THEN amount ELSE 0 END), 0) as total_revenue,
+                    COALESCE(SUM(CASE WHEN status = 'unpaid' THEN amount ELSE 0 END), 0) as unpaid_amount,
+                    COUNT(DISTINCT customer_id) as total_customers,
+                    COUNT(DISTINCT CASE WHEN status = 'paid' THEN customer_id ELSE NULL END) as paid_customers
+                FROM invoices
+                WHERE (invoice_type != 'voucher' OR invoice_type IS NULL)
+                AND invoice_number NOT LIKE 'VCHR-%'
+                AND DATE(created_at) >= ? AND DATE(created_at) <= ?
+            `;
+            
+            this.db.get(sql, [startDate, endDate], (err, row) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve({
+                        total_invoices: parseInt(row.total_invoices) || 0,
+                        paid_invoices: parseInt(row.paid_invoices) || 0,
+                        unpaid_invoices: parseInt(row.unpaid_invoices) || 0,
+                        total_revenue: parseFloat(row.total_revenue) || 0,
+                        unpaid_amount: parseFloat(row.unpaid_amount) || 0,
+                        total_customers: parseInt(row.total_customers) || 0,
+                        paid_customers: parseInt(row.paid_customers) || 0
+                    });
+                }
+            });
+        });
+    }
+
+    // Method untuk mendapatkan daftar invoice PPPoE dengan filter tanggal
+    async getPPPoEInvoices(startDate, endDate, status = null) {
+        return new Promise((resolve, reject) => {
+            let sql = `
+                SELECT 
+                    i.*,
+                    c.name as customer_name,
+                    c.username as customer_username,
+                    c.phone as customer_phone,
+                    p.name as package_name,
+                    p.speed as package_speed
+                FROM invoices i
+                LEFT JOIN customers c ON i.customer_id = c.id
+                LEFT JOIN packages p ON i.package_id = p.id
+                WHERE (i.invoice_type != 'voucher' OR i.invoice_type IS NULL)
+                AND i.invoice_number NOT LIKE 'VCHR-%'
+                AND DATE(i.created_at) >= ? AND DATE(i.created_at) <= ?
+            `;
+            
+            const params = [startDate, endDate];
+            
+            if (status) {
+                sql += ` AND i.status = ?`;
+                params.push(status);
+            }
+            
+            sql += ` ORDER BY i.created_at DESC`;
+            
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve(rows || []);
+                }
+            });
+        });
+    }
+
+    // Method untuk menghitung data laba rugi dengan rincian
+    async calculateProfitLoss(startDate, endDate) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                // 2. Pendapatan Voucher (tidak bergantung pada invoice_type)
+                const voucherInvoices = await this.getVoucherInvoices(startDate, endDate);
+                const voucherStats = this.calculateVoucherStats(voucherInvoices);
+                
+                // 3. Pendapatan lain-lain dari Manajemen Pendapatan
+                const incomes = await this.getIncomes(startDate, endDate);
+                const otherIncomeTotal = incomes.reduce((sum, inc) => sum + (inc.amount || 0), 0);
+                
+                // 4. Pengeluaran dengan rincian
+                const expenses = await this.getExpenses(startDate, endDate);
+                
+                // Group expenses by category and account_expenses
+                const expensesByCategory = expenses.reduce((acc, exp) => {
+                    const category = exp.category || 'Lainnya';
+                    const account = exp.account_expenses || 'Tidak Diketahui';
+                    
+                    if (!acc[category]) {
+                        acc[category] = {};
+                    }
+                    if (!acc[category][account]) {
+                        acc[category][account] = 0;
+                    }
+                    acc[category][account] += (exp.amount || 0);
+                    return acc;
+                }, {});
+                
+                // Calculate total expenses by category
+                const expensesTotalByCategory = {};
+                Object.keys(expensesByCategory).forEach(category => {
+                    expensesTotalByCategory[category] = Object.values(expensesByCategory[category])
+                        .reduce((sum, amount) => sum + amount, 0);
+                });
+                
+                // 1. Pendapatan Bulanan Pembayaran Pelanggan (bukan voucher)
+                // Check if invoice_type column exists
+                this.db.all("PRAGMA table_info(invoices)", (pragmaErr, columns) => {
+                    if (pragmaErr) {
+                        reject(pragmaErr);
+                        return;
+                    }
+                    
+                    const hasInvoiceType = columns.some(col => col.name === 'invoice_type');
+                    
+                    let monthlyPaymentSql;
+                    if (hasInvoiceType) {
+                        monthlyPaymentSql = `
+                            SELECT SUM(p.amount) as total
+                            FROM payments p
+                            JOIN invoices i ON p.invoice_id = i.id
+                            WHERE DATE(p.payment_date) BETWEEN ? AND ?
+                            AND p.payment_type IN ('direct', 'collector', 'online', 'manual')
+                            AND (i.invoice_type != 'voucher' OR i.invoice_type IS NULL)
+                            AND i.invoice_number NOT LIKE 'VCHR-%'
+                        `;
+                    } else {
+                        // If invoice_type column doesn't exist, filter by invoice_number pattern
+                        monthlyPaymentSql = `
+                            SELECT SUM(p.amount) as total
+                            FROM payments p
+                            JOIN invoices i ON p.invoice_id = i.id
+                            WHERE DATE(p.payment_date) BETWEEN ? AND ?
+                            AND p.payment_type IN ('direct', 'collector', 'online', 'manual')
+                            AND i.invoice_number NOT LIKE 'VCHR-%'
+                        `;
+                    }
+                    
+                    // Get monthly payment total
+                    this.db.get(monthlyPaymentSql, [startDate, endDate], (err, row) => {
+                        if (err) {
+                            reject(err);
+                            return;
+                        }
+                        
+                        const monthlyPaymentTotal = row?.total || 0;
+                        const voucherRevenue = voucherStats.total_revenue || 0;
+                        const totalRevenue = monthlyPaymentTotal + voucherRevenue + otherIncomeTotal;
+                        const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+                        const netProfit = totalRevenue - totalExpenses;
+                        
+                        resolve({
+                            revenue: {
+                                monthlyPayment: monthlyPaymentTotal,
+                                voucher: voucherRevenue,
+                                otherIncome: otherIncomeTotal,
+                                total: totalRevenue
+                            },
+                            expenses: {
+                                byCategory: expensesByCategory,
+                                totalByCategory: expensesTotalByCategory,
+                                total: totalExpenses
+                            },
+                            netProfit: netProfit
+                        });
+                    });
+                });
+            } catch (error) {
+                reject(error);
+            }
         });
     }
 
@@ -4333,5 +5516,109 @@ Info: ${getSetting('contact_whatsapp', '0813-6888-8498')}`;
 
 // Create singleton instance
 const billingManager = new BillingManager();
+
+// Method untuk menghitung statistik voucher
+billingManager.calculateVoucherStats = function(invoices = []) {
+    const totalVouchers = invoices.length;
+    const paidInvoices = invoices.filter(inv => inv.computed_status === 'paid');
+    const unpaidInvoices = invoices.filter(inv => inv.computed_status !== 'paid');
+    
+    const toNumber = (value) => {
+        const num = parseFloat(value);
+        return Number.isFinite(num) ? num : 0;
+    };
+    
+    // Hitung total revenue dari voucher yang sudah digunakan (paid)
+    const totalRevenue = paidInvoices.reduce((sum, inv) => sum + toNumber(inv.amount || inv.price || 0), 0);
+    
+    // Hitung potensi pendapatan dari voucher yang belum digunakan
+    const unpaidAmount = unpaidInvoices.reduce((sum, inv) => sum + toNumber(inv.amount || inv.price || 0), 0);
+    
+    // Hitung rata-rata harga dari semua voucher (bukan hanya yang paid)
+    const totalAmount = invoices.reduce((sum, inv) => sum + toNumber(inv.amount || inv.price || 0), 0);
+    const averagePrice = totalVouchers > 0 ? totalAmount / totalVouchers : 0;
+    
+    return {
+        total_vouchers: totalVouchers,
+        paid_vouchers: paidInvoices.length,
+        unpaid_vouchers: unpaidInvoices.length,
+        total_revenue: totalRevenue,
+        unpaid_amount: unpaidAmount,
+        average_price: averagePrice
+    };
+};
+
+// Method untuk filter voucher invoices by status
+billingManager.filterVoucherInvoicesByStatus = function(invoices = [], status = 'all') {
+    if (!status || status === 'all') return invoices;
+    const normalizedStatus = status.toLowerCase();
+    return invoices.filter(inv => (inv.computed_status || '').toLowerCase() === normalizedStatus);
+};
+
+// Method untuk normalize voucher date
+billingManager.normalizeVoucherDate = function(dateValue) {
+    if (!dateValue) {
+        return new Date().toISOString();
+    }
+
+    if (dateValue instanceof Date) {
+        return dateValue.toISOString();
+    }
+
+    if (typeof dateValue === 'string') {
+        let normalized = dateValue.trim();
+        if (!normalized) {
+            return new Date().toISOString();
+        }
+
+        // Replace space with T for ISO compliance
+        if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(normalized)) {
+            normalized = normalized.replace(' ', 'T');
+        }
+
+        const parsed = new Date(normalized);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString();
+        }
+
+        // Fallback: assume local time string
+        const fallback = normalized.replace(' ', 'T');
+        const parsedFallback = new Date(fallback);
+        if (!Number.isNaN(parsedFallback.getTime())) {
+            return parsedFallback.toISOString();
+        }
+    }
+
+    return new Date().toISOString();
+};
+
+// Method untuk membangun transaksi voucher
+billingManager.buildVoucherTransactions = function(voucherInvoices = []) {
+    return voucherInvoices
+        .filter(inv => (inv.computed_status || '').toLowerCase() === 'paid')
+        .map(inv => {
+            const amount = parseFloat(inv.amount || inv.price || 0) || 0;
+            const dateSource = inv.first_used_at || inv.used_at || inv.created_at;
+            const normalizedDate = this.normalizeVoucherDate(dateSource);
+            const descriptionParts = [`Voucher ${inv.voucher_username}`];
+            if (inv.profile) {
+                descriptionParts.push(`(${inv.profile})`);
+            }
+            return {
+                type: 'income',
+                date: normalizedDate,
+                amount,
+                payment_method: 'voucher',
+                gateway_name: 'Voucher',
+                invoice_number: inv.invoice_number || `VCHR-${inv.voucher_username}`,
+                customer_name: inv.voucher_username,
+                customer_phone: '',
+                description: descriptionParts.join(' '),
+                notes: inv.notes || '',
+                collector_name: '',
+                commission_amount: 0
+            };
+        });
+};
 
 module.exports = billingManager; 

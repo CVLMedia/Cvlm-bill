@@ -107,5 +107,11 @@
     "wifi_name": "JINOM-HOMENET-WIFI",
     "hotspot_url": "http://SERVER_IP",
     "hotspot_ip": "SERVER_IP"
-  }
+  },
+  "whatsapp_primary_gateway": "baileys",
+  "fonnte_api_key": "",
+  "fonnte_api_url": "https://api.fonnte.com",
+  "fonnte_delay": 1000,
+  "telegram_bot_token": "",
+  "telegram_monitoring_enabled": true
 }

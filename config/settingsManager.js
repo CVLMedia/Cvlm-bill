@@ -52,9 +52,10 @@ function getSetting(key, defaultValue) {
   return settings[key] !== undefined ? settings[key] : defaultValue;
 }
 
-function setSetting(key, value) {
+function setSetting(key, value, req = null) {
   try {
     const settings = getSettingsWithCache();
+    const oldValue = settings[key];
     settings[key] = value;
     fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
     
@@ -62,6 +63,31 @@ function setSetting(key, value) {
     settingsCache = settings;
     lastModified = fs.statSync(settingsPath).mtime.getTime();
     cacheExpiry = Date.now() + CACHE_TTL;
+    
+    // Log activity - Ubah/Edit/Tambah Settingan
+    try {
+      const { logActivity } = require('../utils/activityLogger');
+      const username = req?.session?.admin?.username || req?.session?.adminUser || 'admin';
+      const action = oldValue === undefined ? 'settings_add' : 'settings_update';
+      const desc = oldValue === undefined 
+        ? `Tambah Settingan: ${key} = ${typeof value === 'object' ? JSON.stringify(value) : value}`
+        : `Edit Settingan: ${key} = ${typeof oldValue === 'object' ? JSON.stringify(oldValue) : oldValue} → ${typeof value === 'object' ? JSON.stringify(value) : value}`;
+      
+      logActivity(
+        username,
+        'admin',
+        action,
+        desc,
+        req?.ip || null,
+        req?.get('User-Agent') || null
+      ).catch(err => {
+        // Silent fail untuk logging, jangan ganggu operasi utama
+        if (process.env.DEBUG) console.error('Failed to log settings change:', err);
+      });
+    } catch (logErr) {
+      // Silent fail untuk logging
+      if (process.env.DEBUG) console.error('Error logging settings change:', logErr);
+    }
     
     return true;
   } catch (e) {

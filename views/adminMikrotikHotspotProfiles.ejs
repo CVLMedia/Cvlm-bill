@@ -23,6 +23,235 @@
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
+
+        /* Modern Notification Modal - Neumorphic Style */
+        .notification-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none; /* default hidden, tidak blok UI */
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        
+        .notification-overlay.show {
+            display: flex;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .notification-card {
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 
+                20px 20px 60px #d0d0d0,
+                -20px -20px 60px #ffffff,
+                inset 0 0 0 rgba(255, 255, 255, 0),
+                inset 0 0 0 rgba(0, 0, 0, 0);
+            text-align: center;
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+        
+        .notification-overlay.show .notification-card {
+            transform: scale(1);
+        }
+        
+        .notification-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            position: relative;
+            box-shadow: 
+                8px 8px 16px rgba(0, 0, 0, 0.2),
+                -8px -8px 16px rgba(255, 255, 255, 0.3);
+        }
+        
+        .notification-icon.success {
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+        }
+        
+        .notification-icon.error {
+            background: linear-gradient(145deg, #f44336, #d32f2f);
+        }
+        
+        .notification-icon.warning {
+            background: linear-gradient(145deg, #ff9800, #f57c00);
+        }
+        
+        .notification-icon.info {
+            background: linear-gradient(145deg, #2196F3, #1976D2);
+        }
+        
+        .notification-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 12px;
+        }
+        
+        .notification-message {
+            font-size: 16px;
+            color: #5a6c7d;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        
+        .notification-button {
+            background: linear-gradient(145deg, #2196F3, #1976D2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 
+                6px 6px 12px rgba(0, 0, 0, 0.15),
+                -6px -6px 12px rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        
+        .notification-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                8px 8px 16px rgba(0, 0, 0, 0.2),
+                -8px -8px 16px rgba(255, 255, 255, 0.15);
+        }
+        
+        .notification-button:active {
+            transform: translateY(0);
+            box-shadow: 
+                4px 4px 8px rgba(0, 0, 0, 0.1),
+                -4px -4px 8px rgba(255, 255, 255, 0.1);
+        }
+        
+        .notification-button.success {
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+        }
+        
+        .notification-button.error {
+            background: linear-gradient(145deg, #f44336, #d32f2f);
+        }
+        
+        .notification-button.warning {
+            background: linear-gradient(145deg, #ff9800, #f57c00);
+        }
+
+        .notification-button-secondary {
+            background: linear-gradient(145deg, #6c757d, #5a6268) !important;
+        }
+        
+        #notificationButtons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        /* Modern Metric Cards Styling - Same as admin/dashboard */
+        .metric-card {
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+            border: none;
+            position: relative;
+            overflow: hidden;
+            background: var(--card-bg-color);
+            color: #ffffff;
+            min-height: auto;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2), 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+        
+        .metric-card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .metric-card-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin: 8px 0;
+            line-height: 1.2;
+        }
+        
+        .metric-card-label {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Card Colors - Gradient Backgrounds */
+        .metric-card-primary {
+            --card-bg-color: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+        
+        .metric-card-success {
+            --card-bg-color: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+        }
+        
+        .metric-card-warning {
+            --card-bg-color: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        }
+        
+        .metric-card-info {
+            --card-bg-color: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .metric-card {
+                padding: 16px;
+            }
+            
+            .metric-card-value {
+                font-size: 1.5rem;
+            }
+            
+            .metric-card-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+        }
         .dataTables_wrapper .dataTables_filter input {
             border-radius: 6px;
             border: 1px solid #ccc;
@@ -114,35 +343,39 @@
             <!-- Statistik -->
             <div class="row mb-4">
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Total Profile</h5>
-                            <h3 id="totalProfiles">0</h3>
+                    <div class="metric-card metric-card-primary">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-list-ul"></i>
                         </div>
+                        <div class="metric-card-value" id="totalProfiles">0</div>
+                        <div class="metric-card-label">Total Profile</div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-success text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Aktif</h5>
-                            <h3 id="activeProfiles">0</h3>
+                    <div class="metric-card metric-card-success">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-check-circle"></i>
                         </div>
+                        <div class="metric-card-value" id="activeProfiles">0</div>
+                        <div class="metric-card-label">Aktif</div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-warning text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Rate Limited</h5>
-                            <h3 id="rateLimitedProfiles">0</h3>
+                    <div class="metric-card metric-card-warning">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-speedometer2"></i>
                         </div>
+                        <div class="metric-card-value" id="rateLimitedProfiles">0</div>
+                        <div class="metric-card-label">Rate Limited</div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body">
-                            <h5 class="card-title">Shared Users</h5>
-                            <h3 id="sharedUsersProfiles">0</h3>
+                    <div class="metric-card metric-card-info">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-people"></i>
                         </div>
+                        <div class="metric-card-value" id="sharedUsersProfiles">0</div>
+                        <div class="metric-card-label">Shared Users</div>
                     </div>
                 </div>
             </div>
@@ -297,53 +530,19 @@
                         </div>
                     </div>
 
-                    <!-- Address Settings -->
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="localAddress" class="form-label">Local Address</label>
-                                <input type="text" class="form-control" id="localAddress" name="localAddress" placeholder="0.0.0.0/0">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="remoteAddress" class="form-label">Remote Address</label>
-                                <input type="text" class="form-control" id="remoteAddress" name="remoteAddress" placeholder="0.0.0.0/0">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- DNS Settings -->
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="dnsServer" class="form-label">DNS Server</label>
-                                <input type="text" class="form-control" id="dnsServer" name="dnsServer" placeholder="8.8.8.8,8.8.4.4">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="parentQueue" class="form-label">Parent Queue</label>
-                                <input type="text" class="form-control" id="parentQueue" name="parentQueue" placeholder="default">
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Advanced Settings -->
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="addressList" class="form-label">Address List</label>
-                                <input type="text" class="form-control" id="addressList" name="addressList" placeholder="whitelist">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
                                 <label for="sharedUsers" class="form-label">Shared Users</label>
                                 <input type="number" class="form-control" id="sharedUsers" name="sharedUsers" placeholder="1" min="1">
+                                <small class="form-text text-muted">Jumlah user yang bisa menggunakan profile ini secara bersamaan</small>
                             </div>
                         </div>
                     </div>
+                    
+                    <!-- Catatan: Field berikut tidak didukung oleh API Mikrotik untuk hotspot profile -->
+                    <!-- local-address, remote-address, dns-server, parent-queue, address-list dihapus -->
 
                     <!-- Preset Buttons -->
                     <div class="mb-3">
@@ -413,6 +612,21 @@
 <!-- Notifikasi -->
 <div id="restartNotif" class="alert d-none position-fixed top-0 end-0 m-4" style="z-index:9999; min-width:300px;"></div>
 
+<!-- Modern Notification Modal -->
+<div id="notificationModal" class="notification-overlay">
+    <div class="notification-card">
+        <div class="notification-icon" id="notificationIcon">
+            <i class="bi" id="notificationIconClass"></i>
+        </div>
+        <div class="notification-title" id="notificationTitle"></div>
+        <div class="notification-message" id="notificationMessage"></div>
+        <div id="notificationButtons">
+            <button class="notification-button" id="notificationButton" onclick="closeNotification()"></button>
+            <button class="notification-button notification-button-secondary" id="notificationButtonCancel" onclick="closeNotification()" style="display: none; margin-left: 10px;"></button>
+        </div>
+    </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -422,6 +636,116 @@
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
 
 <script>
+// Modern Notification Function
+function showNotification(type, title, message, buttonText, callback) {
+    const modal = document.getElementById('notificationModal');
+    const icon = document.getElementById('notificationIcon');
+    const iconClass = document.getElementById('notificationIconClass');
+    const titleEl = document.getElementById('notificationTitle');
+    const messageEl = document.getElementById('notificationMessage');
+    const button = document.getElementById('notificationButton');
+    const buttonCancel = document.getElementById('notificationButtonCancel');
+
+    // Hide cancel button for simple notifications
+    buttonCancel.style.display = 'none';
+
+    // Set icon
+    icon.className = 'notification-icon ' + type;
+    if (type === 'success') {
+        iconClass.className = 'bi bi-check-circle-fill';
+    } else if (type === 'error') {
+        iconClass.className = 'bi bi-x-circle-fill';
+    } else if (type === 'warning') {
+        iconClass.className = 'bi bi-exclamation-triangle-fill';
+    } else {
+        iconClass.className = 'bi bi-info-circle-fill';
+    }
+
+    // Set content
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    button.textContent = buttonText;
+    button.className = 'notification-button ' + type;
+
+    // Show modal
+    modal.classList.add('show');
+
+    // Button handler
+    button.onclick = function() {
+        closeNotification();
+        if (callback && typeof callback === 'function') {
+            callback();
+        }
+    };
+
+    // Auto-close jika tidak ada callback
+    if (!callback) {
+        setTimeout(function() {
+            closeNotification();
+        }, 5000);
+    }
+}
+
+// Confirm Notification (2 tombol)
+function showConfirmNotification(type, title, message, confirmText, cancelText, confirmCallback) {
+    const modal = document.getElementById('notificationModal');
+    const icon = document.getElementById('notificationIcon');
+    const iconClass = document.getElementById('notificationIconClass');
+    const titleEl = document.getElementById('notificationTitle');
+    const messageEl = document.getElementById('notificationMessage');
+    const button = document.getElementById('notificationButton');
+    const buttonCancel = document.getElementById('notificationButtonCancel');
+
+    buttonCancel.style.display = 'inline-block';
+
+    icon.className = 'notification-icon ' + type;
+    if (type === 'success') {
+        iconClass.className = 'bi bi-check-circle-fill';
+    } else if (type === 'error') {
+        iconClass.className = 'bi bi-x-circle-fill';
+    } else if (type === 'warning') {
+        iconClass.className = 'bi bi-exclamation-triangle-fill';
+    } else {
+        iconClass.className = 'bi bi-info-circle-fill';
+    }
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    button.textContent = confirmText;
+    button.className = 'notification-button ' + type;
+    buttonCancel.textContent = cancelText;
+
+    modal.classList.add('show');
+
+    button.onclick = function() {
+        closeNotification();
+        if (confirmCallback && typeof confirmCallback === 'function') {
+            confirmCallback();
+        }
+    };
+
+    buttonCancel.onclick = function() {
+        closeNotification();
+    };
+}
+
+function closeNotification() {
+    const modal = document.getElementById('notificationModal');
+    modal.classList.remove('show');
+}
+
+// Close on overlay click
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('notificationModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeNotification();
+            }
+        });
+    }
+});
+
 $(function() {
     let profiles = [];
     let dataTable;
@@ -563,10 +887,10 @@ $(function() {
                     initDataTable();
                 }
             } else {
-                alert('Gagal memuat data profile: ' + (res.message || 'Unknown error'));
+                showNotification('error', 'Error!', 'Gagal memuat data profile: ' + (res.message || 'Unknown error'), 'Try again');
             }
         }).fail(function() {
-            alert('Gagal memuat data profile hotspot');
+            showNotification('error', 'Error!', 'Gagal memuat data profile hotspot', 'Try again');
         }).always(function() {
             $('#btnRefresh').prop('disabled', false).html('<i class="bi bi-arrow-clockwise"></i> Refresh');
         });
@@ -640,9 +964,9 @@ $(function() {
         const name = $(this).data('name');
         const routerId = $(this).data('router-id');
         
-        if (confirm(`Yakin ingin menghapus profile "${name}"?`)) {
+        showConfirmNotification('warning', 'Konfirmasi!', `Yakin ingin menghapus profile \"${name}\"?`, 'Hapus', 'Batal', function() {
             deleteProfile(id, routerId);
-        }
+        });
     });
 
     // Preset buttons
@@ -736,12 +1060,7 @@ $(function() {
             $('#idleTimeoutUnit').val('menit');
         }
         
-        // Handle address fields
-        $('#localAddress').val(profile['local-address'] || profile.localAddress || '');
-        $('#remoteAddress').val(profile['remote-address'] || profile.remoteAddress || '');
-        $('#dnsServer').val(profile['dns-server'] || profile.dnsServer || '');
-        $('#parentQueue').val(profile['parent-queue'] || profile.parentQueue || '');
-        $('#addressList').val(profile['address-list'] || profile.addressList || '');
+        // Handle shared users (field lain tidak didukung oleh API Mikrotik)
         $('#sharedUsers').val(profile['shared-users'] || profile.sharedUsers || '1');
     }
 
@@ -757,12 +1076,9 @@ $(function() {
             sessionTimeoutUnit: $('#sessionTimeoutUnit').val(),
             idleTimeout: $('#idleTimeout').val(),
             idleTimeoutUnit: $('#idleTimeoutUnit').val(),
-            localAddress: $('#localAddress').val(),
-            remoteAddress: $('#remoteAddress').val(),
-            dnsServer: $('#dnsServer').val(),
-            parentQueue: $('#parentQueue').val(),
-            addressList: $('#addressList').val(),
             sharedUsers: $('#sharedUsers').val()
+            // Catatan: localAddress, remoteAddress, dnsServer, parentQueue, addressList 
+            // tidak didukung oleh API Mikrotik untuk hotspot profile, dihapus dari form
         };
 
         // Debug logging
@@ -776,26 +1092,30 @@ $(function() {
         
         $.post(url, formData, function(res) {
             if (res.success) {
-                alert('Profile berhasil disimpan!');
-                $('#profileModal').modal('hide');
-                loadProfiles();
+                showNotification('success', 'Success!', 'Profile hotspot berhasil disimpan!', 'Continue', function() {
+                    $('#profileModal').modal('hide');
+                    loadProfiles();
+                });
             } else {
-                alert('Gagal menyimpan profile: ' + (res.message || 'Unknown error'));
+                const msg = 'Gagal menyimpan profile: ' + (res.message || 'Unknown error');
                 console.error('Save error:', res);
+                showNotification('error', 'Error!', msg, 'Try again');
             }
         }).fail(function(xhr, status, error) {
             console.error('AJAX Error:', status, error);
-            alert('Gagal menyimpan profile: ' + error);
+            showNotification('error', 'Error!', 'Gagal menyimpan profile: ' + error, 'Try again');
         });
     }
 
     function deleteProfile(id, routerId) {
         $.post('/admin/mikrotik/hotspot-profiles/delete', { id, router_id: routerId }, function(res) {
             if (res.success) {
-                alert('Profile berhasil dihapus!');
-                loadProfiles();
+                showNotification('success', 'Success!', 'Profile hotspot berhasil dihapus!', 'Continue', function() {
+                    loadProfiles();
+                });
             } else {
-                alert('Gagal menghapus profile: ' + (res.message || 'Unknown error'));
+                const msg = 'Gagal menghapus profile: ' + (res.message || 'Unknown error');
+                showNotification('error', 'Error!', msg, 'Try again');
             }
         });
     }

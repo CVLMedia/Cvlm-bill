@@ -465,6 +465,19 @@ Balas dengan: *BANTU* atau *HELP*
 
     // Get rate limit settings
     getRateLimitSettings() {
+        // Prefer nested object if exists, fallback to flattened keys (for backward compatibility)
+        const nested = getSetting('whatsapp_rate_limit', null);
+        if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+            return {
+                maxMessagesPerBatch: nested.maxMessagesPerBatch ?? 10,
+                delayBetweenBatches: nested.delayBetweenBatches ?? 30,
+                delayBetweenMessages: nested.delayBetweenMessages ?? 2,
+                maxRetries: nested.maxRetries ?? 2,
+                dailyMessageLimit: nested.dailyMessageLimit ?? 0,
+                enabled: nested.enabled !== undefined ? nested.enabled : true
+            };
+        }
+        // Fallback to flattened keys for backward compatibility
         return {
             maxMessagesPerBatch: getSetting('whatsapp_rate_limit.maxMessagesPerBatch', 10),
             delayBetweenBatches: getSetting('whatsapp_rate_limit.delayBetweenBatches', 30),
@@ -496,11 +509,6 @@ Balas dengan: *BANTU* atau *HELP*
     // Send notification with header and footer
     async sendNotification(phoneNumber, message, options = {}) {
         try {
-            if (!this.sock) {
-                logger.error('WhatsApp sock not initialized');
-                return { success: false, error: 'WhatsApp not connected' };
-            }
-
             // Check rate limiting
             const settings = this.getRateLimitSettings();
             if (settings.enabled && !this.checkDailyMessageLimit()) {
@@ -508,15 +516,120 @@ Balas dengan: *BANTU* atau *HELP*
                 return { success: false, error: 'Daily message limit reached' };
             }
 
-            const formattedNumber = this.formatPhoneNumber(phoneNumber);
-            const jid = `${formattedNumber}@s.whatsapp.net`;
-
             // Add header and footer
             const companyHeader = getSetting('company_header', '📱 SISTEM BILLING 📱\n\n');
             const footerSeparator = '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
             const footerInfo = footerSeparator + getSetting('footer_info', 'Powered by Alijaya Digital Network');
             
             const fullMessage = `${companyHeader}${message}${footerInfo}`;
+            
+            // Try to use gateway manager first (for text messages only)
+            // Always try gateway manager first for text messages, even if status check shows disconnected
+            // Gateway manager has its own fallback mechanism
+            if (!options.document?.buffer && !options.imagePath) {
+                try {
+                    const gatewayManager = require('./whatsapp-gateway-manager');
+                    logger.info(`[NOTIFICATION] Attempting to send via gateway manager to ${phoneNumber}`);
+                    const result = await gatewayManager.sendMessage(phoneNumber, fullMessage);
+                    if (result && result.success) {
+                        this.incrementDailyMessageCount();
+                        logger.info(`✅ WhatsApp notification sent via gateway manager to ${phoneNumber}`);
+                        return { success: true, withImage: false, gateway: 'gateway-manager' };
+                    } else {
+                        logger.warn(`[NOTIFICATION] Gateway manager failed:`, result?.error || 'Unknown error');
+                        // Try sendMessage.js as fallback (it has its own gateway manager fallback)
+                        try {
+                            const sendMessageModule = require('./sendMessage');
+                            logger.info(`[NOTIFICATION] Attempting to send via sendMessage module to ${phoneNumber}`);
+                            const sendResult = await sendMessageModule.sendMessage(phoneNumber, fullMessage, true);
+                            if (sendResult && sendResult.success) {
+                                this.incrementDailyMessageCount();
+                                logger.info(`✅ WhatsApp notification sent via sendMessage module to ${phoneNumber}`);
+                                return { success: true, withImage: false, gateway: 'sendMessage' };
+                            } else {
+                                logger.warn(`[NOTIFICATION] sendMessage module also failed:`, sendResult?.error || 'Unknown error');
+                            }
+                        } catch (sendMsgError) {
+                            logger.warn(`[NOTIFICATION] sendMessage module error:`, sendMsgError.message);
+                        }
+                        // Continue to fallback to sock
+                    }
+                } catch (gatewayError) {
+                    logger.warn(`[NOTIFICATION] Gateway manager error:`, gatewayError.message);
+                    // Try sendMessage.js as fallback
+                    try {
+                        const sendMessageModule = require('./sendMessage');
+                        logger.info(`[NOTIFICATION] Attempting to send via sendMessage module (gateway error fallback) to ${phoneNumber}`);
+                        const sendResult = await sendMessageModule.sendMessage(phoneNumber, fullMessage, true);
+                        if (sendResult && sendResult.success) {
+                            this.incrementDailyMessageCount();
+                            logger.info(`✅ WhatsApp notification sent via sendMessage module to ${phoneNumber}`);
+                            return { success: true, withImage: false, gateway: 'sendMessage' };
+                        }
+                    } catch (sendMsgError) {
+                        logger.warn(`[NOTIFICATION] sendMessage module error:`, sendMsgError.message);
+                    }
+                    // Continue to fallback to sock
+                }
+            }
+            
+            // Fallback to sock for attachments or if gateway manager fails
+            // Only check sock if we need to use it (for attachments or if gateway failed)
+            if (options.document?.buffer || options.imagePath) {
+                // For attachments, we need sock
+                if (!this.sock) {
+                    // Try to get sock from global if available
+                    if (typeof global !== 'undefined' && global.getWhatsAppSocket) {
+                        this.sock = global.getWhatsAppSocket();
+                        logger.info('[NOTIFICATION] Retrieved sock from global.getWhatsAppSocket()');
+                    } else if (typeof global !== 'undefined' && global.whatsappSocket) {
+                        this.sock = global.whatsappSocket;
+                        logger.info('[NOTIFICATION] Retrieved sock from global.whatsappSocket');
+                    }
+                    
+                    if (!this.sock) {
+                        logger.error('[NOTIFICATION] WhatsApp sock not initialized - cannot send attachments');
+                        return { success: false, error: 'WhatsApp not connected - cannot send attachments' };
+                    }
+                }
+            } else {
+                // For text messages, try sock as fallback if gateway failed or not available
+                if (!this.sock) {
+                    // Try to get sock from global if available
+                    if (typeof global !== 'undefined' && global.getWhatsAppSocket) {
+                        this.sock = global.getWhatsAppSocket();
+                        logger.info('[NOTIFICATION] Retrieved sock from global.getWhatsAppSocket()');
+                    } else if (typeof global !== 'undefined' && global.whatsappSocket) {
+                        this.sock = global.whatsappSocket;
+                        logger.info('[NOTIFICATION] Retrieved sock from global.whatsappSocket');
+                    }
+                    
+                    if (!this.sock) {
+                        // Gateway manager and sendMessage already tried and failed, and no sock available
+                        logger.error('[NOTIFICATION] No WhatsApp connection available (gateway manager failed and sock not available)');
+                        
+                        // Log activity - Pesan Notifikasi Gagal
+                        try {
+                            const { logActivity } = require('../utils/activityLogger');
+                            logActivity(
+                                'system',
+                                'system',
+                                'notification_failed',
+                                `Pesan Notifikasi Gagal: Ke ${phoneNumber} - WhatsApp tidak terhubung (gateway manager dan sock tidak tersedia)`,
+                                null,
+                                null
+                            ).catch(err => logger.error('Failed to log notification activity:', err));
+                        } catch (logErr) {
+                            logger.error('Error logging notification failure:', logErr);
+                        }
+                        
+                        return { success: false, error: 'WhatsApp not connected' };
+                    }
+                }
+            }
+
+            const formattedNumber = this.formatPhoneNumber(phoneNumber);
+            const jid = `${formattedNumber}@s.whatsapp.net`;
             
             // Handle document attachment first (e.g., PDF invoice)
             if (options.document?.buffer) {
@@ -532,6 +645,22 @@ Balas dengan: *BANTU* atau *HELP*
                     logger.info(`✅ WhatsApp document notification sent to ${phoneNumber}`);
 
                     this.incrementDailyMessageCount();
+                    
+                    // Log activity - Pesan Notifikasi Terkirim
+                    try {
+                        const { logActivity } = require('../utils/activityLogger');
+                        logActivity(
+                            'system',
+                            'system',
+                            'notification_sent',
+                            `Pesan Notifikasi Terkirim: Ke ${phoneNumber} via WhatsApp (dengan dokumen)`,
+                            null,
+                            null
+                        ).catch(err => logger.error('Failed to log notification activity:', err));
+                    } catch (logErr) {
+                        logger.error('Error logging notification:', logErr);
+                    }
+                    
                     return { success: true, withDocument: true };
                 } catch (docErr) {
                     logger.error(`❌ Failed sending document to ${phoneNumber}, falling back:`, docErr);
@@ -550,6 +679,22 @@ Balas dengan: *BANTU* atau *HELP*
                         
                         // Increment daily count
                         this.incrementDailyMessageCount();
+                        
+                        // Log activity - Pesan Notifikasi Terkirim
+                        try {
+                            const { logActivity } = require('../utils/activityLogger');
+                            logActivity(
+                                'system',
+                                'system',
+                                'notification_sent',
+                                `Pesan Notifikasi Terkirim: Ke ${phoneNumber} via WhatsApp (dengan gambar)`,
+                                null,
+                                null
+                            ).catch(err => logger.error('Failed to log notification activity:', err));
+                        } catch (logErr) {
+                            logger.error('Error logging notification:', logErr);
+                        }
+                        
                         return { success: true, withImage: true };
                     } else {
                         logger.warn(`⚠️ Image not found at path: ${imagePath}, falling back to text message`);
@@ -566,9 +711,41 @@ Balas dengan: *BANTU* atau *HELP*
             
             // Increment daily count
             this.incrementDailyMessageCount();
+            
+            // Log activity - Pesan Notifikasi Terkirim
+            try {
+                const { logActivity } = require('../utils/activityLogger');
+                logActivity(
+                    'system',
+                    'system',
+                    'notification_sent',
+                    `Pesan Notifikasi Terkirim: Ke ${phoneNumber} via WhatsApp (text)`,
+                    null,
+                    null
+                ).catch(err => logger.error('Failed to log notification activity:', err));
+            } catch (logErr) {
+                logger.error('Error logging notification:', logErr);
+            }
+            
             return { success: true, withImage: false };
         } catch (error) {
             logger.error(`Error sending WhatsApp notification to ${phoneNumber}:`, error);
+            
+            // Log activity - Pesan Notifikasi Gagal
+            try {
+                const { logActivity } = require('../utils/activityLogger');
+                logActivity(
+                    'system',
+                    'system',
+                    'notification_failed',
+                    `Pesan Notifikasi Gagal: Ke ${phoneNumber} - Error: ${error.message}`,
+                    null,
+                    null
+                ).catch(err => logger.error('Failed to log notification activity:', err));
+            } catch (logErr) {
+                logger.error('Error logging notification failure:', logErr);
+            }
+            
             return { success: false, error: error.message };
         }
     }
@@ -678,18 +855,49 @@ Balas dengan: *BANTU* atau *HELP*
                 });
             }
 
-            if (!this.sock) {
-                logger.error('WhatsApp sock not initialized');
-                return { success: false, sent: 0, failed: ids.length, skipped: 0, error: 'WhatsApp not connected' };
-            }
-
-            let sent = 0;
-            let failed = 0;
+            // Try to use gateway manager first
+            const gatewayManager = require('./whatsapp-gateway-manager');
+            const gatewayStatus = gatewayManager.getGatewayStatus();
+            
+            // Check if any gateway is connected (more robust check)
+            const baileysConnected = gatewayStatus.baileys && gatewayStatus.baileys.connected === true;
+            const fonnteConnected = gatewayStatus.fonnte && gatewayStatus.fonnte.connected === true;
+            const hasActiveGateway = baileysConnected || fonnteConnected;
 
             const companyHeader = getSetting('company_header', '📱 SISTEM BILLING 📱\n\n');
             const footerSeparator = '\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n';
             const footerInfo = footerSeparator + getSetting('footer_info', 'Powered by Alijaya Digital Network');
             const fullMessage = `${companyHeader}${message}${footerInfo}`;
+
+            let sent = 0;
+            let failed = 0;
+
+            // Use gateway manager if available
+            if (hasActiveGateway) {
+                for (const gid of ids) {
+                    try {
+                        const result = await gatewayManager.sendGroupMessage(gid, fullMessage);
+                        if (result.success) {
+                            sent++;
+                        } else {
+                            failed++;
+                            logger.error(`Failed to send to group ${gid}: ${result.error}`);
+                        }
+                        // small delay between group messages to avoid rate limit
+                        await this.delay(1000);
+                    } catch (e) {
+                        failed++;
+                        logger.error(`Error sending to group ${gid}:`, e);
+                    }
+                }
+                return { success: sent > 0, sent, failed, skipped: 0 };
+            }
+
+            // Fallback to sock
+            if (!this.sock) {
+                logger.error('WhatsApp sock not initialized');
+                return { success: false, sent: 0, failed: ids.length, skipped: 0, error: 'WhatsApp not connected' };
+            }
 
             for (const gid of ids) {
                 try {
@@ -867,20 +1075,34 @@ Balas dengan: *BANTU* atau *HELP*
     // Send payment received notification
     async sendPaymentReceivedNotification(paymentId) {
         try {
+            logger.info(`[NOTIFICATION] sendPaymentReceivedNotification called for payment ID: ${paymentId}`);
+            
             // Check if template is enabled
             if (!this.isTemplateEnabled('payment_received')) {
-                logger.info('Payment received notification is disabled, skipping...');
+                logger.info(`[NOTIFICATION] Payment received notification is disabled, skipping payment ID: ${paymentId}`);
                 return { success: true, skipped: true, reason: 'Template disabled' };
             }
 
             const payment = await billingManager.getPaymentById(paymentId);
-            const invoice = await billingManager.getInvoiceById(payment.invoice_id);
-            const customer = await billingManager.getCustomerById(invoice.customer_id);
-
-            if (!payment || !invoice || !customer) {
-                logger.error('Missing data for payment notification');
-                return { success: false, error: 'Missing data' };
+            if (!payment) {
+                logger.error(`[NOTIFICATION] Payment not found for payment ID: ${paymentId}`);
+                return { success: false, error: 'Payment not found' };
             }
+            logger.info(`[NOTIFICATION] Payment found:`, { paymentId: payment.id, invoiceId: payment.invoice_id });
+
+            const invoice = await billingManager.getInvoiceById(payment.invoice_id);
+            if (!invoice) {
+                logger.error(`[NOTIFICATION] Invoice not found for payment ID: ${paymentId}, invoice_id: ${payment.invoice_id}`);
+                return { success: false, error: 'Invoice not found' };
+            }
+            logger.info(`[NOTIFICATION] Invoice found:`, { invoiceId: invoice.id, invoiceNumber: invoice.invoice_number, customerId: invoice.customer_id });
+
+            const customer = await billingManager.getCustomerById(invoice.customer_id);
+            if (!customer) {
+                logger.error(`[NOTIFICATION] Customer not found for payment ID: ${paymentId}, invoice_id: ${payment.invoice_id}, customer_id: ${invoice.customer_id}`);
+                return { success: false, error: 'Customer not found' };
+            }
+            logger.info(`[NOTIFICATION] Customer found:`, { customerId: customer.id, customerName: customer.name, customerPhone: customer.phone });
 
             const data = {
                 customer_name: customer.name,
@@ -898,14 +1120,42 @@ Balas dengan: *BANTU* atau *HELP*
 
             const options = {};
 
+            // Check if gateway manager is available for attachments
+            const gatewayManager = require('./whatsapp-gateway-manager');
+            const gatewayStatus = gatewayManager.getGatewayStatus();
+            const hasActiveGateway = (gatewayStatus.baileys && gatewayStatus.baileys.connected) || 
+                                    (gatewayStatus.fonnte && gatewayStatus.fonnte.connected);
+
+            // Try to prepare PDF attachment, but if gateway manager is available and sock is not,
+            // we'll send text-only message via gateway manager
             const pdfAttachment = await this.prepareInvoicePdf(invoice.id);
             if (pdfAttachment) {
-                options.document = pdfAttachment;
+                // Only add attachment if we have sock instance (for Baileys direct send)
+                // If only gateway manager is available, send text-only
+                if (this.sock) {
+                    options.document = pdfAttachment;
+                    logger.info(`[NOTIFICATION] PDF attachment prepared for invoice: ${invoice.invoice_number}`);
+                } else if (hasActiveGateway) {
+                    logger.info(`[NOTIFICATION] PDF attachment prepared but will send text-only via gateway (sock not available)`);
+                    // Don't add attachment, will send text-only via gateway manager
+                } else {
+                    logger.warn(`[NOTIFICATION] PDF attachment prepared but cannot send (no gateway and no sock)`);
+                }
             }
 
-            return await this.sendNotification(customer.phone, message, options);
+            logger.info(`[NOTIFICATION] Sending notification to ${customer.phone} for payment ID: ${paymentId}`);
+            const result = await this.sendNotification(customer.phone, message, options);
+            
+            if (result && result.success) {
+                logger.info(`[NOTIFICATION] Payment notification sent successfully to ${customer.phone} for payment ID: ${paymentId}`);
+            } else {
+                logger.warn(`[NOTIFICATION] Payment notification returned non-success for payment ID: ${paymentId}:`, result);
+            }
+            
+            return result;
         } catch (error) {
-            logger.error('Error sending payment received notification:', error);
+            logger.error(`[NOTIFICATION] Error sending payment received notification for payment ID ${paymentId}:`, error);
+            logger.error(`[NOTIFICATION] Error stack:`, error.stack);
             return { success: false, error: error.message };
         }
     }

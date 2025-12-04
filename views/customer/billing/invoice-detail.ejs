@@ -371,7 +371,10 @@
                 const response = await fetch('/customer/billing/api/payment-methods');
                 const result = await response.json();
                 
-                if (result.success && result.methods) {
+                if (result.success && result.methodsByGateway) {
+                    renderPaymentMethods(result.methodsByGateway);
+                } else if (result.success && result.methods) {
+                    // Fallback untuk kompatibilitas
                     renderPaymentMethods(result.methods);
                 } else {
                     showPaymentMethodsError('Gagal memuat metode pembayaran: ' + (result.message || 'Unknown error'));
@@ -382,10 +385,56 @@
             }
         }
         
-        function renderPaymentMethods(methods) {
+        function renderPaymentMethods(methodsByGateway) {
             const container = document.getElementById('payment-methods-container');
             
-            if (!methods || methods.length === 0) {
+            // Check if methodsByGateway is an object (grouped) or array (legacy)
+            let isGrouped = methodsByGateway && typeof methodsByGateway === 'object' && !Array.isArray(methodsByGateway);
+            
+            if (!isGrouped) {
+                // Legacy format: array of methods
+                const methods = methodsByGateway || [];
+                if (methods.length === 0) {
+                    container.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Tidak ada metode pembayaran yang tersedia saat ini.
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '<div class="row g-2 mb-3">';
+                methods.forEach(method => {
+                    const invoiceAmount = <%= invoice.amount %>;
+                    const isDisabled = method.minimum_amount && invoiceAmount < method.minimum_amount;
+                    const disabledClass = isDisabled ? 'disabled' : '';
+                    const disabledTitle = isDisabled ? `Minimal pembayaran: Rp ${method.minimum_amount?.toLocaleString('id-ID')}` : '';
+                    
+                    html += `
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-${method.color} w-100 payment-method ${disabledClass}" 
+                                    data-gateway="${method.gateway}" 
+                                    data-method="${method.method}"
+                                    ${isDisabled ? 'disabled' : ''}
+                                    title="${disabledTitle}">
+                                <i class="${method.icon}"></i><br>
+                                <small>${method.name}</small>
+                                <br><small class="text-muted">Fee: ${method.fee_customer || 'Gratis'}</small>
+                                ${isDisabled ? `<br><small class="text-danger">Min: Rp ${method.minimum_amount?.toLocaleString('id-ID')}</small>` : ''}
+                            </button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+                bindPaymentMethodEvents();
+                return;
+            }
+            
+            // New format: grouped by gateway
+            const gateways = Object.keys(methodsByGateway);
+            if (gateways.length === 0) {
                 container.innerHTML = `
                     <div class="alert alert-warning">
                         <i class="bi bi-exclamation-triangle"></i>
@@ -395,32 +444,102 @@
                 return;
             }
             
-            let html = '<div class="row g-2 mb-3">';
+            const invoiceAmount = <%= invoice.amount %>;
+            const gatewayNames = {
+                'duitku': 'Duitku',
+                'tripay': 'Tripay',
+                'midtrans': 'Midtrans',
+                'xendit': 'Xendit'
+            };
             
-            methods.forEach(method => {
-                // Check if amount meets minimum requirement
-                const invoiceAmount = <%= invoice.amount %>;
-                const isDisabled = method.minimum_amount && invoiceAmount < method.minimum_amount;
-                const disabledClass = isDisabled ? 'disabled' : '';
-                const disabledTitle = isDisabled ? `Minimal pembayaran: Rp ${method.minimum_amount?.toLocaleString('id-ID')}` : '';
+            let html = '';
+            
+            // Pisahkan Duitku dari gateway lain
+            const duitkuMethods = methodsByGateway.duitku || [];
+            const otherGateways = gateways.filter(g => g !== 'duitku');
+            
+            // Kolom Duitku (jika ada)
+            if (duitkuMethods.length > 0) {
+                html += `
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="bi bi-wallet2 text-success"></i> 
+                            <strong>Duitku</strong>
+                        </h6>
+                        <div class="row g-2">
+                `;
+                
+                duitkuMethods.forEach(method => {
+                    const isDisabled = method.minimum_amount && invoiceAmount < method.minimum_amount;
+                    const disabledClass = isDisabled ? 'disabled' : '';
+                    const disabledTitle = isDisabled ? `Minimal pembayaran: Rp ${method.minimum_amount?.toLocaleString('id-ID')}` : '';
+                    const iconHtml = method.image_url 
+                        ? `<img src="${method.image_url}" alt="${method.name}" class="mb-1" style="height:24px;object-fit:contain;">`
+                        : `<i class="${method.icon}"></i>`;
+                    
+                    html += `
+                        <div class="col-md-6 col-lg-4">
+                            <button class="btn btn-outline-${method.color} w-100 payment-method ${disabledClass}" 
+                                    data-gateway="${method.gateway}" 
+                                    data-method="${method.method}"
+                                    ${isDisabled ? 'disabled' : ''}
+                                    title="${disabledTitle}">
+                                ${iconHtml}<br>
+                                <small>${method.name}</small>
+                                <br><small class="text-muted">Fee: ${method.fee_customer || 'Gratis'}</small>
+                                ${isDisabled ? `<br><small class="text-danger">Min: Rp ${method.minimum_amount?.toLocaleString('id-ID')}</small>` : ''}
+                            </button>
+                        </div>
+                    `;
+                });
                 
                 html += `
-                    <div class="col-md-6">
-                        <button class="btn btn-outline-${method.color} w-100 payment-method ${disabledClass}" 
-                                data-gateway="${method.gateway}" 
-                                data-method="${method.method}"
-                                ${isDisabled ? 'disabled' : ''}
-                                title="${disabledTitle}">
-                            <i class="${method.icon}"></i><br>
-                            <small>${method.name}</small>
-                            <br><small class="text-muted">Fee: ${method.fee_customer || 'Gratis'}</small>
-                            ${isDisabled ? `<br><small class="text-danger">Min: Rp ${method.minimum_amount?.toLocaleString('id-ID')}</small>` : ''}
-                        </button>
+                        </div>
                     </div>
                 `;
+            }
+            
+            // Kolom untuk gateway lainnya (Tripay, Midtrans, Xendit, dll)
+            otherGateways.forEach(gateway => {
+                const gatewayMethods = methodsByGateway[gateway] || [];
+                if (gatewayMethods.length > 0) {
+                    html += `
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                <i class="bi bi-credit-card text-primary"></i> 
+                                <strong>${gatewayNames[gateway] || gateway.toUpperCase()}</strong>
+                            </h6>
+                            <div class="row g-2">
+                    `;
+                    
+                    gatewayMethods.forEach(method => {
+                        const isDisabled = method.minimum_amount && invoiceAmount < method.minimum_amount;
+                        const disabledClass = isDisabled ? 'disabled' : '';
+                        const disabledTitle = isDisabled ? `Minimal pembayaran: Rp ${method.minimum_amount?.toLocaleString('id-ID')}` : '';
+                        
+                        html += `
+                            <div class="col-md-6 col-lg-4">
+                                <button class="btn btn-outline-${method.color} w-100 payment-method ${disabledClass}" 
+                                        data-gateway="${method.gateway}" 
+                                        data-method="${method.method}"
+                                        ${isDisabled ? 'disabled' : ''}
+                                        title="${disabledTitle}">
+                                    <i class="${method.icon}"></i><br>
+                                    <small>${method.name}</small>
+                                    <br><small class="text-muted">Fee: ${method.fee_customer || 'Gratis'}</small>
+                                    ${isDisabled ? `<br><small class="text-danger">Min: Rp ${method.minimum_amount?.toLocaleString('id-ID')}</small>` : ''}
+                                </button>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
             });
             
-            html += '</div>';
             container.innerHTML = html;
             
             // Bind event listeners to new buttons

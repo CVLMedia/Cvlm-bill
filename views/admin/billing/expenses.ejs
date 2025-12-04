@@ -102,7 +102,7 @@
                                     </div>
                                     <div>
                                         <div class="h4 text-info">
-                                            <%= (expenses && expenses.length > 0) ? Math.round(expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0) / expenses.length) : 0 %>
+                                            Rp <%= (expenses && expenses.length > 0) ? Math.round(expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0) / expenses.length).toLocaleString('id-ID') : '0' %>
                                         </div>
                                         <div class="text-muted">Rata-rata per Transaksi</div>
                                         <small class="text-muted">Dalam Rupiah</small>
@@ -142,8 +142,8 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Tanggal</th>
-                                        <th>Deskripsi</th>
-                                        <th>Kategori</th>
+                                        <th>Kategori Expenses</th>
+                                        <th>Account Expenses</th>
                                         <th>Jumlah</th>
                                         <th>Metode Pembayaran</th>
                                         <th>Catatan</th>
@@ -155,8 +155,8 @@
                                         <% expenses.forEach(function(expense) { %>
                                             <tr data-id="<%= expense.id %>">
                                                 <td><%= new Date(expense.expense_date).toLocaleDateString('id-ID') %></td>
-                                                <td><%= expense.description %></td>
-                                                <td><span class="badge bg-info"><%= expense.category %></span></td>
+                                                <td><span class="badge bg-info"><%= expense.category || '-' %></span></td>
+                                                <td><%= expense.account_expenses || '-' %></td>
                                                 <td class="text-danger">Rp <%= (expense.amount || 0).toLocaleString('id-ID') %></td>
                                                 <td><%= expense.payment_method || '-' %></td>
                                                 <td><%= expense.notes || '-' %></td>
@@ -193,28 +193,27 @@
                 <form id="addExpenseForm">
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="description" class="form-label">Deskripsi *</label>
-                            <input type="text" class="form-control" id="description" name="description" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="amount" class="form-label">Jumlah *</label>
-                            <input type="number" class="form-control" id="amount" name="amount" step="0.01" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="category" class="form-label">Kategori *</label>
+                            <label for="category" class="form-label">Kategori Expenses *</label>
                             <select class="form-select" id="category" name="category" required>
-                                <option value="">Pilih Kategori</option>
-                                <option value="Operasional">Operasional</option>
-                                <option value="Gaji">Gaji</option>
-                                <option value="Utilitas">Utilitas</option>
-                                <option value="Maintenance">Maintenance</option>
-                                <option value="Marketing">Marketing</option>
-                                <option value="Lainnya">Lainnya</option>
+                                <option value="">Pilih Kategori Expenses</option>
+                                <option value="Harga Pokok Penjualan (HPP)">Harga Pokok Penjualan (HPP)</option>
+                                <option value="Beban Operasional (OPEX)">Beban Operasional (OPEX)</option>
+                                <option value="Beban Lainnya">Beban Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="account_expenses" class="form-label">Account Expenses *</label>
+                            <select class="form-select" id="account_expenses" name="account_expenses" required>
+                                <option value="">Pilih Kategori Expenses terlebih dahulu</option>
                             </select>
                         </div>
                         <div class="mb-3">
                             <label for="expense_date" class="form-label">Tanggal Pengeluaran *</label>
                             <input type="date" class="form-control" id="expense_date" name="expense_date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="amount" class="form-label">Jumlah *</label>
+                            <input type="number" class="form-control" id="amount" name="amount" step="0.01" required>
                         </div>
                         <div class="mb-3">
                             <label for="payment_method" class="form-label">Metode Pembayaran</label>
@@ -252,28 +251,27 @@
                     <input type="hidden" id="edit_id" name="id">
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label for="edit_description" class="form-label">Deskripsi *</label>
-                            <input type="text" class="form-control" id="edit_description" name="description" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_amount" class="form-label">Jumlah *</label>
-                            <input type="number" class="form-control" id="edit_amount" name="amount" step="0.01" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_category" class="form-label">Kategori *</label>
+                            <label for="edit_category" class="form-label">Kategori Expenses *</label>
                             <select class="form-select" id="edit_category" name="category" required>
-                                <option value="">Pilih Kategori</option>
-                                <option value="Operasional">Operasional</option>
-                                <option value="Gaji">Gaji</option>
-                                <option value="Utilitas">Utilitas</option>
-                                <option value="Maintenance">Maintenance</option>
-                                <option value="Marketing">Marketing</option>
-                                <option value="Lainnya">Lainnya</option>
+                                <option value="">Pilih Kategori Expenses</option>
+                                <option value="Harga Pokok Penjualan (HPP)">Harga Pokok Penjualan (HPP)</option>
+                                <option value="Beban Operasional (OPEX)">Beban Operasional (OPEX)</option>
+                                <option value="Beban Lainnya">Beban Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_account_expenses" class="form-label">Account Expenses *</label>
+                            <select class="form-select" id="edit_account_expenses" name="account_expenses" required>
+                                <option value="">Pilih Kategori Expenses terlebih dahulu</option>
                             </select>
                         </div>
                         <div class="mb-3">
                             <label for="edit_expense_date" class="form-label">Tanggal Pengeluaran *</label>
                             <input type="date" class="form-control" id="edit_expense_date" name="expense_date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_amount" class="form-label">Jumlah *</label>
+                            <input type="number" class="form-control" id="edit_amount" name="amount" step="0.01" required>
                         </div>
                         <div class="mb-3">
                             <label for="edit_payment_method" class="form-label">Metode Pembayaran</label>
@@ -303,6 +301,62 @@
     <script>
         // Set default date to today
         document.getElementById('expense_date').value = new Date().toISOString().split('T')[0];
+
+        // Account Expenses options based on category
+        const accountExpensesOptions = {
+            'Harga Pokok Penjualan (HPP)': [
+                'Biaya bandwidth/upstream internet',
+                'Sewa tower / POP / data center',
+                'Infrastruktur jaringan (fiber, radio, router, OLT)',
+                'Perangkat pelanggan (ONT/Radio)',
+                'Maintenance jaringan (langsung ke layanan)',
+                'Basic Fee XR (BFXR)',
+                'Lainnya (Yang Berhubungan Dengan HPP)'
+            ],
+            'Beban Operasional (OPEX)': [
+                'Gaji staf kantor & CS',
+                'Listrik kantor',
+                'Sewa kantor',
+                'ATK & administrasi',
+                'Iklan & promosi',
+                'Komisi penjualan',
+                'Transportasi teknisi',
+                'Beban Lainnya (Berkaitan Dengan Operational)'
+            ],
+            'Beban Lainnya': [
+                'Bunga pinjaman',
+                'Penyusutan & amortisasi',
+                'Beban Lain-Lain'
+            ]
+        };
+
+        // Function to update account expenses dropdown
+        function updateAccountExpenses(categorySelectId, accountSelectId) {
+            const categorySelect = document.getElementById(categorySelectId);
+            const accountSelect = document.getElementById(accountSelectId);
+            
+            // Clear existing options
+            accountSelect.innerHTML = '<option value="">Pilih Account Expenses</option>';
+            
+            const selectedCategory = categorySelect.value;
+            if (selectedCategory && accountExpensesOptions[selectedCategory]) {
+                accountExpensesOptions[selectedCategory].forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    accountSelect.appendChild(optionElement);
+                });
+            }
+        }
+
+        // Add event listeners for category changes
+        document.getElementById('category').addEventListener('change', function() {
+            updateAccountExpenses('category', 'account_expenses');
+        });
+
+        document.getElementById('edit_category').addEventListener('change', function() {
+            updateAccountExpenses('edit_category', 'edit_account_expenses');
+        });
 
         // Load commission data
         async function loadCommissionData() {
@@ -335,15 +389,15 @@
         function exportToCSV() {
             <% if (expenses && expenses.length > 0) { %>
             const expenses = <%- JSON.stringify(expenses) %>;
-            const csvHeaders = ['Tanggal', 'Deskripsi', 'Kategori', 'Jumlah', 'Metode Pembayaran', 'Catatan'];
+            const csvHeaders = ['Tanggal', 'Kategori Expenses', 'Account Expenses', 'Jumlah', 'Metode Pembayaran', 'Catatan'];
             
             const csvRows = [csvHeaders.join(',')];
             
             expenses.forEach(expense => {
                 const row = [
                     `"${new Date(expense.expense_date).toLocaleDateString('id-ID')}"`,
-                    `"${expense.description.replace(/"/g, '""')}"`,
-                    `"${expense.category}"`,
+                    `"${expense.category || ''}"`,
+                    `"${expense.account_expenses || ''}"`,
                     `"${expense.amount}"`,
                     `"${expense.payment_method || ''}"`,
                     `"${(expense.notes || '').replace(/"/g, '""')}"`
@@ -367,8 +421,42 @@
         // Add expense form submission
         document.getElementById('addExpenseForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData.entries());
+            
+            // Validasi form sebelum submit
+            const form = this;
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            const formData = new FormData(form);
+            const data = {};
+            
+            // Konversi FormData ke object dan pastikan nilai tidak kosong
+            for (let [key, value] of formData.entries()) {
+                data[key] = value.trim();
+            }
+            
+            // Validasi tambahan di client side
+            if (!data.category || data.category === '') {
+                alert('Kategori Expenses harus dipilih');
+                return;
+            }
+            
+            if (!data.account_expenses || data.account_expenses === '') {
+                alert('Account Expenses harus dipilih');
+                return;
+            }
+            
+            if (!data.expense_date || data.expense_date === '') {
+                alert('Tanggal Pengeluaran harus diisi');
+                return;
+            }
+            
+            if (!data.amount || data.amount === '' || isNaN(parseFloat(data.amount))) {
+                alert('Jumlah harus diisi dengan angka yang valid');
+                return;
+            }
             
             try {
                 const response = await fetch('/admin/billing/api/expenses', {
@@ -384,36 +472,91 @@
                     document.getElementById('addExpenseForm').reset();
                     setTimeout(() => window.location.reload(), 1000);
                 } else {
-                    alert(result.message);
+                    alert(result.message || 'Gagal menyimpan data');
                 }
             } catch (error) {
-                alert('Terjadi kesalahan saat menyimpan data');
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat menyimpan data: ' + error.message);
             }
         });
 
         // Edit expense
         function editExpense(id) {
-            const row = document.querySelector(`tr[data-id="${id}"]`);
-            const cells = row.cells;
-            
-            document.getElementById('edit_id').value = id;
-            document.getElementById('edit_description').value = cells[1].textContent;
-            document.getElementById('edit_amount').value = cells[3].textContent.replace('Rp ', '').replace(/\./g, '');
-            document.getElementById('edit_category').value = cells[2].querySelector('.badge').textContent;
-            document.getElementById('edit_expense_date').value = cells[0].textContent.split('/').reverse().join('-');
-            document.getElementById('edit_payment_method').value = cells[4].textContent === '-' ? '' : cells[4].textContent;
-            document.getElementById('edit_notes').value = cells[5].textContent === '-' ? '' : cells[5].textContent;
-            
-            new bootstrap.Modal(document.getElementById('editExpenseModal')).show();
+            // Fetch expense data from server
+            fetch(`/admin/billing/api/expenses/${id}`)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.data) {
+                        const expense = result.data;
+                        document.getElementById('edit_id').value = id;
+                        document.getElementById('edit_amount').value = expense.amount || '';
+                        document.getElementById('edit_category').value = expense.category || '';
+                        
+                        // Update account expenses dropdown based on category
+                        updateAccountExpenses('edit_category', 'edit_account_expenses');
+                        
+                        // Set account expenses after a short delay to ensure dropdown is populated
+                        setTimeout(() => {
+                            document.getElementById('edit_account_expenses').value = expense.account_expenses || '';
+                        }, 100);
+                        
+                        document.getElementById('edit_expense_date').value = expense.expense_date || '';
+                        document.getElementById('edit_payment_method').value = expense.payment_method || '';
+                        document.getElementById('edit_notes').value = expense.notes || '';
+                        
+                        new bootstrap.Modal(document.getElementById('editExpenseModal')).show();
+                    } else {
+                        alert('Gagal memuat data pengeluaran');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Terjadi kesalahan saat memuat data');
+                });
         }
 
         // Edit expense form submission
         document.getElementById('editExpenseForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData.entries());
+            
+            // Validasi form sebelum submit
+            const form = this;
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            const formData = new FormData(form);
+            const data = {};
+            
+            // Konversi FormData ke object dan pastikan nilai tidak kosong
+            for (let [key, value] of formData.entries()) {
+                data[key] = value.trim();
+            }
+            
             const id = data.id;
             delete data.id;
+            
+            // Validasi tambahan di client side
+            if (!data.category || data.category === '') {
+                alert('Kategori Expenses harus dipilih');
+                return;
+            }
+            
+            if (!data.account_expenses || data.account_expenses === '') {
+                alert('Account Expenses harus dipilih');
+                return;
+            }
+            
+            if (!data.expense_date || data.expense_date === '') {
+                alert('Tanggal Pengeluaran harus diisi');
+                return;
+            }
+            
+            if (!data.amount || data.amount === '' || isNaN(parseFloat(data.amount))) {
+                alert('Jumlah harus diisi dengan angka yang valid');
+                return;
+            }
             
             try {
                 const response = await fetch(`/admin/billing/api/expenses/${id}`, {
@@ -428,10 +571,11 @@
                     document.getElementById('editExpenseModal').querySelector('.btn-close').click();
                     setTimeout(() => window.location.reload(), 1000);
                 } else {
-                    alert(result.message);
+                    alert(result.message || 'Gagal mengupdate data');
                 }
             } catch (error) {
-                alert('Terjadi kesalahan saat mengupdate data');
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat mengupdate data: ' + error.message);
             }
         });
 

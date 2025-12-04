@@ -14,33 +14,6 @@
         .main-content {
             background-color: #f8f9fa;
             min-height: 100vh;
-            margin-left: 0;
-            transition: margin-left 0.3s ease;
-        }
-        
-        /* Adjust main content when sidebar is collapsed */
-        @media (min-width: 768px) {
-            #mainContent {
-                transition: margin-left 0.3s ease, width 0.3s ease;
-            }
-            
-            .sidebar.collapsed ~ main#mainContent,
-            #sidebar.collapsed ~ main#mainContent {
-                margin-left: 0 !important;
-                width: 100% !important;
-            }
-            
-            .sidebar:not(.collapsed) ~ main#mainContent,
-            #sidebar:not(.collapsed) ~ main#mainContent {
-                margin-left: 16.666667% !important;
-            }
-        }
-        
-        /* Ensure hamburger button is visible */
-        .hamburger {
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
         }
         .stat-card {
             background: white;
@@ -86,10 +59,10 @@
     </style>
 </head>
 <body>
-<div class="container-fluid p-0">
-    <div class="row g-0">
+<div class="container-fluid">
+    <div class="row">
         <%- include('../../partials/billing-sidebar') %>
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content py-4" id="mainContent">
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content py-4">
                 
                 <!-- Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -99,38 +72,9 @@
                     </div>
                 </div>
 
-                <!-- Filter Section -->
-                <div class="filter-section">
-                    <form method="GET" class="row g-3 align-items-end">
-                        <div class="col-md-3">
-                            <label class="form-label">Tanggal Mulai</label>
-                            <input type="date" class="form-control" name="start_date" value="<%= startDate %>" required>
-        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Tanggal Selesai</label>
-                            <input type="date" class="form-control" name="end_date" value="<%= endDate %>" required>
-        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">Tipe Laporan</label>
-                            <select class="form-select" name="type">
-                                <option value="all" <%= type === 'all' ? 'selected' : '' %>>Semua Transaksi</option>
-                                <option value="income" <%= type === 'income' ? 'selected' : '' %>>Hanya Pemasukan</option>
-                                <option value="expense" <%= type === 'expense' ? 'selected' : '' %>>Hanya Pengeluaran</option>
-            </select>
-        </div>
-                        <div class="col-md-3">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bx bx-search"></i> Terapkan Filter
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary ms-2" onclick="exportToCSV()">
-                                <i class="bx bx-download"></i> Export CSV
-                            </button>
-        </div>
-    </form>
-                </div>
-
                 <!-- Summary Cards -->
                 <% if (financialData && financialData.summary) { %>
+                <% const voucherSummary = financialData.voucherSummary || { recognized_revenue: 0, recognized_vouchers: 0, pending_revenue: 0, pending_vouchers: 0, total_vouchers: 0 }; %>
                 <div class="row mb-4">
                     <div class="col-md-3">
                         <div class="stat-card income">
@@ -144,6 +88,7 @@
                                     </div>
                                     <div class="stat-label">Total Pemasukan</div>
                                     <small class="text-muted"><%= financialData.summary.incomeCount || 0 %> transaksi</small>
+                                    <small class="text-info d-block">Voucher: Rp <%= Number(voucherSummary.recognized_revenue || 0).toLocaleString('id-ID') %> (<%= voucherSummary.recognized_vouchers || 0 %> voucher)</small>
                                 </div>
                             </div>
                         </div>
@@ -160,22 +105,24 @@
                                     </div>
                                     <div class="stat-label">Total Pengeluaran</div>
                                     <small class="text-muted"><%= financialData.summary.expenseCount || 0 %> transaksi</small>
+                                    <small class="text-muted d-block">Komisi Kolektor: Rp <%= Number(financialData.summary.totalCommission || 0).toLocaleString('id-ID') %></small>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="stat-card" style="border-left-color: #6f42c1;">
+                        <div class="stat-card" style="border-left-color: #0dcaf0;">
                             <div class="d-flex align-items-center">
                                 <div class="me-3">
-                                    <i class="bx bx-user-check" style="font-size: 2rem; color: #6f42c1;"></i>
+                                    <i class="bx bx-ticket" style="font-size: 2rem; color: #0dcaf0;"></i>
                                 </div>
                                 <div>
-                                    <div class="stat-value" style="color: #6f42c1;">
-                                        Rp <%= Number(financialData.summary.totalCommission || 0).toLocaleString('id-ID') %>
+                                    <div class="stat-value" style="color: #0dcaf0;">
+                                        Rp <%= Number(voucherSummary.recognized_revenue || 0).toLocaleString('id-ID') %>
                                     </div>
-                                    <div class="stat-label">Total Komisi Kolektor</div>
-                                    <small class="text-muted">Biaya operasional</small>
+                                    <div class="stat-label">Pendapatan Voucher</div>
+                                    <small class="text-muted"><%= voucherSummary.recognized_vouchers || 0 %> voucher diakui</small>
+                                    <small class="text-muted d-block">Belum diakui: Rp <%= Number(voucherSummary.pending_revenue || 0).toLocaleString('id-ID') %></small>
                                 </div>
                 </div>
             </div>
@@ -198,6 +145,219 @@
         </div>
     </div>
                 <% } %>
+
+                <!-- Laporan Laba Rugi -->
+                <% if (financialData && financialData.profitLossData) { %>
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bx bx-line-chart"></i> Laporan Laba Rugi
+                        </h5>
+                        <button type="button" class="btn btn-light btn-sm" onclick="exportProfitLossToExcel()">
+                            <i class="bx bx-download"></i> Export to Excel
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 60%;">Keterangan</th>
+                                        <th class="text-end" style="width: 40%;">Jumlah (Rp)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Pendapatan Usaha -->
+                                    <tr class="table-success">
+                                        <td><strong>PENDAPATAN USAHA</strong></td>
+                                        <td class="text-end"><strong>-</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-left: 30px;">Pendapatan Bulanan Pembayaran Pelanggan</td>
+                                        <td class="text-end text-success">
+                                            Rp <%= Number(financialData.profitLossData.revenue.monthlyPayment || 0).toLocaleString('id-ID') %>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-left: 30px;">Pendapatan Voucher</td>
+                                        <td class="text-end text-success">
+                                            Rp <%= Number(financialData.profitLossData.revenue.voucher || 0).toLocaleString('id-ID') %>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-left: 30px;">Pendapatan lain-lain dari Manajemen Pendapatan</td>
+                                        <td class="text-end text-success">
+                                            Rp <%= Number(financialData.profitLossData.revenue.otherIncome || 0).toLocaleString('id-ID') %>
+                                        </td>
+                                    </tr>
+                                    <tr class="table-success">
+                                        <td><strong>Total Pendapatan Usaha</strong></td>
+                                        <td class="text-end"><strong class="text-success">
+                                            Rp <%= Number(financialData.profitLossData.revenue.total || 0).toLocaleString('id-ID') %>
+                                        </strong></td>
+                                    </tr>
+                                    
+                                    <!-- Pengeluaran -->
+                                    <tr class="table-danger">
+                                        <td><strong>PENGELUARAN</strong></td>
+                                        <td class="text-end"><strong>-</strong></td>
+                                    </tr>
+                                    
+                                    <% 
+                                    const expensesByCategory = financialData.profitLossData.expenses.byCategory;
+                                    const categoryOrder = ['Harga Pokok Penjualan (HPP)', 'Beban Operasional (OPEX)', 'Beban Lainnya'];
+                                    
+                                    categoryOrder.forEach(function(category) {
+                                        if (expensesByCategory[category]) {
+                                            const categoryTotal = financialData.profitLossData.expenses.totalByCategory[category] || 0;
+                                    %>
+                                    <tr>
+                                        <td style="padding-left: 30px;"><strong><%= category %></strong></td>
+                                        <td class="text-end text-danger">
+                                            <strong>Rp <%= Number(categoryTotal).toLocaleString('id-ID') %></strong>
+                                        </td>
+                                    </tr>
+                                    <% 
+                                            Object.keys(expensesByCategory[category]).forEach(function(account) {
+                                                const accountAmount = expensesByCategory[category][account];
+                                    %>
+                                    <tr>
+                                        <td style="padding-left: 60px;"><%= account %></td>
+                                        <td class="text-end text-danger">
+                                            Rp <%= Number(accountAmount).toLocaleString('id-ID') %>
+                                        </td>
+                                    </tr>
+                                    <% 
+                                            });
+                                        }
+                                    });
+                                    
+                                    // Handle categories yang tidak ada di categoryOrder
+                                    Object.keys(expensesByCategory).forEach(function(category) {
+                                        if (!categoryOrder.includes(category)) {
+                                            const categoryTotal = financialData.profitLossData.expenses.totalByCategory[category] || 0;
+                                    %>
+                                    <tr>
+                                        <td style="padding-left: 30px;"><strong><%= category %></strong></td>
+                                        <td class="text-end text-danger">
+                                            <strong>Rp <%= Number(categoryTotal).toLocaleString('id-ID') %></strong>
+                                        </td>
+                                    </tr>
+                                    <% 
+                                            Object.keys(expensesByCategory[category]).forEach(function(account) {
+                                                const accountAmount = expensesByCategory[category][account];
+                                    %>
+                                    <tr>
+                                        <td style="padding-left: 60px;"><%= account %></td>
+                                        <td class="text-end text-danger">
+                                            Rp <%= Number(accountAmount).toLocaleString('id-ID') %>
+                                        </td>
+                                    </tr>
+                                    <% 
+                                            });
+                                        }
+                                    });
+                                    %>
+                                    
+                                    <tr class="table-danger">
+                                        <td><strong>Total Pengeluaran</strong></td>
+                                        <td class="text-end"><strong class="text-danger">
+                                            Rp <%= Number(financialData.profitLossData.expenses.total || 0).toLocaleString('id-ID') %>
+                                        </strong></td>
+                                    </tr>
+                                    
+                                    <!-- Laba Bersih -->
+                                    <tr class="<%= financialData.profitLossData.netProfit >= 0 ? 'table-success' : 'table-danger' %>">
+                                        <td><strong>LABA BERSIH</strong></td>
+                                        <td class="text-end">
+                                            <strong style="color: <%= financialData.profitLossData.netProfit >= 0 ? '#28a745' : '#dc3545' %>;">
+                                                Rp <%= Number(financialData.profitLossData.netProfit || 0).toLocaleString('id-ID') %>
+                                            </strong>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+
+                <!-- Chart Grafik -->
+                <% if (financialData && financialData.profitLossData) { %>
+                <div class="row mb-4">
+                    <!-- Chart Pendapatan vs Pengeluaran (Full Width) -->
+                    <div class="col-12 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="bx bx-bar-chart-alt-2"></i> Pendapatan vs Pengeluaran (Detail)
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="revenueExpenseChart" height="400"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chart Breakdown Pengeluaran per Kategori (Bar Chart) -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">
+                                    <i class="bx bx-bar-chart"></i> Breakdown Pengeluaran per Kategori
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="expenseCategoryChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chart Breakdown Pendapatan (Pie Chart) -->
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">
+                                    <i class="bx bx-pie-chart-alt-2"></i> Breakdown Pendapatan
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="revenueBreakdownChart" height="300"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <% } %>
+
+                <!-- Filter Section -->
+                <div class="filter-section">
+                    <form method="GET" class="row g-3 align-items-end" id="filterForm">
+                        <div class="col-md-3">
+                            <label class="form-label">Tanggal Mulai</label>
+                            <input type="date" class="form-control" name="start_date" id="start_date" value="<%= startDate %>" required>
+        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Tanggal Selesai</label>
+                            <input type="date" class="form-control" name="end_date" id="end_date" value="<%= endDate %>" required>
+        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Tipe Laporan</label>
+                            <select class="form-select" name="type">
+                                <option value="all" <%= type === 'all' ? 'selected' : '' %>>Semua Transaksi</option>
+                                <option value="income" <%= type === 'income' ? 'selected' : '' %>>Hanya Pemasukan</option>
+                                <option value="expense" <%= type === 'expense' ? 'selected' : '' %>>Hanya Pengeluaran</option>
+            </select>
+        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bx bx-search"></i> Terapkan Filter
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary ms-2" onclick="exportToCSV()">
+                                <i class="bx bx-download"></i> Export CSV
+                            </button>
+        </div>
+    </form>
+                </div>
 
                 <!-- Transaction List -->
                 <div class="card">
@@ -224,12 +384,15 @@
             </tr>
             </thead>
             <tbody>
-                                    <% financialData.transactions.forEach(function(transaction) { %>
+                                    <% financialData.transactions.forEach(function(transaction) { 
+                                        const dateObj = transaction.date ? new Date(transaction.date) : null;
+                                        const isValidDate = dateObj && !isNaN(dateObj.getTime());
+                                    %>
                                     <tr>
                                         <td>
                                             <div class="d-flex flex-column">
-                                                <span><%= new Date(transaction.date).toLocaleDateString('id-ID') %></span>
-                                                <small class="text-muted"><%= new Date(transaction.date).toLocaleTimeString('id-ID') %></small>
+                                                <span><%= isValidDate ? dateObj.toLocaleDateString('id-ID') : '-' %></span>
+                                                <small class="text-muted"><%= isValidDate ? dateObj.toLocaleTimeString('id-ID') : '-' %></small>
                                             </div>
                                         </td>
                                         <td>
@@ -304,7 +467,262 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+        // Auto reset tanggal ke bulan berjalan setiap tanggal 1 (buku baru)
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            const today = now.getDate();
+            const startDateInput = document.getElementById('start_date');
+            const endDateInput = document.getElementById('end_date');
+            
+            // Jika tanggal 1, reset ke bulan berjalan (buku baru)
+            if (today === 1) {
+                const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                
+                const newStartDate = currentMonthStart.toISOString().split('T')[0];
+                const newEndDate = currentMonthEnd.toISOString().split('T')[0];
+                
+                // Hanya update jika berbeda dengan nilai saat ini
+                if (startDateInput.value !== newStartDate || endDateInput.value !== newEndDate) {
+                    startDateInput.value = newStartDate;
+                    endDateInput.value = newEndDate;
+                    // Auto submit untuk refresh data
+                    document.getElementById('filterForm').submit();
+                }
+            }
+        });
+
+        <% if (financialData && financialData.profitLossData) { %>
+        // Chart data
+        const profitLossData = <%- JSON.stringify(financialData.profitLossData) %>;
+        
+        // Chart 1: Pendapatan vs Pengeluaran (Bar Chart Detail)
+        const revenueExpenseCtx = document.getElementById('revenueExpenseChart');
+        if (revenueExpenseCtx) {
+            // Prepare data for detailed chart
+            const revenueLabels = ['Pendapatan Bulanan', 'Pendapatan Voucher', 'Pendapatan Lain-lain'];
+            const revenueData = [
+                profitLossData.revenue.monthlyPayment,
+                profitLossData.revenue.voucher,
+                profitLossData.revenue.otherIncome
+            ];
+            
+            const expenseCategories = Object.keys(profitLossData.expenses.totalByCategory);
+            const expenseData = Object.values(profitLossData.expenses.totalByCategory);
+            
+            // Combine all labels
+            const allLabels = [...revenueLabels, ...expenseCategories];
+            
+            new Chart(revenueExpenseCtx, {
+                type: 'bar',
+                data: {
+                    labels: allLabels,
+                    datasets: [
+                        {
+                            label: 'Pendapatan',
+                            data: [...revenueData, ...new Array(expenseCategories.length).fill(null)],
+                            backgroundColor: [
+                                'rgba(40, 167, 69, 0.8)',      // Pendapatan Bulanan - Hijau
+                                'rgba(0, 123, 255, 0.8)',       // Pendapatan Voucher - Biru
+                                'rgba(0, 255, 255, 0.8)',       // Pendapatan Lain-lain - Cyan (#00FFFF)
+                                ...new Array(expenseCategories.length).fill(null)
+                            ],
+                            borderColor: [
+                                'rgba(40, 167, 69, 1)',         // Pendapatan Bulanan - Hijau
+                                'rgba(0, 123, 255, 1)',         // Pendapatan Voucher - Biru
+                                'rgba(0, 255, 255, 1)',         // Pendapatan Lain-lain - Cyan (#00FFFF)
+                                ...new Array(expenseCategories.length).fill(null)
+                            ],
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Pengeluaran',
+                            data: [...new Array(revenueLabels.length).fill(null), ...expenseData],
+                            backgroundColor: [
+                                ...new Array(revenueLabels.length).fill(null),
+                                ...expenseCategories.map((_, i) => {
+                                    const colors = [
+                                        'rgba(220, 53, 69, 0.8)',
+                                        'rgba(255, 193, 7, 0.8)',
+                                        'rgba(108, 117, 125, 0.8)'
+                                    ];
+                                    return colors[i % colors.length];
+                                })
+                            ],
+                            borderColor: [
+                                ...new Array(revenueLabels.length).fill(null),
+                                ...expenseCategories.map((_, i) => {
+                                    const colors = [
+                                        'rgba(220, 53, 69, 1)',
+                                        'rgba(255, 193, 7, 1)',
+                                        'rgba(108, 117, 125, 1)'
+                                    ];
+                                    return colors[i % colors.length];
+                                })
+                            ],
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    if (context.parsed.y === null) return '';
+                                    return context.dataset.label + ': Rp ' + context.parsed.y.toLocaleString('id-ID');
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'Rp ' + value.toLocaleString('id-ID');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart 2: Breakdown Pendapatan (Pie Chart)
+        const revenueBreakdownCtx = document.getElementById('revenueBreakdownChart');
+        if (revenueBreakdownCtx) {
+            new Chart(revenueBreakdownCtx, {
+                type: 'pie',
+                data: {
+                    labels: [
+                        'Pendapatan Bulanan',
+                        'Pendapatan Voucher',
+                        'Pendapatan Lain-lain'
+                    ],
+                    datasets: [{
+                        data: [
+                            profitLossData.revenue.monthlyPayment,
+                            profitLossData.revenue.voucher,
+                            profitLossData.revenue.otherIncome
+                        ],
+                        backgroundColor: [
+                            'rgba(40, 167, 69, 0.8)',      // Pendapatan Bulanan - Hijau
+                            'rgba(0, 123, 255, 0.8)',       // Pendapatan Voucher - Biru
+                            'rgba(0, 255, 255, 0.8)'        // Pendapatan Lain-lain - Cyan (#00FFFF)
+                        ],
+                        borderColor: [
+                            'rgba(40, 167, 69, 1)',        // Pendapatan Bulanan - Hijau
+                            'rgba(0, 123, 255, 1)',         // Pendapatan Voucher - Biru
+                            'rgba(0, 255, 255, 1)'          // Pendapatan Lain-lain - Cyan (#00FFFF)
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((value / total) * 100).toFixed(1);
+                                    return label + ': Rp ' + value.toLocaleString('id-ID') + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Chart 2: Breakdown Pengeluaran per Kategori (Bar Chart)
+        const expenseCategoryCtx = document.getElementById('expenseCategoryChart');
+        if (expenseCategoryCtx) {
+            const expenseCategories = Object.keys(profitLossData.expenses.totalByCategory);
+            const expenseAmounts = Object.values(profitLossData.expenses.totalByCategory);
+            
+            const colors = [
+                'rgba(220, 53, 69, 0.8)',
+                'rgba(255, 193, 7, 0.8)',
+                'rgba(108, 117, 125, 0.8)',
+                'rgba(23, 162, 184, 0.8)',
+                'rgba(111, 66, 193, 0.8)'
+            ];
+            
+            new Chart(expenseCategoryCtx, {
+                type: 'bar',
+                data: {
+                    labels: expenseCategories,
+                    datasets: [{
+                        label: 'Pengeluaran (Rp)',
+                        data: expenseAmounts,
+                        backgroundColor: colors.slice(0, expenseCategories.length),
+                        borderColor: colors.slice(0, expenseCategories.length).map(c => c.replace('0.8', '1')),
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.parsed.y;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return 'Rp ' + value.toLocaleString('id-ID') + ' (' + percentage + '%)';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'Rp ' + value.toLocaleString('id-ID');
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        <% } %>
+
+        // Export Laporan Laba Rugi to Excel
+        function exportProfitLossToExcel() {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            
+            if (!startDate || !endDate) {
+                alert('Silakan pilih periode tanggal terlebih dahulu');
+                return;
+            }
+            
+            const url = `/admin/billing/export/profit-loss.xlsx?start_date=${startDate}&end_date=${endDate}`;
+            window.location.href = url;
+        }
+
         function exportToCSV() {
             <% if (financialData && financialData.transactions && financialData.transactions.length > 0) { %>
             const transactions = <%- JSON.stringify(financialData.transactions) %>;
@@ -313,8 +731,10 @@
             const csvRows = [csvHeaders.join(',')];
             
             transactions.forEach(transaction => {
+                const dateObj = transaction.date ? new Date(transaction.date) : null;
+                const isValidDate = dateObj && !isNaN(dateObj.getTime());
                 const row = [
-                    `"${new Date(transaction.date).toLocaleDateString('id-ID')}"`,
+                    `"${isValidDate ? dateObj.toLocaleDateString('id-ID') : ''}"`,
                     `"${transaction.type === 'income' ? 'Pemasukan' : 'Pengeluaran'}"`,
                     `"${transaction.amount}"`,
                     `"${transaction.payment_method || ''}"`,

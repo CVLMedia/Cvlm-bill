@@ -6,15 +6,162 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
-        body { background: #f5f6fa; }
-        .login-box {
-            margin: 80px auto;
-            max-width: 400px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            padding: 32px 28px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
+        
+        body { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-image: url('/img/login-background.jpg');
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            min-height: 100vh;
+            width: 100%;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* Overlay untuk kontras */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 0;
+        }
+        
+        /* Container untuk login box */
+        .login-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .login-box {
+            width: 100%;
+            max-width: 420px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            padding: 40px 32px;
+            position: relative;
+        }
+        
+        /* Efek glow subtle di border */
+        .login-box::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            right: -1px;
+            bottom: -1px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+            border-radius: 16px;
+            z-index: -1;
+            opacity: 0.6;
+        }
+        
+        .login-logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        
+        .login-logo img {
+            max-width: 280px;
+            max-height: 120px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            margin-bottom: 16px;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+        
+        .login-logo .company-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-top: 8px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        /* Styling untuk form elements */
+        .login-box h3 {
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            font-weight: 600;
+        }
+        
+        .login-box .form-label {
+            color: #ffffff;
+            font-weight: 500;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+        }
+        
+        .login-box .form-control {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #ffffff;
+            backdrop-filter: blur(5px);
+        }
+        
+        .login-box .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        .login-box .form-control:focus {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: #ffffff;
+            box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
+        }
+        
+        .login-box .btn-primary {
+            background: rgba(13, 110, 253, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(5px);
+            font-weight: 600;
+        }
+        
+        .login-box .btn-primary:hover {
+            background: rgba(13, 110, 253, 0.9);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+        
+        .login-box .btn-outline-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #ffffff;
+            backdrop-filter: blur(5px);
+        }
+        
+        .login-box .btn-outline-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.4);
+            color: #ffffff;
+        }
+        
+        .login-box .alert {
+            background: rgba(220, 53, 69, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            backdrop-filter: blur(5px);
+        }
+        
         .toast {
             position: fixed;
             top: 20px;
@@ -22,10 +169,81 @@
             z-index: 9999;
             min-width: 300px;
         }
+        
+        /* Responsive untuk berbagai ukuran device */
+        @media (max-width: 768px) {
+            body {
+                background-attachment: scroll;
+                background-size: cover;
+            }
+            
+            .login-container {
+                padding: 15px;
+            }
+            
+            .login-box {
+                max-width: 100%;
+                padding: 32px 24px;
+                border-radius: 12px;
+            }
+            
+            .login-logo img {
+                max-width: 220px;
+                max-height: 100px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .login-box {
+                padding: 28px 20px;
+            }
+            
+            .login-logo img {
+                max-width: 180px;
+                max-height: 80px;
+            }
+        }
+        
+        /* Untuk device landscape */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .login-container {
+                padding: 10px;
+            }
+            
+            .login-box {
+                padding: 24px 20px;
+            }
+        }
+        
+        /* Untuk device dengan tinggi sangat kecil */
+        @media (max-height: 600px) {
+            .login-logo {
+                margin-bottom: 16px;
+            }
+            
+            .login-box {
+                padding: 24px 20px;
+            }
+        }
     </style>
 </head>
 <body>
-<div class="login-box">
+<div class="login-container">
+    <div class="login-box">
+    <!-- Logo Perusahaan -->
+    <div class="login-logo">
+        <% 
+        const logoPath = typeof logoFilename !== 'undefined' && logoFilename 
+            ? `/img/${logoFilename}` 
+            : '/img/logo.png';
+        const companyName = typeof companyHeader !== 'undefined' && companyHeader 
+            ? companyHeader 
+            : 'Billing System';
+        %>
+        <img src="<%= logoPath %>" alt="<%= companyName %>" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <div class="company-name" style="display:none;"><%= companyName %></div>
+    </div>
+    
     <h3 class="mb-4 text-center">Login Admin</h3>
     <div id="loginAlert" style="display:none;"></div>
     <form id="loginForm">
@@ -37,6 +255,16 @@
             <label for="password" class="form-label">Password</label>
             <input type="password" class="form-control" id="password" name="password" required>
         </div>
+        <% if (typeof licenseExpired !== 'undefined' && licenseExpired) { %>
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Trial period telah berakhir!</strong><br>
+                <small>Silakan aktivasi license key untuk melanjutkan.</small>
+            </div>
+            <a href="/admin/license" class="btn btn-warning w-100 mb-3">
+                <i class="bi bi-shield-lock me-2"></i>Aktivasi License Key
+            </a>
+        <% } %>
         <button type="submit" class="btn btn-primary w-100" id="loginBtn">
             <span class="btn-text">Login</span>
             <span class="btn-loading" style="display:none;">
@@ -51,6 +279,7 @@
             <i class="bi bi-phone me-1"></i>
             Login Mobile
         </a>
+    </div>
     </div>
 </div>
 

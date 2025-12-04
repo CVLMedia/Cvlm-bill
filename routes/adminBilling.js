@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
+const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const billingManager = require('../config/billing');
 const logger = require('../config/logger');
@@ -11,6 +12,9 @@ const multer = require('multer');
 const upload = multer();
 const ExcelJS = require('exceljs');
 const { adminAuth } = require('./adminAuth');
+
+// Import logActivity from utils
+const { logActivity } = require('../utils/activityLogger');
 
 // Configure multer for image uploads
 const imageStorage = multer.diskStorage({
@@ -35,6 +39,41 @@ const imageUpload = multer({
             cb(null, true);
         } else {
             cb(new Error('Only JPG files are allowed'));
+        }
+    }
+});
+
+// Configure multer for customer photo uploads
+const customerPhotoStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = path.join(__dirname, '../public/uploads/customers');
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        // Generate unique filename: customer-{phone}-{type}-{timestamp}.{ext}
+        const phone = req.body.phone ? req.body.phone.replace(/\D/g, '') : Date.now();
+        const type = file.fieldname === 'ktp_photo' ? 'ktp' : 'house';
+        const ext = path.extname(file.originalname) || '.jpg';
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `customer-${phone}-${type}-${uniqueSuffix}${ext}`);
+    }
+});
+
+const customerPhotoUpload = multer({ 
+    storage: customerPhotoStorage,
+    limits: {
+        fileSize: 20 * 1024 * 1024 // 20MB limit
+    },
+    fileFilter: function (req, file, cb) {
+        // Accept only image files
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Hanya file gambar yang diizinkan (JPG, PNG, GIF)'));
         }
     }
 });
@@ -860,8 +899,9 @@ router.get('/financial-report', getAppSettings, async (req, res) => {
     try {
         const { start_date, end_date, type } = req.query;
         
-        // Default date range: current month
+        // Default date range: current month (auto reset setiap tanggal 1)
         const now = new Date();
+        // Jika tanggal 1, gunakan bulan berjalan. Jika tidak, tetap gunakan bulan berjalan
         const startDate = start_date || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
         const endDate = end_date || new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
         
@@ -1402,10 +1442,280 @@ router.get('/export/financial-report.xlsx', async (req, res) => {
         // Write to response
         await workbook.xlsx.write(res);
         res.end();
+    } catch (error) {
+        logger.error('Error exporting financial report to Excel:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Export Laporan Laba Rugi to Excel
+router.get('/export/profit-loss.xlsx', async (req, res) => {
+    try {
+        const { start_date, end_date } = req.query;
+        
+        // Default date range: current month
+        const now = new Date();
+        const startDate = start_date || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const endDate = end_date || new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        
+        const financialData = await billingManager.getFinancialReport(startDate, endDate, 'all');
+        
+        if (!financialData || !financialData.profitLossData) {
+            return res.status(404).json({ success: false, message: 'Data laba rugi tidak ditemukan' });
+        }
+        
+        const profitLossData = financialData.profitLossData;
+        
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Laporan Laba Rugi');
+        
+        // Set column widths
+        worksheet.columns = [
+            { header: 'Keterangan', key: 'keterangan', width: 60 },
+            { header: 'Jumlah (Rp)', key: 'jumlah', width: 25 }
+        ];
+        
+        // Style header
+        worksheet.getRow(1).font = { bold: true, size: 12 };
+        worksheet.getRow(1).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF4472C4' }
+        };
+        worksheet.getRow(1).font = { ...worksheet.getRow(1).font, color: { argb: 'FFFFFFFF' } };
+        worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        
+        // Add title
+        worksheet.insertRow(1, ['LAPORAN LABA RUGI', '']);
+        worksheet.mergeCells('A1:B1');
+        worksheet.getRow(1).font = { bold: true, size: 14 };
+        worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        worksheet.getRow(1).height = 25;
+        
+        // Add period
+        worksheet.insertRow(2, [`Periode: ${startDate} s/d ${endDate}`, '']);
+        worksheet.mergeCells('A2:B2');
+        worksheet.getRow(2).alignment = { vertical: 'middle', horizontal: 'center' };
+        worksheet.getRow(2).height = 20;
+        
+        // Add empty row
+        worksheet.insertRow(3, ['', '']);
+        
+        // Add header row
+        worksheet.insertRow(4, ['Keterangan', 'Jumlah (Rp)']);
+        worksheet.getRow(4).font = { bold: true };
+        worksheet.getRow(4).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE7E6E6' }
+        };
+        worksheet.getRow(4).alignment = { vertical: 'middle', horizontal: 'center' };
+        
+        let currentRow = 5;
+        
+        // PENDAPATAN USAHA
+        worksheet.insertRow(currentRow, ['PENDAPATAN USAHA', '']);
+        worksheet.getRow(currentRow).font = { bold: true };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFD4EDDA' }
+        };
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pendapatan Bulanan Pembayaran Pelanggan', profitLossData.revenue.monthlyPayment]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pendapatan Voucher', profitLossData.revenue.voucher]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pendapatan lain-lain dari Manajemen Pendapatan', profitLossData.revenue.otherIncome]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Total Pendapatan Usaha', profitLossData.revenue.total]);
+        worksheet.getRow(currentRow).font = { bold: true };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFC3E6CB' }
+        };
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        // Empty row
+        worksheet.insertRow(currentRow, ['', '']);
+        currentRow++;
+        
+        // PENGELUARAN
+        worksheet.insertRow(currentRow, ['PENGELUARAN', '']);
+        worksheet.getRow(currentRow).font = { bold: true };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF8D7DA' }
+        };
+        currentRow++;
+        
+        // Add expenses by category
+        const expensesByCategory = profitLossData.expenses.byCategory;
+        const categoryOrder = ['Harga Pokok Penjualan (HPP)', 'Beban Operasional (OPEX)', 'Beban Lainnya'];
+        
+        categoryOrder.forEach(category => {
+            if (expensesByCategory[category]) {
+                const categoryTotal = profitLossData.expenses.totalByCategory[category] || 0;
+                worksheet.insertRow(currentRow, [category, categoryTotal]);
+                worksheet.getRow(currentRow).font = { bold: true };
+                worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+                currentRow++;
+                
+                Object.keys(expensesByCategory[category]).forEach(account => {
+                    const accountAmount = expensesByCategory[category][account];
+                    worksheet.insertRow(currentRow, [`  ${account}`, accountAmount]);
+                    worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+                    currentRow++;
+                });
+            }
+        });
+        
+        // Handle other categories
+        Object.keys(expensesByCategory).forEach(category => {
+            if (!categoryOrder.includes(category)) {
+                const categoryTotal = profitLossData.expenses.totalByCategory[category] || 0;
+                worksheet.insertRow(currentRow, [category, categoryTotal]);
+                worksheet.getRow(currentRow).font = { bold: true };
+                worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+                currentRow++;
+                
+                Object.keys(expensesByCategory[category]).forEach(account => {
+                    const accountAmount = expensesByCategory[category][account];
+                    worksheet.insertRow(currentRow, [`  ${account}`, accountAmount]);
+                    worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+                    currentRow++;
+                });
+            }
+        });
+        
+        worksheet.insertRow(currentRow, ['Total Pengeluaran', profitLossData.expenses.total]);
+        worksheet.getRow(currentRow).font = { bold: true };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE5C3C6' }
+        };
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        // Empty row
+        worksheet.insertRow(currentRow, ['', '']);
+        currentRow++;
+        
+        // LABA BERSIH
+        const isProfit = profitLossData.netProfit >= 0;
+        worksheet.insertRow(currentRow, ['LABA BERSIH', profitLossData.netProfit]);
+        worksheet.getRow(currentRow).font = { bold: true, size: 12 };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: isProfit ? 'FFD4EDDA' : 'FFF8D7DA' }
+        };
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        
+        // Set alignment for all rows
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber > 4) {
+                row.getCell(1).alignment = { vertical: 'middle', horizontal: 'left' };
+                row.getCell(2).alignment = { vertical: 'middle', horizontal: 'right' };
+            }
+        });
+        
+        // Set response headers
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=laporan-laba-rugi-${startDate}-${endDate}.xlsx`);
+        
+        // Write to response
+        await workbook.xlsx.write(res);
+        res.end();
         
     } catch (error) {
-        logger.error('Error exporting financial report:', error);
+        logger.error('Error exporting profit loss to Excel:', error);
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Laporan Keuangan Voucher
+router.get('/reports/voucher', getAppSettings, async (req, res) => {
+    try {
+        const { start_date, end_date, status } = req.query;
+        
+        // Default date range: current month
+        const now = new Date();
+        // Pastikan menggunakan timezone lokal untuk mendapatkan tanggal yang benar
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const startDate = start_date || new Date(year, month, 1).toISOString().split('T')[0];
+        // Tanggal terakhir bulan ini
+        const endDate = end_date || new Date(year, month + 1, 0).toISOString().split('T')[0];
+        
+        logger.info(`Voucher report query: startDate=${startDate}, endDate=${endDate}, status=${status || 'all'}`);
+        
+        const allInvoices = await billingManager.getVoucherInvoices(startDate, endDate);
+        const filteredInvoices = billingManager.filterVoucherInvoicesByStatus(allInvoices, status || 'all');
+        const stats = billingManager.calculateVoucherStats(filteredInvoices);
+        
+        logger.info(`Found ${filteredInvoices.length} voucher invoices for date range ${startDate} to ${endDate} (status=${status || 'all'})`);
+        
+        res.render('admin/billing/report-voucher', {
+            title: 'Laporan Keuangan Voucher',
+            page: 'report-voucher',
+            stats,
+            invoices: filteredInvoices,
+            startDate,
+            endDate,
+            status: status || 'all',
+            appSettings: req.appSettings
+        });
+    } catch (error) {
+        logger.error('Error loading voucher report:', error);
+        res.status(500).render('error', { 
+            message: 'Gagal memuat laporan keuangan voucher',
+            error: error.message 
+        });
+    }
+});
+
+// Laporan Keuangan PPPoE
+router.get('/reports/pppoe', getAppSettings, async (req, res) => {
+    try {
+        const { start_date, end_date, status } = req.query;
+        
+        // Default date range: current month
+        const now = new Date();
+        const startDate = start_date || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const endDate = end_date || new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+        
+        const stats = await billingManager.getPPPoEReportStats(startDate, endDate);
+        const invoices = await billingManager.getPPPoEInvoices(startDate, endDate, status || null);
+        
+        res.render('admin/billing/report-pppoe', {
+            title: 'Laporan Keuangan PPPoE',
+            page: 'report-pppoe',
+            stats,
+            invoices,
+            startDate,
+            endDate,
+            status: status || 'all',
+            appSettings: req.appSettings
+        });
+    } catch (error) {
+        logger.error('Error loading PPPoE report:', error);
+        res.status(500).render('error', { 
+            message: 'Gagal memuat laporan keuangan PPPoE',
+            error: error.message 
+        });
     }
 });
 
@@ -1413,7 +1723,7 @@ router.get('/export/financial-report.xlsx', async (req, res) => {
 router.post('/payment-settings/active-gateway', async (req, res) => {
     try {
         const { activeGateway } = req.body || {};
-        if (!activeGateway || !['midtrans', 'xendit', 'tripay'].includes(activeGateway)) {
+        if (!activeGateway || !['midtrans', 'xendit', 'tripay', 'duitku'].includes(activeGateway)) {
             return res.status(400).json({ success: false, message: 'activeGateway tidak valid' });
         }
         const all = getSettingsWithCache();
@@ -1433,7 +1743,7 @@ router.post('/payment-settings/active-gateway', async (req, res) => {
 router.post('/payment-settings/:gateway', async (req, res) => {
     try {
         const gateway = String(req.params.gateway || '').toLowerCase();
-        if (!['midtrans', 'xendit', 'tripay'].includes(gateway)) {
+        if (!['midtrans', 'xendit', 'tripay', 'duitku'].includes(gateway)) {
             return res.status(400).json({ success: false, message: 'Gateway tidak dikenali' });
         }
 
@@ -1486,6 +1796,20 @@ router.post('/payment-settings/:gateway', async (req, res) => {
                 base_url: req.body.base_url !== undefined ? String(req.body.base_url || '').trim() : (pg.tripay?.base_url || pg.base_url || '')
                 // Method is now selected by customer, removed from admin settings
             };
+        } else if (gateway === 'duitku') {
+            if (req.body.base_url !== undefined && !isValidOptionalHttpUrl(req.body.base_url)) {
+                return res.status(400).json({ success: false, message: 'Duitku base_url harus diawali http:// atau https://' });
+            }
+            pg.duitku = {
+                ...(pg.duitku || {}),
+                enabled: toBool(req.body.enabled, pg.duitku?.enabled ?? false),
+                production: toBool(req.body.production, pg.duitku?.production ?? false),
+                merchant_code: req.body.merchant_code !== undefined ? req.body.merchant_code : (pg.duitku?.merchant_code || ''),
+                api_key: req.body.api_key !== undefined ? req.body.api_key : (pg.duitku?.api_key || ''),
+                base_url: req.body.base_url !== undefined ? String(req.body.base_url || '').trim() : (pg.duitku?.base_url || ''),
+                expiry_period: req.body.expiry_period !== undefined ? parseInt(req.body.expiry_period || 60) : (pg.duitku?.expiry_period || 60),
+                invoice_endpoint: req.body.invoice_endpoint !== undefined ? String(req.body.invoice_endpoint || '/webapi/api/merchant/v2/inquiry').trim() : (pg.duitku?.invoice_endpoint || '/webapi/api/merchant/v2/inquiry')
+            };
         }
 
         all.payment_gateway = pg;
@@ -1521,6 +1845,7 @@ router.get('/payment-settings', getAppSettings, async (req, res) => {
         const pg = settings.payment_gateway || {};
         const mid = pg.midtrans || {};
         const xe = pg.xendit || {};
+        const dk = pg.duitku || {};
         const saved = req.query.saved === '1';
 
         // Get current gateway status
@@ -1534,6 +1859,7 @@ router.get('/payment-settings', getAppSettings, async (req, res) => {
             pg,
             mid,
             xe,
+            dk,
             gatewayStatus,
             saved
         });
@@ -1658,6 +1984,18 @@ router.post('/customers/bulk-delete', async (req, res) => {
                 const deleted = await billingManager.deleteCustomer(String(phone));
                 results.push({ phone, success: true });
                 success++;
+                
+                // Log activity for each deleted customer
+                if (req.session && req.session.admin) {
+                    logActivity(
+                        req.session.admin.username || 'admin',
+                        'admin',
+                        'customer_delete',
+                        `Menghapus pelanggan (bulk): ${deleted?.name || phone} (${deleted?.username || phone})`,
+                        req.ip,
+                        req.get('User-Agent')
+                    ).catch(err => logger.error('Failed to log activity:', err));
+                }
             } catch (e) {
                 // Map known errors to friendly messages
                 let msg = e.message || 'Gagal menghapus';
@@ -2447,6 +2785,77 @@ router.post('/system/update', async (req, res) => {
     }
 });
 
+// ===== System Restart =====
+router.post('/system/restart', async (req, res) => {
+    try {
+        const repoPath = getSetting('repo_path', process.cwd());
+        const appNameSetting = getSetting('pm2_restart_target', null)
+            || getSetting('pm2_app_name', null)
+            || process.env.PM2_APP_NAME
+            || 'cvlmedia';
+        const appResolvedFromFallback = (!getSetting('pm2_restart_target', null) && !getSetting('pm2_app_name', null) && !process.env.PM2_APP_NAME);
+        const opts = { cwd: repoPath, windowsHide: true, shell: process.platform === 'win32' ? undefined : '/bin/bash' };
+        const pm2Cmd = `pm2 restart ${appNameSetting} || pm2 reload ${appNameSetting}`;
+        exec(pm2Cmd, opts, (error, stdout, stderr) => {
+            if (error) {
+                return res.status(500).json({ success: false, message: 'Restart failed', error: stderr || error.message, log: stdout, app: appNameSetting, fallbackUsed: appResolvedFromFallback });
+            }
+            exec('pm2 save', opts, () => {
+                res.json({ success: true, message: 'Billing system restarted', log: stdout, app: appNameSetting, fallbackUsed: appResolvedFromFallback });
+            });
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Unexpected error', error: e.message });
+    }
+});
+
+// ===== System Server Info =====
+router.get('/system/server-info', async (req, res) => {
+    try {
+        const appVersion = getSetting('app_version', '4.1');
+        const pm2App = getSetting('pm2_restart_target', null)
+            || getSetting('pm2_app_name', null)
+            || process.env.PM2_APP_NAME
+            || 'cvlmedia';
+        
+        // Gunakan waktu server langsung (server sudah dalam timezone WIB)
+        const { execSync } = require('child_process');
+        let serverTimeWIB;
+        try {
+            // Ambil waktu server langsung dari system (server timezone sudah WIB)
+            const dateStr = execSync('date "+%d/%m/%Y %H:%M:%S"', { encoding: 'utf-8' }).trim();
+            serverTimeWIB = `${dateStr} WIB`;
+        } catch (e) {
+            // Fallback ke JavaScript Date dengan timezone Asia/Jakarta
+            const now = new Date();
+            // Konversi ke WIB (UTC+7)
+            const wibOffset = 7 * 60 * 60 * 1000; // 7 jam dalam milliseconds
+            const wibTime = new Date(now.getTime() + wibOffset);
+            const day = String(wibTime.getUTCDate()).padStart(2, '0');
+            const month = String(wibTime.getUTCMonth() + 1).padStart(2, '0');
+            const year = wibTime.getUTCFullYear();
+            const hour = String(wibTime.getUTCHours()).padStart(2, '0');
+            const minute = String(wibTime.getUTCMinutes()).padStart(2, '0');
+            const second = String(wibTime.getUTCSeconds()).padStart(2, '0');
+            serverTimeWIB = `${day}/${month}/${year} ${hour}:${minute}:${second} WIB`;
+        }
+        
+        const now = new Date();
+
+        res.json({
+            success: true,
+            serverTimeIso: now.toISOString(),
+            serverTimeLocale: now.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+            serverTimeWIB: serverTimeWIB, // Format WIB yang sudah siap ditampilkan
+            serverTimeUnix: Date.now(), // Unix timestamp untuk perhitungan offset
+            appVersion,
+            pm2App: pm2App || null
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, message: 'Failed to load server info', error: e.message });
+    }
+});
+
 // Get WhatsApp status
 router.get('/whatsapp-settings/status', async (req, res) => {
     try {
@@ -2456,21 +2865,585 @@ router.get('/whatsapp-settings/status', async (req, res) => {
         const invoices = await billingManager.getInvoices();
         const pendingInvoices = invoices.filter(i => i.status === 'unpaid');
         
-        // Get WhatsApp status from global
-        const whatsappStatus = global.whatsappStatus || { connected: false, status: 'disconnected' };
+        // Get WhatsApp status from gateway manager
+        const gatewayManager = require('../config/whatsapp-gateway-manager');
+        const gatewayStatus = gatewayManager.getGatewayStatus();
+        
+        // Determine overall connection status
+        let whatsappStatusText = 'Disconnected';
+        let isConnected = false;
+        
+        if (gatewayStatus.active) {
+            if (gatewayStatus.active === 'baileys' && gatewayStatus.baileys.connected) {
+                isConnected = true;
+                whatsappStatusText = `Connected (Baileys${gatewayStatus.isFallback ? ' - Fallback' : ''})`;
+            } else if (gatewayStatus.active === 'fonnte' && gatewayStatus.fonnte.connected) {
+                isConnected = true;
+                whatsappStatusText = `Connected (Fonnte${gatewayStatus.isFallback ? ' - Fallback' : ''})`;
+            }
+        }
+        
+        // If no active gateway, check if any gateway is available
+        if (!isConnected) {
+            if (gatewayStatus.baileys.connected) {
+                isConnected = true;
+                whatsappStatusText = 'Connected (Baileys)';
+            } else if (gatewayStatus.fonnte.connected) {
+                isConnected = true;
+                whatsappStatusText = 'Connected (Fonnte)';
+            }
+        }
         
         res.json({
             success: true,
-            whatsappStatus: whatsappStatus.connected ? 'Connected' : 'Disconnected',
+            whatsappStatus: whatsappStatusText,
             activeCustomers: activeCustomers.length,
             pendingInvoices: pendingInvoices.length,
-            nextReminder: 'Daily at 09:00'
+            nextReminder: 'Daily at 09:00',
+            gateway: gatewayStatus
         });
     } catch (error) {
         logger.error('Error getting WhatsApp status:', error);
         res.status(500).json({
             success: false,
             message: 'Error getting status: ' + error.message
+        });
+    }
+});
+
+// Email Settings Routes
+// Route untuk mengelola expenses
+router.get('/expenses', getAppSettings, async (req, res) => {
+    try {
+        const { start_date, end_date } = req.query;
+        const expenses = await billingManager.getExpenses(start_date, end_date);
+        
+        res.render('admin/billing/expenses', {
+            title: 'Manajemen Pengeluaran',
+            expenses,
+            startDate: start_date || '',
+            endDate: end_date || '',
+            page: 'expenses',
+            appSettings: req.appSettings
+        });
+    } catch (error) {
+        logger.error('Error loading expenses:', error);
+        res.status(500).render('error', { 
+            message: 'Gagal memuat data pengeluaran',
+            error: error.message 
+        });
+    }
+});
+
+// API untuk menambah expense
+router.post('/api/expenses', async (req, res) => {
+    try {
+        const { amount, category, account_expenses, expense_date, payment_method, notes } = req.body;
+        
+        // Validasi yang lebih ketat
+        if (!amount || amount === '' || isNaN(parseFloat(amount))) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Jumlah harus diisi dengan angka yang valid' 
+            });
+        }
+        
+        if (!category || category.trim() === '') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Kategori Expenses harus dipilih' 
+            });
+        }
+        
+        if (!account_expenses || account_expenses.trim() === '') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Account Expenses harus dipilih' 
+            });
+        }
+        
+        if (!expense_date || expense_date.trim() === '') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Tanggal Pengeluaran harus diisi' 
+            });
+        }
+        
+        const expense = await billingManager.addExpense({
+            amount: parseFloat(amount),
+            category: category.trim(),
+            account_expenses: account_expenses.trim() || null,
+            expense_date: expense_date.trim(),
+            payment_method: payment_method ? payment_method.trim() : '',
+            notes: notes ? notes.trim() : ''
+        });
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || req.session.adminUser || 'admin',
+                'admin',
+                'expense_add',
+                `Input pengeluaran manual: ${category} - Rp ${parseFloat(amount).toLocaleString('id-ID')} - ${expense_date}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
+        res.json({ success: true, data: expense, message: 'Pengeluaran berhasil ditambahkan' });
+    } catch (error) {
+        logger.error('Error adding expense:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// API untuk get expense by id
+router.get('/api/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const expenses = await billingManager.getExpenses();
+        const expense = expenses.find(exp => exp.id === parseInt(id));
+        
+        if (!expense) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Pengeluaran tidak ditemukan' 
+            });
+        }
+        
+        res.json({ success: true, data: expense });
+    } catch (error) {
+        logger.error('Error getting expense:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// API untuk update expense
+router.put('/api/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { amount, category, account_expenses, expense_date, payment_method, notes } = req.body;
+        
+        // Validasi yang lebih ketat
+        if (!amount || amount === '' || isNaN(parseFloat(amount))) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Jumlah harus diisi dengan angka yang valid' 
+            });
+        }
+        
+        if (!category || category.trim() === '') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Kategori Expenses harus dipilih' 
+            });
+        }
+        
+        if (!account_expenses || account_expenses.trim() === '') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Account Expenses harus dipilih' 
+            });
+        }
+        
+        if (!expense_date || expense_date.trim() === '') {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Tanggal Pengeluaran harus diisi' 
+            });
+        }
+        
+        const expense = await billingManager.updateExpense(parseInt(id), {
+            amount: parseFloat(amount),
+            category: category.trim(),
+            account_expenses: account_expenses.trim() || null,
+            expense_date: expense_date.trim(),
+            payment_method: payment_method ? payment_method.trim() : '',
+            notes: notes ? notes.trim() : ''
+        });
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || req.session.adminUser || 'admin',
+                'admin',
+                'expense_update',
+                `Edit pengeluaran: ID ${id} - ${category} - Rp ${parseFloat(amount).toLocaleString('id-ID')}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
+        res.json({ success: true, data: expense, message: 'Pengeluaran berhasil diperbarui' });
+    } catch (error) {
+        logger.error('Error updating expense:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// API untuk delete expense
+router.delete('/api/expenses/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await billingManager.deleteExpense(parseInt(id));
+        
+        res.json({ success: true, data: result, message: 'Pengeluaran berhasil dihapus' });
+    } catch (error) {
+        logger.error('Error deleting expense:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// API untuk statistik komisi kolektor
+router.get('/api/commission-stats', async (req, res) => {
+    try {
+        const { start_date, end_date } = req.query;
+        const stats = await billingManager.getCommissionStats(start_date, end_date);
+        
+        res.json({ success: true, data: stats });
+    } catch (error) {
+        logger.error('Error getting commission stats:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// Route untuk mengelola income (pemasukan)
+router.get('/income', getAppSettings, async (req, res) => {
+    try {
+        const { start_date, end_date } = req.query;
+        const incomes = await billingManager.getIncomes(start_date, end_date);
+        
+        res.render('admin/billing/income', {
+            title: 'Manajemen Pemasukan',
+            incomes,
+            startDate: start_date || '',
+            endDate: end_date || '',
+            page: 'income',
+            appSettings: req.appSettings
+        });
+    } catch (error) {
+        logger.error('Error loading income:', error);
+        res.status(500).render('error', { 
+            message: 'Gagal memuat data pemasukan',
+            error: error.message,
+            appSettings: req.appSettings
+        });
+    }
+});
+
+// API untuk menambah income
+router.post('/api/income', async (req, res) => {
+    try {
+        const { description, amount, category, income_date, payment_method, notes } = req.body;
+        
+        if (!description || !amount || !category || !income_date) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Semua field wajib diisi' 
+            });
+        }
+        
+        const income = await billingManager.addIncome({
+            description,
+            amount: parseFloat(amount),
+            category,
+            income_date,
+            payment_method: payment_method || '',
+            notes: notes || ''
+        });
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || req.session.adminUser || 'admin',
+                'admin',
+                'income_add',
+                `Input pemasukan manual: ${description} - Rp ${parseFloat(amount).toLocaleString('id-ID')} - ${income_date}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
+        res.json({ success: true, data: income, message: 'Pemasukan berhasil ditambahkan' });
+    } catch (error) {
+        logger.error('Error adding income:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// API untuk update income
+router.put('/api/income/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { description, amount, category, income_date, payment_method, notes } = req.body;
+        
+        if (!description || !amount || !category || !income_date) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Semua field wajib diisi' 
+            });
+        }
+        
+        const income = await billingManager.updateIncome(parseInt(id), {
+            description,
+            amount: parseFloat(amount),
+            category,
+            income_date,
+            payment_method: payment_method || '',
+            notes: notes || ''
+        });
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || req.session.adminUser || 'admin',
+                'admin',
+                'income_update',
+                `Edit pemasukan: ID ${id} - ${description} - Rp ${parseFloat(amount).toLocaleString('id-ID')}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
+        res.json({ success: true, data: income, message: 'Pemasukan berhasil diperbarui' });
+    } catch (error) {
+        logger.error('Error updating income:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// API untuk delete income
+router.delete('/api/income/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await billingManager.deleteIncome(parseInt(id));
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || req.session.adminUser || 'admin',
+                'admin',
+                'income_delete',
+                `Hapus pemasukan: ID ${id}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
+        res.json({ success: true, data: result, message: 'Pemasukan berhasil dihapus' });
+    } catch (error) {
+        logger.error('Error deleting income:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.get('/email-settings', getAppSettings, async (req, res) => {
+    try {
+        res.render('admin/billing/email-settings', {
+            title: 'Email Notification Settings',
+            appSettings: req.appSettings
+        });
+    } catch (error) {
+        logger.error('Error loading Email settings page:', error);
+        res.status(500).render('error', {
+            message: 'Error loading Email settings page',
+            error: error.message,
+            appSettings: req.appSettings
+        });
+    }
+});
+
+// Get Email templates
+router.get('/email-settings/templates', async (req, res) => {
+    try {
+        const emailNotifications = require('../config/email-notifications');
+        const templates = emailNotifications.getTemplates();
+        
+        res.json({
+            success: true,
+            templates: templates
+        });
+    } catch (error) {
+        logger.error('Error getting Email templates:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error getting templates: ' + error.message
+        });
+    }
+});
+
+// Save Email templates
+router.post('/email-settings/templates', async (req, res) => {
+    try {
+        const emailNotifications = require('../config/email-notifications');
+        const templateData = req.body;
+        
+        // Update templates
+        const updatedCount = emailNotifications.updateTemplates(templateData);
+        
+        res.json({
+            success: true,
+            message: `${updatedCount} templates saved successfully`
+        });
+    } catch (error) {
+        logger.error('Error saving Email templates:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error saving templates: ' + error.message
+        });
+    }
+});
+
+// Get Email connection status
+router.get('/email-settings/status', async (req, res) => {
+    try {
+        const emailNotifications = require('../config/email-notifications');
+        // Reload transporter to get latest SMTP settings
+        emailNotifications.reloadTransporter();
+        const isConfigured = emailNotifications.isConfigured();
+        const connectionTest = await emailNotifications.testConnection();
+        
+        // Get stats
+        const customers = await billingManager.getCustomers();
+        const activeCustomers = customers.filter(c => c.status === 'active' && c.email);
+        const pendingInvoices = await billingManager.getUnpaidInvoices();
+        
+        res.json({
+            success: true,
+            emailConfigured: isConfigured,
+            connectionStatus: connectionTest.success ? 'Connected' : 'Not Connected',
+            connectionError: connectionTest.error || null,
+            activeCustomersWithEmail: activeCustomers.length,
+            pendingInvoices: pendingInvoices.length
+        });
+    } catch (error) {
+        logger.error('Error getting Email status:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error getting status: ' + error.message
+        });
+    }
+});
+
+// Test SMTP Connection (POST endpoint for testing)
+router.post('/email-settings/status', async (req, res) => {
+    try {
+        const emailNotifications = require('../config/email-notifications');
+        // Reload transporter to get latest SMTP settings
+        emailNotifications.reloadTransporter();
+        const isConfigured = emailNotifications.isConfigured();
+        const connectionTest = await emailNotifications.testConnection();
+        
+        // Get stats
+        const customers = await billingManager.getCustomers();
+        const activeCustomers = customers.filter(c => c.status === 'active' && c.email);
+        const pendingInvoices = await billingManager.getUnpaidInvoices();
+        
+        res.json({
+            success: true,
+            emailConfigured: isConfigured,
+            connectionStatus: connectionTest.success ? 'Connected' : 'Not Connected',
+            connectionError: connectionTest.error || null,
+            activeCustomersWithEmail: activeCustomers.length,
+            pendingInvoices: pendingInvoices.length
+        });
+    } catch (error) {
+        logger.error('Error testing Email connection:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error testing connection: ' + error.message,
+            connectionStatus: 'Error',
+            connectionError: error.message
+        });
+    }
+});
+
+// Test Email notification
+router.post('/email-settings/test', async (req, res) => {
+    try {
+        const emailNotifications = require('../config/email-notifications');
+        const { emailAddress, templateKey } = req.body;
+        
+        if (!emailAddress || !emailAddress.includes('@')) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid email address'
+            });
+        }
+        
+        if (!templateKey) {
+            return res.status(400).json({
+                success: false,
+                message: 'Template key is required'
+            });
+        }
+        
+        const result = await emailNotifications.testNotification(emailAddress, templateKey);
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                message: 'Test email sent successfully'
+            });
+        } else {
+            res.json({
+                success: false,
+                message: 'Error sending test email: ' + result.error
+            });
+        }
+    } catch (error) {
+        logger.error('Error sending test email:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error sending test email: ' + error.message
+        });
+    }
+});
+
+// Send Email broadcast message
+router.post('/email-settings/broadcast', async (req, res) => {
+    try {
+        const emailNotifications = require('../config/email-notifications');
+        const { type, message, disruptionType, affectedArea, estimatedResolution } = req.body;
+        
+        let result;
+        
+        if (type === 'service_disruption') {
+            result = await emailNotifications.sendServiceDisruptionNotification({
+                type: disruptionType || 'Gangguan Jaringan',
+                area: affectedArea || 'Seluruh Area',
+                estimatedTime: estimatedResolution || 'Sedang dalam penanganan'
+            });
+        } else if (type === 'service_announcement') {
+            result = await emailNotifications.sendServiceAnnouncement({
+                content: message
+            });
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid broadcast type'
+            });
+        }
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                sent: result.sent,
+                failed: result.failed,
+                total: result.total,
+                message: `Broadcast sent successfully. ${result.sent} sent / ${result.failed} failed`
+            });
+        } else {
+            res.json({
+                success: false,
+                message: result.error
+            });
+        }
+    } catch (error) {
+        logger.error('Error sending email broadcast:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error sending broadcast: ' + error.message
         });
     }
 });
@@ -2537,6 +3510,26 @@ router.post('/whatsapp-settings/test', async (req, res) => {
         };
         
         const result = await whatsappNotifications.testNotification(phoneNumber, templateKey, testData[templateKey]);
+        
+        // Log activity - Connect/Disconnect WA Gateway
+        try {
+            const username = req.session?.admin?.username || req.session?.adminUser || 'admin';
+            const action = result.success ? 'wa_gateway_connect' : 'wa_gateway_disconnect';
+            const desc = result.success 
+                ? `Konek WA Gateway: Test berhasil - Notifikasi terkirim ke ${phoneNumber}`
+                : `Diskonek WA Gateway: Test gagal - ${result.error || 'Error'}`;
+            
+            logActivity(
+                username,
+                'admin',
+                action,
+                desc,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        } catch (logErr) {
+            logger.error('Error logging WA Gateway test:', logErr);
+        }
         
         if (result.success) {
             res.json({
@@ -2947,9 +3940,23 @@ router.get('/customers', getAppSettings, async (req, res) => {
     }
 });
 
-router.post('/customers', async (req, res) => {
+router.post('/customers', customerPhotoUpload.fields([
+    { name: 'ktp_photo', maxCount: 1 },
+    { name: 'house_photo', maxCount: 1 }
+]), async (req, res) => {
     try {
-        const { name, username, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, auto_suspension, billing_day, renewal_type, fix_date, create_pppoe_user, pppoe_password, static_ip, assigned_ip, mac_address, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes, router_id } = req.body;
+        const { name, username, phone, pppoe_username, email, address, package_id, odp_id, pppoe_profile, auto_suspension, status, billing_day, renewal_type, fix_date, create_pppoe_user, pppoe_password, static_ip, assigned_ip, mac_address, latitude, longitude, cable_type, cable_length, port_number, cable_status, cable_notes, router_id } = req.body;
+        
+        // Handle uploaded photos
+        let ktpPhotoPath = null;
+        let housePhotoPath = null;
+        
+        if (req.files && req.files.ktp_photo && req.files.ktp_photo[0]) {
+            ktpPhotoPath = `/uploads/customers/${req.files.ktp_photo[0].filename}`;
+        }
+        if (req.files && req.files.house_photo && req.files.house_photo[0]) {
+            housePhotoPath = `/uploads/customers/${req.files.house_photo[0].filename}`;
+        }
         
         // Validate required fields
         if (!name || !username || !phone || !package_id) {
@@ -2984,7 +3991,7 @@ router.post('/customers', async (req, res) => {
             package_id,
             odp_id: odp_id || null,
             pppoe_profile: profileToUse,
-            status: 'active',
+            status: status || 'register', // Gunakan status dari form, default 'register'
             auto_suspension: auto_suspension !== undefined ? parseInt(auto_suspension) : 1,
             billing_day: (() => {
                 const v = parseInt(billing_day, 10);
@@ -3007,10 +4014,26 @@ router.post('/customers', async (req, res) => {
             cable_length: cable_length ? parseInt(cable_length) : null,
             port_number: port_number ? parseInt(port_number) : null,
             cable_status: cable_status || 'connected',
-            cable_notes: cable_notes || null
+            cable_notes: cable_notes || null,
+            // Photo paths
+            ktp_photo_path: ktpPhotoPath,
+            house_photo_path: housePhotoPath
         };
 
         const result = await billingManager.createCustomer(customerData);
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || 'admin',
+                'admin',
+                'customer_create',
+                `Membuat pelanggan baru: ${name} (${username})`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
         // Map customer ke router jika dipilih
         let mappedRouterId = null;
         try {
@@ -3025,30 +4048,79 @@ router.post('/customers', async (req, res) => {
             logger.warn('Gagal menyimpan mapping customer_router_map: ' + e.message);
         }
 
-        // Optional: create PPPoE user in Mikrotik
+        // Create PPPoE user in Mikrotik
+        // Mode 1: Auto-create (checkbox checked) - menggunakan customer_id
+        // Mode 2: Manual (checkbox unchecked) - menggunakan pppoe_username yang diisi manual
         let pppoeCreate = { attempted: false, created: false, message: '' };
         try {
+            // Cek apakah checkbox create_pppoe_user di-check
             const shouldCreate = create_pppoe_user === 1 || create_pppoe_user === '1' || create_pppoe_user === true || create_pppoe_user === 'true';
-            if (shouldCreate && pppoe_username) {
+            
+            // Tentukan username dan password berdasarkan mode
+            let pppoeUsernameToUse = null;
+            let passwordToUse = null;
+            let isAutoMode = false;
+            
+            if (shouldCreate) {
+                // AUTO MODE: Gunakan customer_id
+                pppoeUsernameToUse = result.customer_id;
+                passwordToUse = result.customer_id;
+                isAutoMode = true;
+                logger.info(`[CREATE_CUSTOMER] 🔄 Auto-create mode: Using customer_id ${pppoeUsernameToUse}`);
+            } else if (pppoe_username && pppoe_username.trim()) {
+                // MANUAL MODE: Gunakan yang diisi user
+                pppoeUsernameToUse = pppoe_username.trim();
+                passwordToUse = (pppoe_password && pppoe_password.trim()) ? pppoe_password.trim() : pppoeUsernameToUse;
+                isAutoMode = false;
+                logger.info(`[CREATE_CUSTOMER] 🔄 Manual mode: Using provided username ${pppoeUsernameToUse}`);
+            }
+            
+            // Create PPPoE jika ada username
+            if (pppoeUsernameToUse) {
                 pppoeCreate.attempted = true;
-                // determine profile (already computed as profileToUse)
-                const passwordToUse = (pppoe_password && String(pppoe_password).trim())
-                    ? String(pppoe_password).trim()
-                    : (Math.random().toString(36).slice(-8) + Math.floor(Math.random()*10));
+                
+                // Get customer name untuk comment
+                const customerName = name || 'Customer';
 
+                logger.info(`[CREATE_CUSTOMER] ✅ Attempting to create PPPoE user: ${pppoeUsernameToUse}, profile: ${profileToUse}, comment: ${customerName}, mode: ${isAutoMode ? 'AUTO' : 'MANUAL'}`);
+                
                 const { addPPPoEUser } = require('../config/mikrotik');
                 // Pass customer object with id for per-router connection; mapping dilakukan di atas
-                const addRes = await addPPPoEUser({ username: pppoe_username, password: passwordToUse, profile: profileToUse, customer: { id: result.id } });
+                // Pass comment dengan nama customer
+                const addRes = await addPPPoEUser({ 
+                    username: pppoeUsernameToUse, 
+                    password: passwordToUse, 
+                    profile: profileToUse, 
+                    customer: { id: result.id },
+                    comment: customerName
+                });
+                
+                logger.info(`[CREATE_CUSTOMER] addPPPoEUser response:`, JSON.stringify(addRes, null, 2));
+                
                 if (addRes && addRes.success) {
                     pppoeCreate.created = true;
-                    pppoeCreate.message = 'User PPPoE berhasil dibuat di Mikrotik';
+                    pppoeCreate.message = `User PPPoE berhasil dibuat di Mikrotik (${isAutoMode ? 'Auto' : 'Manual'})`;
+                    logger.info(`[CREATE_CUSTOMER] ✅ PPPoE user ${pppoeUsernameToUse} successfully created in Mikrotik for customer ${customerName}`);
                 } else {
                     pppoeCreate.created = false;
                     pppoeCreate.message = (addRes && addRes.message) ? addRes.message : 'Gagal membuat user PPPoE';
+                    logger.error(`[CREATE_CUSTOMER] ❌ Failed to create PPPoE user ${pppoeUsernameToUse}: ${pppoeCreate.message}`);
+                    if (addRes) {
+                        logger.error(`[CREATE_CUSTOMER] Full response:`, JSON.stringify(addRes, null, 2));
+                    }
+                }
+            } else {
+                if (shouldCreate) {
+                    logger.warn(`[CREATE_CUSTOMER] Cannot create PPPoE: customer_id not found for customer ${name}`);
+                    pppoeCreate.message = 'PPPoE username tidak ditemukan (customer_id belum di-generate)';
+                } else {
+                    logger.info(`[CREATE_CUSTOMER] ⏭️ Manual mode but no PPPoE username provided - skipping creation`);
+                    pppoeCreate.message = 'PPPoE username tidak diisi (manual mode)';
                 }
             }
         } catch (e) {
-            logger.warn('Gagal membuat user PPPoE di Mikrotik (opsional): ' + e.message);
+            logger.error(`[CREATE_CUSTOMER] ❌ Exception creating PPPoE user: ${e.message}`);
+            logger.error(`[CREATE_CUSTOMER] Stack trace:`, e.stack);
             pppoeCreate.created = false;
             pppoeCreate.message = e.message;
         }
@@ -3056,7 +4128,11 @@ router.post('/customers', async (req, res) => {
         res.json({
             success: true,
             message: 'Pelanggan berhasil ditambahkan',
-            customer: result,
+            customer: {
+                ...result,
+                customer_id: result.customer_id,
+                pppoe_username: result.pppoe_username || result.customer_id
+            },
             pppoeCreate
         });
     } catch (error) {
@@ -3261,10 +4337,46 @@ router.get('/customers/:username/test', async (req, res) => {
     }
 });
 
-router.put('/customers/:phone', async (req, res) => {
+router.put('/customers/:phone', customerPhotoUpload.fields([
+    { name: 'ktp_photo', maxCount: 1 },
+    { name: 'house_photo', maxCount: 1 }
+]), async (req, res) => {
     try {
         const { phone } = req.params;
         const { name, username, pppoe_username, email, address, package_id, odp_id, pppoe_profile, status, auto_suspension, billing_day, renewal_type, fix_date, latitude, longitude, static_ip, assigned_ip, mac_address, cable_type, cable_length, port_number, cable_status, cable_notes, router_id } = req.body;
+        
+        // Handle uploaded photos (only update if new files are uploaded)
+        let ktpPhotoPath = undefined;
+        let housePhotoPath = undefined;
+        
+        if (req.files && req.files.ktp_photo && req.files.ktp_photo[0]) {
+            ktpPhotoPath = `/uploads/customers/${req.files.ktp_photo[0].filename}`;
+            // Delete old photo if exists
+            if (currentCustomer && currentCustomer.ktp_photo_path) {
+                const oldPhotoPath = path.join(__dirname, '../public', currentCustomer.ktp_photo_path);
+                try {
+                    if (fs.existsSync(oldPhotoPath)) {
+                        fs.unlinkSync(oldPhotoPath);
+                    }
+                } catch (e) {
+                    logger.warn('Failed to delete old KTP photo:', e.message);
+                }
+            }
+        }
+        if (req.files && req.files.house_photo && req.files.house_photo[0]) {
+            housePhotoPath = `/uploads/customers/${req.files.house_photo[0].filename}`;
+            // Delete old photo if exists
+            if (currentCustomer && currentCustomer.house_photo_path) {
+                const oldPhotoPath = path.join(__dirname, '../public', currentCustomer.house_photo_path);
+                try {
+                    if (fs.existsSync(oldPhotoPath)) {
+                        fs.unlinkSync(oldPhotoPath);
+                    }
+                } catch (e) {
+                    logger.warn('Failed to delete old house photo:', e.message);
+                }
+            }
+        }
         
         
         // Validate required fields
@@ -3292,6 +4404,23 @@ router.put('/customers/:phone', async (req, res) => {
             });
         }
 
+        // Jika status customer saat ini adalah "register", PASTIKAN status tetap "register"
+        // Status hanya bisa diubah dari "register" ke "active" melalui endpoint /accept
+        const currentStatus = (currentCustomer.status || '').toLowerCase();
+        let finalStatus;
+        
+        if (currentStatus === 'register') {
+            // Jika status saat ini register, SELALU pertahankan status register
+            // Tidak peduli apa yang dipilih user di form
+            finalStatus = 'register';
+            if (status && status.toLowerCase() !== 'register') {
+                logger.warn(`[UPDATE] Attempted to change status from 'register' to '${status}' for customer ${phone}. Status will remain 'register'. Use /accept endpoint to activate customer.`);
+            }
+        } else {
+            // Jika status bukan register, gunakan status dari form atau tetap status saat ini
+            finalStatus = status || currentCustomer.status;
+        }
+
         // Get package to get default profile if not specified
         let profileToUse = pppoe_profile;
         if (!profileToUse && package_id) {
@@ -3314,7 +4443,7 @@ router.put('/customers/:phone', async (req, res) => {
             package_id: package_id,
             odp_id: odp_id !== undefined ? odp_id : currentCustomer.odp_id,
             pppoe_profile: profileToUse,
-            status: status || currentCustomer.status,
+            status: finalStatus,
             auto_suspension: auto_suspension !== undefined ? parseInt(auto_suspension) : currentCustomer.auto_suspension,
             billing_day: (function(){
                 const v = parseInt(billing_day, 10);
@@ -3337,11 +4466,26 @@ router.put('/customers/:phone', async (req, res) => {
             cable_length: cable_length !== undefined ? parseInt(cable_length) : currentCustomer.cable_length,
             port_number: port_number !== undefined ? parseInt(port_number) : currentCustomer.port_number,
             cable_status: cable_status !== undefined ? cable_status : currentCustomer.cable_status,
-            cable_notes: cable_notes !== undefined ? cable_notes : currentCustomer.cable_notes
+            cable_notes: cable_notes !== undefined ? cable_notes : currentCustomer.cable_notes,
+            // Photo paths (only update if new files are uploaded)
+            ktp_photo_path: ktpPhotoPath !== undefined ? ktpPhotoPath : currentCustomer.ktp_photo_path,
+            house_photo_path: housePhotoPath !== undefined ? housePhotoPath : currentCustomer.house_photo_path
         };
 
         // Use current phone for lookup, allow phone to be updated in customerData
         const result = await billingManager.updateCustomerByPhone(phone, customerData);
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || 'admin',
+                'admin',
+                'customer_update',
+                `Mengupdate pelanggan: ${name} (${username})`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
 
         // Update NAS mapping jika router_id diberikan
         try {
@@ -3414,6 +4558,286 @@ router.put('/customers/:phone', async (req, res) => {
     }
 });
 
+// Accept customer (change status from register to active and send welcome messages)
+router.post('/customers/:phone/accept', async (req, res) => {
+    try {
+        const { phone } = req.params;
+        
+        // Get customer data
+        const customer = await billingManager.getCustomerByPhone(phone);
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Pelanggan tidak ditemukan'
+            });
+        }
+        
+        // Check if customer is in register status
+        if (customer.status !== 'register' && customer.status !== 'Register') {
+            return res.status(400).json({
+                success: false,
+                message: `Pelanggan sudah dalam status ${customer.status}. Hanya pelanggan dengan status "register" yang dapat di-accept.`
+            });
+        }
+        
+        // Generate PPPoE username and password menggunakan customer_id
+        // Username dan password PPPoE sama dengan customer_id
+        let pppoeUsername = customer.pppoe_username;
+        let pppoePassword = null;
+        
+        // Pastikan customer_id ada, jika tidak generate dengan format yy-mm-dd hh:mm
+        let customerId = customer.customer_id;
+        if (!customerId) {
+            const now = new Date();
+            const yy = now.getFullYear().toString().slice(-2);
+            const mm = String(now.getMonth() + 1).padStart(2, '0');
+            const dd = String(now.getDate()).padStart(2, '0');
+            const hh = String(now.getHours()).padStart(2, '0');
+            const min = String(now.getMinutes()).padStart(2, '0');
+            customerId = `${dd}${mm}${yy}${hh}${min}`;
+            
+            // Update customer_id di database
+            try {
+                const db = require('../config/billing').db;
+                await new Promise((resolve, reject) => {
+                    db.run('UPDATE customers SET customer_id = ? WHERE id = ?', [customerId, customer.id], (err) => {
+                        if (err) reject(err);
+                        else resolve();
+                    });
+                });
+                logger.info(`[ACCEPT] Generated customer_id ${customerId} for customer ${customer.name}`);
+            } catch (e) {
+                logger.warn(`[ACCEPT] Failed to update customer_id: ${e.message}`);
+            }
+        }
+        
+        // Gunakan customer_id sebagai username dan password PPPoE
+        if (!pppoeUsername) {
+            pppoeUsername = customerId;
+        }
+        
+        // Password sama dengan username (customer_id)
+        pppoePassword = pppoeUsername;
+        
+        // Update customer status to active
+        // Gunakan _bypassRegisterProtection untuk melewati proteksi status register
+        // Pastikan semua data customer yang sudah ada tetap dipertahankan
+        const updateData = {
+            name: customer.name, // Pertahankan nama
+            username: customer.username, // Pertahankan username
+            phone: customer.phone, // Pertahankan phone
+            email: customer.email || null, // Pertahankan email
+            address: customer.address || null, // Pertahankan alamat
+            package_id: customer.package_id || null, // Pertahankan paket yang sudah dipilih
+            odp_id: customer.odp_id || null, // Pertahankan ODP
+            pppoe_profile: customer.pppoe_profile || null, // Pertahankan profile
+            status: 'active',
+            pppoe_username: pppoeUsername,
+            pppoe_password: pppoePassword,
+            auto_suspension: customer.auto_suspension !== undefined ? customer.auto_suspension : 1, // Pertahankan auto_suspension
+            billing_day: customer.billing_day || 15, // Pertahankan billing_day
+            renewal_type: customer.renewal_type || 'renewal', // Pertahankan renewal_type
+            fix_date: customer.fix_date || null, // Pertahankan fix_date
+            latitude: customer.latitude || null, // Pertahankan latitude
+            longitude: customer.longitude || null, // Pertahankan longitude
+            cable_type: customer.cable_type || null, // Pertahankan cable_type
+            cable_length: customer.cable_length || null, // Pertahankan cable_length
+            port_number: customer.port_number || null, // Pertahankan port_number
+            cable_status: customer.cable_status || 'connected', // Pertahankan cable_status
+            cable_notes: customer.cable_notes || null, // Pertahankan cable_notes
+            ktp_photo_path: customer.ktp_photo_path || null, // Pertahankan ktp_photo_path
+            house_photo_path: customer.house_photo_path || null, // Pertahankan house_photo_path
+            _bypassRegisterProtection: true // Flag khusus untuk bypass proteksi register
+        };
+        
+        const updatedCustomer = await billingManager.updateCustomerByPhone(phone, updateData);
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || 'admin',
+                'admin',
+                'customer_accept',
+                `Mengaktifkan pelanggan: ${customer.name} (${customer.username})`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
+        // Create PPPoE user in Mikrotik
+        let pppoeCreate = { attempted: false, created: false, message: '' };
+        try {
+            if (pppoeUsername && updatedCustomer.package_id) {
+                pppoeCreate.attempted = true;
+                
+                // Get package untuk profile
+                const packageData = await billingManager.getPackageById(updatedCustomer.package_id);
+                const profileToUse = updatedCustomer.pppoe_profile || packageData?.pppoe_profile || 'default';
+                
+                // Get customer name untuk comment
+                const customerName = customer.name || 'Customer';
+                
+                const { addPPPoEUser } = require('../config/mikrotik');
+                // Create PPPoE user dengan comment = nama customer
+                const addRes = await addPPPoEUser({ 
+                    username: pppoeUsername, 
+                    password: pppoePassword, 
+                    profile: profileToUse, 
+                    customer: { id: updatedCustomer.id },
+                    comment: customerName
+                });
+                
+                if (addRes && addRes.success) {
+                    pppoeCreate.created = true;
+                    pppoeCreate.message = 'User PPPoE berhasil dibuat di Mikrotik';
+                    logger.info(`[ACCEPT] PPPoE user ${pppoeUsername} created in Mikrotik for customer ${customer.name}`);
+                } else {
+                    pppoeCreate.created = false;
+                    pppoeCreate.message = (addRes && addRes.message) ? addRes.message : 'Gagal membuat user PPPoE';
+                    logger.warn(`[ACCEPT] Failed to create PPPoE user ${pppoeUsername} in Mikrotik: ${pppoeCreate.message}`);
+                }
+            } else {
+                pppoeCreate.message = 'PPPoE username atau package tidak ditemukan';
+                logger.warn(`[ACCEPT] Cannot create PPPoE user: username=${pppoeUsername}, package_id=${updatedCustomer.package_id}`);
+            }
+        } catch (e) {
+            logger.error(`[ACCEPT] Error creating PPPoE user in Mikrotik: ${e.message}`);
+            pppoeCreate.created = false;
+            pppoeCreate.message = e.message;
+        }
+        
+        // Get package info for welcome message
+        let packageInfo = null;
+        if (customer.package_id) {
+            packageInfo = await billingManager.getPackageById(customer.package_id);
+        }
+        
+        // Prepare customer data for notifications - gunakan data customer asli, bukan updatedCustomer
+        const customerForNotification = {
+            ...customer, // Gunakan customer asli yang lengkap
+            ...updatedCustomer, // Override dengan data yang sudah diupdate
+            package_name: packageInfo?.name || customer.package_name || 'N/A',
+            package_speed: packageInfo?.speed || customer.package_speed || 'N/A',
+            pppoe_username: pppoeUsername,
+            pppoe_password: pppoePassword
+        };
+        
+        // Send Email Welcome Message
+        let emailResult = { success: false, error: 'Not attempted' };
+        if (customerForNotification.email && customerForNotification.email.trim() !== '') {
+            try {
+                const emailNotifications = require('../config/email-notifications');
+                emailResult = await emailNotifications.sendWelcomeMessage(customerForNotification);
+                if (emailResult.success) {
+                    logger.info(`[ACCEPT] Welcome email sent to ${customer.name} (${customer.email})`);
+                } else {
+                    logger.warn(`[ACCEPT] Failed to send welcome email to ${customer.name}: ${emailResult.error || 'Unknown error'}`);
+                }
+            } catch (emailError) {
+                logger.error(`[ACCEPT] Error sending welcome email to ${customer.name}:`, emailError);
+                emailResult = { success: false, error: emailError.message };
+            }
+        } else {
+            emailResult = { success: false, error: 'No email address' };
+            logger.warn(`[ACCEPT] Customer ${customer.name} has no email address, skipping email notification`);
+        }
+        
+        // Send WhatsApp Welcome Message
+        let waResult = { success: false, error: 'Not attempted' };
+        if (customer.phone && customer.phone.trim() !== '') {
+            try {
+                // Gunakan sendMessage yang sudah otomatis menggunakan gateway manager
+                const { sendMessage } = require('../config/sendMessage');
+                const companyHeader = getSetting('company_header', 'CV Lintas Multimedia');
+                const supportPhone = getSetting('support_phone', '0813-6888-8498');
+                const contactWhatsApp = getSetting('contact_whatsapp', '0813-6888-8498');
+                
+                const waMessage = `🎉 *Selamat Bergabung!*
+
+Halo *${customer.name}*,
+
+Selamat! Akun Anda telah diaktifkan dan siap digunakan.
+
+📋 *Informasi Akun:*
+• Username: \`${pppoeUsername}\`
+• Password: \`${pppoePassword}\`
+• Paket: ${packageInfo?.name || 'N/A'} (${packageInfo?.speed || 'N/A'})
+
+💡 *Cara Menggunakan:*
+1. Hubungkan perangkat Anda ke router WiFi
+2. Masukkan username dan password PPPoE yang diberikan
+3. Nikmati layanan internet Anda
+
+📞 *Butuh Bantuan?*
+Hubungi kami di: ${supportPhone}
+WhatsApp: ${contactWhatsApp}
+
+Terima kasih telah memilih layanan kami!
+
+*${companyHeader}*`;
+                
+                // sendMessage otomatis akan menggunakan gateway manager jika tersedia
+                waResult = await sendMessage(customer.phone, waMessage, true);
+                if (waResult.success) {
+                    logger.info(`[ACCEPT] Welcome WhatsApp message sent to ${customer.name} (${customer.phone})`);
+                } else {
+                    logger.warn(`[ACCEPT] Failed to send welcome WhatsApp to ${customer.name}: ${waResult.error || 'Unknown error'}`);
+                }
+            } catch (waError) {
+                logger.error(`[ACCEPT] Error sending welcome WhatsApp to ${customer.name}:`, waError);
+                waResult = { success: false, error: waError.message };
+            }
+        } else {
+            waResult = { success: false, error: 'No phone number' };
+            logger.warn(`[ACCEPT] Customer ${customer.name} has no phone number, skipping WhatsApp notification`);
+        }
+        
+        // Prepare response message
+        let message = 'Pelanggan berhasil di-accept dan status diubah menjadi aktif.';
+        const notifications = [];
+        
+        if (pppoeCreate.created) {
+            notifications.push('PPPoE user berhasil dibuat di Mikrotik');
+        } else if (pppoeCreate.attempted) {
+            notifications.push(`PPPoE: ${pppoeCreate.message}`);
+        }
+        
+        if (emailResult.success) {
+            notifications.push('Email welcome message terkirim');
+        } else if (emailResult.error && emailResult.error !== 'Not attempted') {
+            notifications.push(`Email: ${emailResult.error}`);
+        }
+        
+        if (waResult.success) {
+            notifications.push('WhatsApp welcome message terkirim');
+        } else if (waResult.error && waResult.error !== 'Not attempted') {
+            notifications.push(`WhatsApp: ${waResult.error}`);
+        }
+        
+        if (notifications.length > 0) {
+            message += '\n\nNotifikasi: ' + notifications.join(', ');
+        }
+        
+        res.json({
+            success: true,
+            message: message,
+            customer: updatedCustomer,
+            pppoe: pppoeCreate,
+            notifications: {
+                email: emailResult,
+                whatsapp: waResult
+            }
+        });
+    } catch (error) {
+        logger.error('Error accepting customer:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Gagal accept pelanggan: ' + error.message,
+            error: error.message
+        });
+    }
+});
+
 // Delete customer
 router.delete('/customers/:phone', async (req, res) => {
     try {
@@ -3421,6 +4845,18 @@ router.delete('/customers/:phone', async (req, res) => {
         
         const deletedCustomer = await billingManager.deleteCustomer(phone);
         logger.info(`Customer deleted: ${phone}`);
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || 'admin',
+                'admin',
+                'customer_delete',
+                `Menghapus pelanggan: ${deletedCustomer?.name || phone} (${deletedCustomer?.username || phone})`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
         
         res.json({
             success: true,
@@ -3505,6 +4941,19 @@ router.post('/invoices', async (req, res) => {
         const newInvoice = await billingManager.createInvoice(invoiceData);
         logger.info(`Invoice created: ${newInvoice.invoice_number}`);
         
+        // Log activity
+        if (req.session && req.session.admin) {
+            const customer = await billingManager.getCustomerById(customer_id);
+            logActivity(
+                req.session.admin.username || 'admin',
+                'admin',
+                'invoice_create',
+                `Membuat invoice baru: ${newInvoice.invoice_number} untuk pelanggan ${customer?.name || customer_id}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
         // Send WhatsApp notification
         try {
             const whatsappNotifications = require('../config/whatsapp-notifications');
@@ -3536,6 +4985,24 @@ router.put('/invoices/:id/status', async (req, res) => {
 
         const updatedInvoice = await billingManager.updateInvoiceStatus(id, status, payment_method);
         logger.info(`Invoice status updated: ${id} to ${status}`);
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            const username = req.session.admin.username || req.session.adminUser || 'admin';
+            const actionType = status === 'paid' ? 'payment_manual' : 'invoice_status_update';
+            const desc = status === 'paid' 
+                ? `Pembayaran manual / SET Lunas: Invoice ${updatedInvoice?.invoice_number || id}${payment_method ? ' (metode: ' + payment_method + ')' : ''}`
+                : `Mengupdate status invoice ${updatedInvoice?.invoice_number || id} menjadi ${status}${payment_method ? ' (metode: ' + payment_method + ')' : ''}`;
+            
+            logActivity(
+                username,
+                'admin',
+                actionType,
+                desc,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
         
         res.json({
             success: true,
@@ -3667,6 +5134,18 @@ router.put('/invoices/:id', async (req, res) => {
         const updatedInvoice = await billingManager.updateInvoice(id, updateData);
         logger.info(`Invoice updated: ${updatedInvoice.invoice_number}`);
         
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || 'admin',
+                'admin',
+                'invoice_update',
+                `Mengupdate invoice: ${updatedInvoice.invoice_number}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
+        
         res.json({
             success: true,
             message: 'Invoice berhasil diperbarui',
@@ -3689,6 +5168,18 @@ router.delete('/invoices/:id', adminAuth, async (req, res) => {
         
         const deletedInvoice = await billingManager.deleteInvoice(id);
         logger.info(`Invoice deleted: ${deletedInvoice.invoice_number}`);
+        
+        // Log activity
+        if (req.session && req.session.admin) {
+            logActivity(
+                req.session.admin.username || 'admin',
+                'admin',
+                'invoice_delete',
+                `Menghapus invoice: ${deletedInvoice.invoice_number}`,
+                req.ip,
+                req.get('User-Agent')
+            ).catch(err => logger.error('Failed to log activity:', err));
+        }
         
         res.json({
             success: true,
@@ -3724,6 +5215,18 @@ router.post('/invoices/bulk-delete', adminAuth, async (req, res) => {
                 const deletedInvoice = await billingManager.deleteInvoice(id);
                 results.push({ id, success: true, invoice_number: deletedInvoice?.invoice_number });
                 success++;
+                
+                // Log activity for each deleted invoice
+                if (req.session && req.session.admin) {
+                    logActivity(
+                        req.session.admin.username || 'admin',
+                        'admin',
+                        'invoice_delete',
+                        `Menghapus invoice (bulk): ${deletedInvoice?.invoice_number || id}`,
+                        req.ip,
+                        req.get('User-Agent')
+                    ).catch(err => logger.error('Failed to log activity:', err));
+                }
             } catch (e) {
                 results.push({ id: rawId, success: false, message: e.message });
                 failed++;
@@ -3819,6 +5322,24 @@ router.post('/payments', async (req, res) => {
         
         logger.info(`Payment recorded: ${newPayment.id}`);
         
+        // Log activity - Pembayaran manual
+        if (req.session && req.session.admin) {
+            try {
+                const invoice = await billingManager.getInvoiceById(paymentData.invoice_id);
+                const customer = invoice ? await billingManager.getCustomerById(invoice.customer_id) : null;
+                logActivity(
+                    req.session.admin.username || req.session.adminUser || 'admin',
+                    'admin',
+                    'payment_manual',
+                    `Pembayaran manual / SET Lunas: Invoice ${invoice?.invoice_number || paymentData.invoice_id} - Pelanggan: ${customer?.name || 'N/A'} - Rp ${paymentData.amount.toLocaleString('id-ID')} (${paymentData.payment_method})`,
+                    req.ip,
+                    req.get('User-Agent')
+                ).catch(err => logger.error('Failed to log activity:', err));
+            } catch (logErr) {
+                logger.error('Error logging payment activity:', logErr);
+            }
+        }
+        
         // Send WhatsApp notification
         try {
             const whatsappNotifications = require('../config/whatsapp-notifications');
@@ -3859,6 +5380,61 @@ router.post('/payments', async (req, res) => {
         });
     }
 });
+
+// Resend payment notification (internal API - can be called from localhost without auth)
+router.post('/payments/:paymentId/resend-notification', async (req, res, next) => {
+    // Allow from localhost or if admin is authenticated
+    const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === '::ffff:127.0.0.1' || 
+                       req.headers.host?.includes('localhost') || req.headers.host?.includes('127.0.0.1');
+    
+    if (!isLocalhost && (!req.session || !req.session.isAdmin)) {
+        // For non-localhost, require admin auth
+        return adminAuth(req, res, next);
+    }
+    
+    // Call handler
+    handleResendNotification(req, res).catch(next);
+});
+
+async function handleResendNotification(req, res) {
+    try {
+        const paymentId = parseInt(req.params.paymentId);
+        
+        if (!paymentId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Payment ID is required'
+            });
+        }
+        
+        const whatsappNotifications = require('../config/whatsapp-notifications');
+        const result = await whatsappNotifications.sendPaymentReceivedNotification(paymentId);
+        
+        if (result.success) {
+            logger.info(`Payment notification resent for payment ID: ${paymentId}`);
+            res.json({
+                success: true,
+                message: 'Notification sent successfully',
+                withDocument: result.withDocument || false
+            });
+        } else {
+            logger.error(`Failed to resend payment notification for payment ID: ${paymentId}`, result.error);
+            res.status(500).json({
+                success: false,
+                message: result.error || 'Failed to send notification',
+                skipped: result.skipped || false,
+                reason: result.reason || null
+            });
+        }
+    } catch (error) {
+        logger.error('Error resending payment notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error resending notification',
+            error: error.message
+        });
+    }
+}
 
 // Export customers to CSV
 router.get('/export/customers', getAppSettings, async (req, res) => {
@@ -4813,15 +6389,135 @@ router.get('/api/invoices', async (req, res) => {
 });
 
 // WhatsApp Notifications
+// Send WhatsApp Notification for Customer (General Notification)
+router.post('/customers/send-whatsapp', async (req, res) => {
+    try {
+        const { phoneNumber, customerName, customMessage } = req.body;
+        
+        if (!phoneNumber || !customerName) {
+            return res.status(400).json({
+                success: false,
+                message: 'Nomor WhatsApp dan Nama Pelanggan harus diisi'
+            });
+        }
+        
+        // Format phone number
+        let formattedPhone = phoneNumber.replace(/\D/g, '');
+        if (formattedPhone.startsWith('0')) {
+            formattedPhone = '62' + formattedPhone.slice(1);
+        } else if (!formattedPhone.startsWith('62')) {
+            formattedPhone = '62' + formattedPhone;
+        }
+        
+        // Create message - gunakan custom message jika ada, atau default message
+        const companyHeader = getSetting('company_header', 'CV Lintas Multimedia');
+        const footerInfo = getSetting('footer_info', 'Internet Tanpa Batas');
+        const supportPhone = getSetting('support_phone', '0813-6888-8498');
+        
+        let message = customMessage || `📋 *NOTIFIKASI PELANGGAN*
+
+Halo ${customerName},
+
+Terima kasih telah menggunakan layanan kami.
+
+Jika ada pertanyaan atau butuh bantuan, silakan hubungi customer service kami.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${companyHeader}
+${footerInfo}
+📞 Support: ${supportPhone}`;
+        
+        // Send WhatsApp message using the existing WhatsApp system
+        logger.info(`Sending WhatsApp notification to ${formattedPhone} for customer ${customerName}`);
+        
+        const sendMessage = require('../config/sendMessage');
+        const result = await sendMessage.sendMessage(formattedPhone, message);
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                message: 'Notifikasi WhatsApp berhasil dikirim'
+            });
+        } else {
+            res.json({
+                success: false,
+                message: 'Gagal mengirim notifikasi WhatsApp: ' + (result.error || 'Unknown error')
+            });
+        }
+        
+    } catch (error) {
+        logger.error('Error sending WhatsApp notification:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Terjadi kesalahan saat mengirim notifikasi'
+        });
+    }
+});
+
 // Send WhatsApp Notification for Invoice
 router.post('/invoices/send-whatsapp', async (req, res) => {
     try {
         const { phoneNumber, customerName, status, amount, dueDate, invoiceNumber, packageName } = req.body;
         
-        if (!phoneNumber || !customerName || !amount || !dueDate) {
+        // Validasi: amount harus ada dan bukan 0 (kecuali untuk notifikasi umum)
+        // Jika amount tidak ada atau 0, mungkin ini adalah notifikasi umum, redirect ke route customer
+        if (!phoneNumber || !customerName) {
             return res.status(400).json({
                 success: false,
-                message: 'Semua field harus diisi'
+                message: 'Nomor WhatsApp dan Nama Pelanggan harus diisi'
+            });
+        }
+        
+        // Jika amount dan dueDate tidak ada, ini adalah notifikasi umum
+        if ((!amount || amount === 0) && !dueDate) {
+            // Redirect ke route customer notification
+            const sendMessage = require('../config/sendMessage');
+            const companyHeader = getSetting('company_header', 'CV Lintas Multimedia');
+            const footerInfo = getSetting('footer_info', 'Internet Tanpa Batas');
+            const supportPhone = getSetting('support_phone', '0813-6888-8498');
+            
+            let formattedPhone = phoneNumber.replace(/\D/g, '');
+            if (formattedPhone.startsWith('0')) {
+                formattedPhone = '62' + formattedPhone.slice(1);
+            } else if (!formattedPhone.startsWith('62')) {
+                formattedPhone = '62' + formattedPhone;
+            }
+            
+            const message = `📋 *NOTIFIKASI PELANGGAN*
+
+Halo ${customerName},
+
+Terima kasih telah menggunakan layanan kami.
+
+Jika ada pertanyaan atau butuh bantuan, silakan hubungi customer service kami.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${companyHeader}
+${footerInfo}
+📞 Support: ${supportPhone}`;
+            
+            const result = await sendMessage.sendMessage(formattedPhone, message);
+            
+            if (result.success) {
+                return res.json({
+                    success: true,
+                    message: 'Notifikasi WhatsApp berhasil dikirim'
+                });
+            } else {
+                return res.json({
+                    success: false,
+                    message: 'Gagal mengirim notifikasi WhatsApp: ' + (result.error || 'Unknown error')
+                });
+            }
+        }
+        
+        // Validasi untuk invoice notification (memerlukan amount dan dueDate)
+        if (!amount || !dueDate) {
+            return res.status(400).json({
+                success: false,
+                message: 'Semua field harus diisi (amount dan dueDate diperlukan untuk notifikasi invoice)'
             });
         }
         
@@ -6209,6 +7905,9 @@ router.get('/reports', getAppSettings, async (req, res) => {
         const totalRevenue = await billingManager.getTotalRevenue();
         const pendingPayments = await billingManager.getPendingPayments();
         
+        // Get detailed stats for reports
+        const reportsStats = await billingManager.getReportsStats();
+        
         res.render('admin/billing/reports', {
             title: 'Laporan Billing - Mobile',
             appSettings: req.appSettings,
@@ -6216,7 +7915,8 @@ router.get('/reports', getAppSettings, async (req, res) => {
                 totalCustomers,
                 totalInvoices,
                 totalRevenue,
-                pendingPayments
+                pendingPayments,
+                ...reportsStats
             }
         });
     } catch (error) {
@@ -6225,6 +7925,268 @@ router.get('/reports', getAppSettings, async (req, res) => {
             message: 'Error loading billing reports',
             error: process.env.NODE_ENV === 'development' ? error : {}
         });
+    }
+});
+
+// API: Get reports stats
+router.get('/api/reports/stats', adminAuth, async (req, res) => {
+    try {
+        const stats = await billingManager.getReportsStats();
+        res.json({ success: true, data: stats });
+    } catch (error) {
+        logger.error('Error getting reports stats:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// API: Get revenue data for chart (last 30 days)
+router.get('/api/reports/revenue-chart', adminAuth, async (req, res) => {
+    try {
+        const dbPath = path.join(__dirname, '../data/billing.db');
+        const db = new sqlite3.Database(dbPath);
+        
+        // Get last 30 days revenue data
+        const revenueData = [];
+        const today = new Date();
+        
+        for (let i = 29; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+            
+            const revenue = await new Promise((resolve, reject) => {
+                db.get(`
+                    SELECT COALESCE(SUM(amount), 0) AS total
+                    FROM payments
+                    WHERE date(payment_date) = date(?)
+                `, [dateStr], (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row?.total || 0);
+                });
+            });
+            
+            revenueData.push({
+                date: dateStr,
+                dateLabel: date.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+                revenue: revenue
+            });
+        }
+        
+        db.close();
+        
+        res.json({ 
+            success: true, 
+            data: revenueData 
+        });
+    } catch (error) {
+        logger.error('Error getting revenue chart data:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// POST: Export Reports to Excel
+router.post('/api/reports/export', adminAuth, async (req, res) => {
+    try {
+        // Get stats
+        const stats = await billingManager.getReportsStats();
+        
+        // Get revenue summary directly from database
+        const dbPath = path.join(__dirname, '../data/billing.db');
+        const db = new sqlite3.Database(dbPath);
+        
+        function getDateStr(d) { return new Date(d).toISOString().split('T')[0]; }
+        const todayStr = getDateStr(new Date());
+        const weekAgoStr = getDateStr(new Date(Date.now() - 6 * 24 * 3600 * 1000));
+        
+        const [todayRevenue, weekRevenue, monthRevenue] = await Promise.all([
+            new Promise((resolve, reject) => {
+                db.get(`
+                    SELECT COALESCE(SUM(amount),0) AS total
+                    FROM payments
+                    WHERE date(payment_date) = date(?)
+                `, [todayStr], (err, row) => err ? reject(err) : resolve(row?.total || 0));
+            }),
+            new Promise((resolve, reject) => {
+                db.get(`
+                    SELECT COALESCE(SUM(amount),0) AS total
+                    FROM payments
+                    WHERE date(payment_date) BETWEEN date(?) AND date(?)
+                `, [weekAgoStr, todayStr], (err, row) => err ? reject(err) : resolve(row?.total || 0));
+            }),
+            new Promise((resolve, reject) => {
+                db.get(`
+                    SELECT COALESCE(SUM(amount),0) AS total
+                    FROM payments
+                    WHERE strftime('%Y-%m', payment_date) = strftime('%Y-%m', 'now')
+                `, [], (err, row) => err ? reject(err) : resolve(row?.total || 0));
+            }),
+        ]);
+        
+        db.close();
+        
+        // Merge stats with basic stats
+        const totalCustomers = await billingManager.getTotalCustomers();
+        const totalInvoices = await billingManager.getTotalInvoices();
+        const totalRevenue = await billingManager.getTotalRevenue();
+        const pendingPayments = await billingManager.getPendingPayments();
+        
+        // Create workbook
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Laporan Billing');
+        
+        // Set column widths
+        worksheet.columns = [
+            { header: 'Keterangan', key: 'keterangan', width: 50 },
+            { header: 'Nilai', key: 'nilai', width: 25 }
+        ];
+        
+        // Add title
+        worksheet.insertRow(1, ['LAPORAN BILLING', '']);
+        worksheet.mergeCells('A1:B1');
+        worksheet.getRow(1).font = { bold: true, size: 16 };
+        worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        worksheet.getRow(1).height = 30;
+        
+        // Add date
+        const now = new Date();
+        worksheet.insertRow(2, [`Tanggal: ${now.toLocaleDateString('id-ID')}`, '']);
+        worksheet.mergeCells('A2:B2');
+        worksheet.getRow(2).alignment = { vertical: 'middle', horizontal: 'center' };
+        worksheet.getRow(2).height = 20;
+        
+        // Add empty row
+        worksheet.insertRow(3, ['', '']);
+        
+        let currentRow = 4;
+        
+        // STATISTIK UMUM
+        worksheet.insertRow(currentRow, ['STATISTIK UMUM', '']);
+        worksheet.getRow(currentRow).font = { bold: true, size: 12 };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE7E6E6' }
+        };
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Total Pelanggan', totalCustomers]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pelanggan Aktif', stats.activeCustomers || 0]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pelanggan Non-Aktif', stats.inactiveCustomers || 0]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pelanggan Baru (Bulan Ini)', stats.newCustomersThisMonth || 0]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Tingkat Retensi', (stats.retentionRate || 0) + '%']);
+        currentRow++;
+        
+        // Empty row
+        worksheet.insertRow(currentRow, ['', '']);
+        currentRow++;
+        
+        // LAPORAN TAGIHAN
+        worksheet.insertRow(currentRow, ['LAPORAN TAGIHAN', '']);
+        worksheet.getRow(currentRow).font = { bold: true, size: 12 };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE7E6E6' }
+        };
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Total Tagihan', totalInvoices]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Tagihan Dibuat (Bulan Ini)', stats.invoicesThisMonth || 0]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Tagihan Lunas', stats.paidInvoices || 0]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Tagihan Belum Lunas', stats.unpaidInvoices || 0]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Tingkat Pembayaran', (stats.paymentRate || 0) + '%']);
+        currentRow++;
+        
+        // Empty row
+        worksheet.insertRow(currentRow, ['', '']);
+        currentRow++;
+        
+        // LAPORAN PEMBAYARAN
+        worksheet.insertRow(currentRow, ['LAPORAN PEMBAYARAN', '']);
+        worksheet.getRow(currentRow).font = { bold: true, size: 12 };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE7E6E6' }
+        };
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pembayaran Berhasil', stats.successfulPayments || 0]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pembayaran Pending', pendingPayments]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pembayaran Gagal', stats.failedPayments || 0]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        // Empty row
+        worksheet.insertRow(currentRow, ['', '']);
+        currentRow++;
+        
+        // LAPORAN PENDAPATAN
+        worksheet.insertRow(currentRow, ['LAPORAN PENDAPATAN', '']);
+        worksheet.getRow(currentRow).font = { bold: true, size: 12 };
+        worksheet.getRow(currentRow).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE7E6E6' }
+        };
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Total Pendapatan', totalRevenue]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pendapatan Hari Ini', todayRevenue]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pendapatan Minggu Ini', weekRevenue]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        worksheet.insertRow(currentRow, ['Pendapatan Bulan Ini', monthRevenue]);
+        worksheet.getRow(currentRow).getCell(2).numFmt = '#,##0';
+        currentRow++;
+        
+        // Set response headers
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=laporan-billing-${now.toISOString().split('T')[0]}.xlsx`);
+        
+        // Write workbook to response
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        logger.error('Error exporting reports:', error);
+        res.status(500).json({ success: false, message: error.message });
     }
 });
 

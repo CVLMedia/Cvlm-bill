@@ -180,11 +180,12 @@
       </div>
       <div class="form-container">
         <form id="loginForm">
-          <div class="form-floating">
-            <input type="text" class="form-control" id="phone" name="phone" placeholder="Nomor HP" required autofocus pattern="08[0-9]{8,13}">
+          <div class="form-floating mb-3">
+            <input type="text" class="form-control" id="phone" name="phone" placeholder="" autofocus>
             <label for="phone">
-              <i class="bi bi-phone me-2"></i>Nomor HP
+              <i class="bi bi-phone me-2"></i>Nomor HP atau ID Pelanggan (6 digit)
             </label>
+            <small class="form-text text-muted" id="phoneHelp" style="display: none;">Masukkan nomor HP (08...) atau ID Pelanggan 6 digit</small>
           </div>
           <button type="submit" class="btn btn-primary btn-login w-100" id="loginBtn">
             <span class="btn-text">
@@ -196,6 +197,11 @@
           </button>
         </form>
         <div id="loginAlert" style="display:none;"></div>
+        <div class="text-center mt-3">
+          <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#registerModal">
+            <i class="bi bi-person-plus me-2"></i>Daftar Pelanggan
+          </button>
+        </div>
         <div class="text-center footer-text">
           <!-- Agent Registration Link -->
           <div class="mb-3">
@@ -228,6 +234,92 @@
       </div>
     </div>
   </div>
+
+  <!-- Register Customer Modal -->
+  <div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="registerModalLabel">
+            <i class="bi bi-person-plus me-2"></i>Daftar Pelanggan Baru
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <form id="registerForm" enctype="multipart/form-data">
+          <div class="modal-body">
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle me-2"></i>
+              <small>Isi data sesuai KTP. Field yang tidak diisi akan diisi otomatis oleh sistem.</small>
+            </div>
+            
+            <div class="mb-3">
+              <label for="reg_name" class="form-label">Nama Lengkap Sesuai KTP *</label>
+              <input type="text" class="form-control" id="reg_name" name="name" required placeholder="Contoh: Budi Santoso">
+            </div>
+            
+            <div class="mb-3">
+              <label for="reg_phone" class="form-label">No Handphone WA *</label>
+              <input type="text" class="form-control" id="reg_phone" name="phone" required placeholder="08xxxxxxxxxx">
+              <small class="form-text text-muted">Nomor yang digunakan untuk WhatsApp</small>
+            </div>
+            
+            <div class="mb-3">
+              <label for="reg_email" class="form-label">Email Aktif</label>
+              <input type="email" class="form-control" id="reg_email" name="email" placeholder="contoh@email.com">
+              <small class="form-text text-muted">Jika kosong, akan dibuat otomatis: namapelanggan@gmail.com</small>
+            </div>
+            
+            <div class="mb-3">
+              <label for="reg_address" class="form-label">Alamat</label>
+              <textarea class="form-control" id="reg_address" name="address" rows="3" placeholder="Alamat lengkap tempat tinggal"></textarea>
+            </div>
+            
+            <div class="mb-3">
+              <label for="reg_package_id" class="form-label">Paket Langganan *</label>
+              <select class="form-select" id="reg_package_id" name="package_id" required>
+                <option value="">-- Pilih Paket --</option>
+                <!-- Options will be loaded via AJAX -->
+              </select>
+              <small class="form-text text-muted">Pilih paket internet yang diinginkan</small>
+            </div>
+            
+            <hr class="my-3">
+            <h6 class="mb-3"><i class="bi bi-images me-2"></i>Upload Dokumen</h6>
+            
+            <div class="mb-3">
+              <label for="reg_ktp_photo" class="form-label">Upload Foto KTP *</label>
+              <input type="file" class="form-control" id="reg_ktp_photo" name="ktp_photo" accept="image/*" required>
+              <small class="form-text text-muted">Format: JPG, PNG, atau GIF. Maksimal 20MB</small>
+              <div id="ktp_preview" class="mt-2" style="display: none;">
+                <img id="ktp_preview_img" src="" alt="Preview KTP" class="img-thumbnail" style="max-width: 200px; max-height: 200px;">
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="reg_house_photo" class="form-label">Upload Rumah Tampak Depan *</label>
+              <input type="file" class="form-control" id="reg_house_photo" name="house_photo" accept="image/*" required>
+              <small class="form-text text-muted">Format: JPG, PNG, atau GIF. Maksimal 20MB</small>
+              <div id="house_preview" class="mt-2" style="display: none;">
+                <img id="house_preview_img" src="" alt="Preview Rumah" class="img-thumbnail" style="max-width: 200px; max-height: 200px;">
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+            <button type="submit" class="btn btn-primary" id="registerBtn">
+              <span class="btn-text">
+                <i class="bi bi-check-circle me-2"></i>Daftar
+              </span>
+              <span class="btn-loading" style="display:none;">
+                <i class="bi bi-hourglass-split me-2"></i>Mendaftar...
+              </span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>
 
@@ -265,14 +357,203 @@
         });
     }
 
+    // Hide help text when user focuses on input
+    $('#phone').on('focus', function() {
+        $('#phoneHelp').fadeOut(200);
+    });
+    
+    // Show help text when input is empty and loses focus
+    $('#phone').on('blur', function() {
+        if ($(this).val().trim() === '') {
+            $('#phoneHelp').fadeIn(200);
+        }
+    });
+    
+    // Hide help text when user starts typing
+    $('#phone').on('input', function() {
+        if ($(this).val().trim() !== '') {
+            $('#phoneHelp').fadeOut(200);
+        }
+    });
+
+    // Load packages when register modal is opened
+    $('#registerModal').on('show.bs.modal', function() {
+        loadPackagesForRegistration();
+    });
+
+    // Load packages for registration dropdown
+    function loadPackagesForRegistration() {
+        $.get('/customer/api/packages', function(response) {
+            if (response.success && response.packages) {
+                const select = $('#reg_package_id');
+                select.empty();
+                select.append('<option value="">-- Pilih Paket --</option>');
+                response.packages.forEach(function(pkg) {
+                    select.append(`<option value="${pkg.id}">${pkg.name} - ${pkg.speed} (Rp ${parseInt(pkg.price).toLocaleString('id-ID')})</option>`);
+                });
+            } else {
+                showToast('error', 'Error', 'Gagal memuat daftar paket. Silakan refresh halaman.');
+            }
+        }).fail(function() {
+            showToast('error', 'Error', 'Gagal memuat daftar paket. Silakan refresh halaman.');
+        });
+    }
+
+    // Preview image before upload
+    $('#reg_ktp_photo').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file size (20MB = 20 * 1024 * 1024 bytes)
+            if (file.size > 20 * 1024 * 1024) {
+                showToast('error', 'Error', 'Ukuran file Foto KTP terlalu besar. Maksimal 20MB');
+                $(this).val('');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#ktp_preview_img').attr('src', e.target.result);
+                $('#ktp_preview').show();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            $('#ktp_preview').hide();
+        }
+    });
+    
+    $('#reg_house_photo').on('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file size (20MB = 20 * 1024 * 1024 bytes)
+            if (file.size > 20 * 1024 * 1024) {
+                showToast('error', 'Error', 'Ukuran file Rumah Tampak Depan terlalu besar. Maksimal 20MB');
+                $(this).val('');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#house_preview_img').attr('src', e.target.result);
+                $('#house_preview').show();
+            };
+            reader.readAsDataURL(file);
+        } else {
+            $('#house_preview').hide();
+        }
+    });
+
+    // Handle registration form submit
+    $('#registerForm').on('submit', function(e) {
+        e.preventDefault();
+        
+        const name = $('#reg_name').val().trim();
+        const phone = $('#reg_phone').val().trim();
+        const email = $('#reg_email').val().trim();
+        const address = $('#reg_address').val().trim();
+        const package_id = $('#reg_package_id').val();
+        const ktpPhoto = $('#reg_ktp_photo')[0].files[0];
+        const housePhoto = $('#reg_house_photo')[0].files[0];
+        
+        // Validation
+        if (!name || !phone || !package_id) {
+            showToast('error', 'Error', 'Nama, No Handphone, dan Paket wajib diisi');
+            return;
+        }
+        
+        // Validate photos
+        if (!ktpPhoto) {
+            showToast('error', 'Error', 'Foto KTP wajib diupload');
+            return;
+        }
+        if (!housePhoto) {
+            showToast('error', 'Error', 'Foto Rumah Tampak Depan wajib diupload');
+            return;
+        }
+        
+        // Validate file sizes
+        if (ktpPhoto.size > 20 * 1024 * 1024) {
+            showToast('error', 'Error', 'Ukuran file Foto KTP terlalu besar. Maksimal 20MB');
+            return;
+        }
+        if (housePhoto.size > 20 * 1024 * 1024) {
+            showToast('error', 'Error', 'Ukuran file Rumah Tampak Depan terlalu besar. Maksimal 20MB');
+            return;
+        }
+        
+        // Validate phone format
+        if (!/^08[0-9]{8,13}$/.test(phone) && !/^\+?62[0-9]{8,13}$/.test(phone)) {
+            showToast('error', 'Error', 'Format nomor handphone tidak valid. Gunakan format 08xxxxxxxxxx');
+            return;
+        }
+        
+        // Show loading
+        const $btn = $('#registerBtn');
+        const $btnText = $btn.find('.btn-text');
+        const $btnLoading = $btn.find('.btn-loading');
+        $btn.prop('disabled', true);
+        $btnText.hide();
+        $btnLoading.show();
+        
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('phone', phone);
+        formData.append('email', email);
+        formData.append('address', address);
+        formData.append('package_id', package_id);
+        formData.append('ktp_photo', ktpPhoto);
+        formData.append('house_photo', housePhoto);
+        
+        // Submit registration with file upload
+        $.ajax({
+            url: '/customer/register',
+            method: 'POST',
+            processData: false,
+            contentType: false,
+            data: formData,
+            success: function(response) {
+                if (response.success) {
+                    showToast('success', 'Registrasi Berhasil', 'Akun Anda berhasil didaftarkan. Silakan login dengan nomor HP atau ID Pelanggan Anda.');
+                    $('#registerModal').modal('hide');
+                    $('#registerForm')[0].reset();
+                    $('#ktp_preview').hide();
+                    $('#house_preview').hide();
+                    // Show customer ID if available
+                    if (response.customer_id) {
+                        setTimeout(() => {
+                            showToast('info', 'ID Pelanggan Anda', `ID Pelanggan: ${response.customer_id}. Gunakan ID ini untuk login.`);
+                        }, 2000);
+                    }
+                } else {
+                    showToast('error', 'Registrasi Gagal', response.message || 'Terjadi kesalahan saat mendaftar');
+                }
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON?.message || xhr.responseJSON?.details || 'Terjadi kesalahan saat mendaftar';
+                showToast('error', 'Error', errorMsg);
+            },
+            complete: function() {
+                $btn.prop('disabled', false);
+                $btnText.show();
+                $btnLoading.hide();
+            }
+        });
+    });
+
     // Handler form login
     $('#loginForm').on('submit', function(e) {
         e.preventDefault();
         
-        const phone = $('#phone').val();
+        const input = $('#phone').val().trim();
         
-        if (!phone || !phone.match(/^08[0-9]{8,13}$/)) {
-            showToast('error', 'Error', 'Nomor HP harus valid (08xxxxxxxxxx)');
+        // Check if input is 6 digit (format lama) atau 10 digit (customer_id format: yy-mm-dd hh:mm) or phone number
+        let data = {};
+        if (/^\d{6}$/.test(input) || /^\d{10}$/.test(input)) {
+            // 6 digit (format lama) atau 10 digit (format baru: yy-mm-dd hh:mm, contoh: 2512021009) = customer_id
+            data.customer_id = input;
+        } else if (input.match(/^08[0-9]{8,13}$/) || input.match(/^\+?62[0-9]{8,13}$/)) {
+            // Phone number
+            data.phone = input;
+        } else {
+            showToast('error', 'Error', 'Masukkan nomor HP (08...) atau ID Pelanggan (6 atau 10 digit)');
             return;
         }
         
@@ -289,7 +570,7 @@
         $.ajax({
             url: '/customer/login',
             method: 'POST',
-            data: { phone },
+            data: data,
             success: function(response) {
                 if (response.success) {
                     const target = response.redirect || '/customer/dashboard';

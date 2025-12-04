@@ -2,12 +2,48 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const multer = require('multer');
 const { findDeviceByTag } = require('../config/addWAN');
 const { findDeviceByPPPoE, getGenieacsCredentials, getGenieacsServerForCustomer } = require('../config/genieacs');
 const { sendMessage } = require('../config/sendMessage');
 const { getSettingsWithCache, getSetting } = require('../config/settingsManager');
 const billingManager = require('../config/billing');
 const router = express.Router();
+
+// Configure multer for customer photo uploads
+const customerPhotoStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const uploadDir = path.join(__dirname, '../public/uploads/customers');
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        cb(null, uploadDir);
+    },
+    filename: function (req, file, cb) {
+        // Generate unique filename: customer-{phone}-{type}-{timestamp}.{ext}
+        const phone = req.body.phone ? req.body.phone.replace(/\D/g, '') : Date.now();
+        const type = file.fieldname === 'ktp_photo' ? 'ktp' : 'house';
+        const ext = path.extname(file.originalname) || '.jpg';
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `customer-${phone}-${type}-${uniqueSuffix}${ext}`);
+    }
+});
+
+const customerPhotoUpload = multer({ 
+    storage: customerPhotoStorage,
+    limits: {
+        fileSize: 20 * 1024 * 1024 // 20MB limit
+    },
+    fileFilter: function (req, file, cb) {
+        // Accept only image files
+        if (file.mimetype.startsWith('image/')) {
+            cb(null, true);
+        } else {
+            cb(new Error('Hanya file gambar yang diizinkan (JPG, PNG, GIF)'));
+        }
+    }
+});
 
 // Phone helpers: normalize and variants (08..., 62..., +62...)
 function normalizePhone(input) {
@@ -588,7 +624,7 @@ async function updateSSIDOptimized(phone, newSSID) {
       return { success: false, message: 'Device tidak ditemukan' };
     }
     
-    // STEP 4: Gunakan server dari customer jika ada, fallback ke default dari /admin/genieacs-servers
+    // STEP 4: Gunakan server dari customer jika ada, fallback ke default dari /admin/routers
     const serverDetails = await getGenieacsCredentials(genieacsServer);
     if (!serverDetails || !serverDetails.url) {
       console.error('GenieACS server belum dikonfigurasi. Tidak dapat memperbarui SSID.');
@@ -902,7 +938,7 @@ async function updatePasswordOptimized(phone, newPassword) {
       return { success: false, message: 'Device tidak ditemukan' };
     }
     
-    // STEP 4: Gunakan server dari customer jika ada, fallback ke default dari /admin/genieacs-servers
+    // STEP 4: Gunakan server dari customer jika ada, fallback ke default dari /admin/routers
     const serverDetails = await getGenieacsCredentials(genieacsServer);
     if (!serverDetails || !serverDetails.url) {
       console.error('GenieACS server belum dikonfigurasi. Tidak dapat memperbarui password.');
@@ -1030,23 +1066,71 @@ router.get('/', (req, res) => {
   return res.redirect('/customer/login');
 });
 
+// GET: API untuk mendapatkan daftar paket
+router.get('/api/packages', async (req, res) => {
+  try {
+    const packages = await billingManager.getPackages();
+    res.json({
+      success: true,
+      packages: packages
+    });
+  } catch (error) {
+    console.error('Error getting packages:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Gagal memuat daftar paket'
+    });
+  }
+});
+
 // POST: Proses login - Optimized dengan AJAX support
 router.post('/login', async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { phone, customer_id } = req.body;
     const settings = getSettingsWithCache();
     
-    // Fast validation: terima 08..., 62..., +62...
-    const valid = !!phone && (/^08[0-9]{8,13}$/.test(phone) || /^\+?62[0-9]{8,13}$/.test(phone));
-    if (!valid) {
-      if (req.xhr || req.headers.accept.indexOf('json') > -1) {
-        return res.status(400).json({ success: false, message: 'Nomor HP harus valid (08..., 62..., atau +62...)' });
+    let normalizedPhone = null;
+    
+    // Support login dengan customer_id (6 digit format lama atau 10 digit format baru: yy-mm-dd hh:mm)
+    if (customer_id && (/^\d{6}$/.test(customer_id) || /^\d{10}$/.test(customer_id))) {
+      try {
+        const customer = await billingManager.getCustomerByCustomerId(customer_id);
+        if (customer) {
+          normalizedPhone = customer.phone;
+        } else {
+          if (req.xhr || req.headers.accept?.indexOf('json') > -1) {
+            return res.status(401).json({ success: false, message: 'ID Pelanggan tidak terdaftar.' });
+          } else {
+            return res.render('login', { settings, error: 'ID Pelanggan tidak terdaftar.' });
+          }
+        }
+      } catch (error) {
+        console.error('Error getting customer by ID:', error);
+        if (req.xhr || req.headers.accept?.indexOf('json') > -1) {
+          return res.status(401).json({ success: false, message: 'ID Pelanggan tidak terdaftar.' });
+        } else {
+          return res.render('login', { settings, error: 'ID Pelanggan tidak terdaftar.' });
+        }
+      }
+    } else if (phone) {
+      // Fast validation: terima 08..., 62..., +62...
+      const valid = !!phone && (/^08[0-9]{8,13}$/.test(phone) || /^\+?62[0-9]{8,13}$/.test(phone));
+      if (!valid) {
+        if (req.xhr || req.headers.accept?.indexOf('json') > -1) {
+          return res.status(400).json({ success: false, message: 'Nomor HP harus valid (08..., 62..., atau +62...)' });
+        } else {
+          return res.render('login', { settings, error: 'Nomor HP tidak valid.' });
+        }
+      }
+      
+      normalizedPhone = normalizePhone(phone);
+    } else {
+      if (req.xhr || req.headers.accept?.indexOf('json') > -1) {
+        return res.status(400).json({ success: false, message: 'Nomor HP atau ID Pelanggan harus diisi' });
       } else {
-        return res.render('login', { settings, error: 'Nomor HP tidak valid.' });
+        return res.render('login', { settings, error: 'Nomor HP atau ID Pelanggan harus diisi.' });
       }
     }
-    
-    const normalizedPhone = normalizePhone(phone);
 
     // Check customer validity
     if (!await isValidCustomer(normalizedPhone)) {
@@ -1124,6 +1208,220 @@ router.post('/login', async (req, res) => {
     } else {
       return res.render('login', { settings: getSettingsWithCache(), error: 'Terjadi kesalahan saat login.' });
     }
+  }
+});
+
+// POST: Registrasi pelanggan baru
+router.post('/register', customerPhotoUpload.fields([
+  { name: 'ktp_photo', maxCount: 1 },
+  { name: 'house_photo', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const { name, phone, email, address, package_id } = req.body;
+    
+    // Validate required fields
+    if (!name || !phone || !package_id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nama, No Handphone, dan Paket wajib diisi',
+        details: 'Silakan lengkapi semua field yang bertanda (*)'
+      });
+    }
+    
+    // Validate photos
+    if (!req.files || !req.files.ktp_photo || req.files.ktp_photo.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Foto KTP wajib diupload',
+        details: 'Silakan upload foto KTP Anda'
+      });
+    }
+    
+    if (!req.files || !req.files.house_photo || req.files.house_photo.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Foto Rumah Tampak Depan wajib diupload',
+        details: 'Silakan upload foto rumah tampak depan'
+      });
+    }
+    
+    // Normalize phone
+    const normalizedPhone = normalizePhone(phone);
+    
+    // Check if customer already exists
+    const existingCustomer = await billingManager.getCustomerByPhone(normalizedPhone);
+    if (existingCustomer) {
+      // Delete uploaded files if customer already exists
+      if (req.files.ktp_photo && req.files.ktp_photo[0]) {
+        try { fs.unlinkSync(req.files.ktp_photo[0].path); } catch (e) {}
+      }
+      if (req.files.house_photo && req.files.house_photo[0]) {
+        try { fs.unlinkSync(req.files.house_photo[0].path); } catch (e) {}
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Nomor telepon sudah terdaftar',
+        details: 'Nomor telepon yang Anda masukkan sudah digunakan. Silakan login atau gunakan nomor yang berbeda.'
+      });
+    }
+    
+    // Auto-generate email if empty
+    let finalEmail = email;
+    if (!finalEmail || finalEmail.trim() === '') {
+      // Generate email from name
+      let cleanEmail = name.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '')
+        .substring(0, 30);
+      if (!cleanEmail) cleanEmail = 'user';
+      finalEmail = cleanEmail + '@gmail.com';
+    }
+    
+    // Get photo paths (relative to public folder)
+    const ktpPhotoPath = req.files.ktp_photo[0].path.replace(path.join(__dirname, '../public'), '').replace(/\\/g, '/');
+    const housePhotoPath = req.files.house_photo[0].path.replace(path.join(__dirname, '../public'), '').replace(/\\/g, '/');
+    
+    // Prepare customer data (system will auto-generate username, customer_id, etc.)
+    // Status 'register' - akan diubah menjadi 'active' setelah admin accept
+    const customerData = {
+      name: name.trim(),
+      phone: normalizedPhone,
+      email: finalEmail.trim(),
+      address: address ? address.trim() : null,
+      package_id: parseInt(package_id),
+      status: 'register', // Status register - menunggu accept dari admin
+      auto_suspension: 1,
+      billing_day: 15,
+      renewal_type: 'renewal',
+      ktp_photo_path: ktpPhotoPath,
+      house_photo_path: housePhotoPath
+    };
+    
+    // Create customer
+    let result;
+    try {
+      result = await billingManager.createCustomer(customerData);
+    } catch (createError) {
+      console.error('Error creating customer:', createError);
+      
+      // Delete uploaded files on error
+      if (req.files) {
+        if (req.files.ktp_photo && req.files.ktp_photo[0]) {
+          try { fs.unlinkSync(req.files.ktp_photo[0].path); } catch (e) {}
+        }
+        if (req.files.house_photo && req.files.house_photo[0]) {
+          try { fs.unlinkSync(req.files.house_photo[0].path); } catch (e) {}
+        }
+      }
+      
+      // Handle specific database errors
+      let errorMessage = 'Gagal mendaftarkan pelanggan';
+      let errorDetails = '';
+      
+      if (createError.message && createError.message.includes('UNIQUE constraint failed')) {
+        if (createError.message.includes('phone')) {
+          errorMessage = 'Nomor telepon sudah terdaftar';
+          errorDetails = 'Nomor telepon yang Anda masukkan sudah digunakan. Silakan login atau gunakan nomor yang berbeda.';
+        } else if (createError.message.includes('customer_id')) {
+          errorMessage = 'Terjadi kesalahan sistem';
+          errorDetails = 'ID Pelanggan sudah digunakan. Silakan coba lagi.';
+        } else {
+          errorMessage = 'Data duplikat terdeteksi';
+          errorDetails = 'Data yang Anda masukkan sudah ada dalam sistem.';
+        }
+      } else if (createError.message && createError.message.includes('FOREIGN KEY constraint failed')) {
+        errorMessage = 'Paket tidak valid';
+        errorDetails = 'Paket yang dipilih tidak ditemukan. Silakan pilih paket yang tersedia.';
+      } else {
+        errorDetails = createError.message || 'Silakan coba lagi atau hubungi administrator.';
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: errorMessage,
+        details: errorDetails
+      });
+    }
+    
+    // Get full customer data with package info
+    let newCustomer;
+    try {
+      newCustomer = await billingManager.getCustomerById(result.id);
+    } catch (getError) {
+      console.error('Error getting customer after creation:', getError);
+      // Customer sudah dibuat, tapi error saat mengambil data
+      // Return success dengan data minimal
+      return res.json({
+        success: true,
+        message: 'Registrasi berhasil! Akun Anda telah dibuat.',
+        customer_id: result.customer_id || null,
+        customer: {
+          id: result.id,
+          name: customerData.name,
+          phone: customerData.phone,
+          email: customerData.email
+        }
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Registrasi berhasil! Akun Anda telah dibuat.',
+      customer_id: newCustomer.customer_id,
+      customer: {
+        id: newCustomer.id,
+        name: newCustomer.name,
+        phone: newCustomer.phone,
+        email: newCustomer.email
+      }
+    });
+  } catch (error) {
+    console.error('Error registering customer:', error);
+    
+    // Delete uploaded files on error
+    if (req.files) {
+      if (req.files.ktp_photo && req.files.ktp_photo[0]) {
+        try { fs.unlinkSync(req.files.ktp_photo[0].path); } catch (e) {}
+      }
+      if (req.files.house_photo && req.files.house_photo[0]) {
+        try { fs.unlinkSync(req.files.house_photo[0].path); } catch (e) {}
+      }
+    }
+    
+    // Handle specific errors
+    let errorMessage = 'Gagal mendaftarkan pelanggan';
+    let errorDetails = '';
+    
+    if (error.message.includes('UNIQUE constraint failed')) {
+      if (error.message.includes('phone')) {
+        errorMessage = 'Nomor telepon sudah terdaftar';
+        errorDetails = 'Nomor telepon yang Anda masukkan sudah digunakan. Silakan login atau gunakan nomor yang berbeda.';
+      } else if (error.message.includes('username')) {
+        errorMessage = 'Username sudah digunakan';
+        errorDetails = 'Terjadi konflik username. Silakan coba lagi.';
+      } else {
+        errorMessage = 'Data duplikat terdeteksi';
+        errorDetails = 'Data yang Anda masukkan sudah ada dalam sistem.';
+      }
+    } else if (error.message.includes('FOREIGN KEY constraint failed')) {
+      errorMessage = 'Paket tidak valid';
+      errorDetails = 'Paket yang dipilih tidak ditemukan. Silakan pilih paket yang tersedia.';
+    } else if (error.message.includes('Hanya file gambar')) {
+      errorMessage = 'Format file tidak valid';
+      errorDetails = error.message;
+    } else if (error.message.includes('File too large')) {
+      errorMessage = 'Ukuran file terlalu besar';
+      errorDetails = 'Ukuran file maksimal 20MB. Silakan kompres gambar atau gunakan file yang lebih kecil.';
+    } else {
+      errorDetails = error.message || 'Silakan coba lagi atau hubungi administrator.';
+    }
+    
+    res.status(400).json({
+      success: false,
+      message: errorMessage,
+      details: errorDetails
+    });
   }
 });
 
@@ -1346,13 +1644,13 @@ router.post('/restart-device', async (req, res) => {
     
     console.log(`✅ Device is online. Last inform: ${lastInform.toLocaleString()}`);
     
-    // Ambil konfigurasi GenieACS dari /admin/genieacs-servers
+    // Ambil konfigurasi GenieACS dari /admin/routers
     const serverDetails = await getGenieacsCredentials(genieacsServer);
     if (!serverDetails || !serverDetails.url) {
       console.error('GenieACS server belum dikonfigurasi. Tidak dapat menjalankan restart.');
       return res.status(500).json({
         success: false,
-        message: 'GenieACS belum dikonfigurasi. Tambahkan server di /admin/genieacs-servers.'
+        message: 'GenieACS belum dikonfigurasi. Tambahkan server di /admin/routers.'
       });
     }
     const genieacsUrl = serverDetails.url;

@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>List Voucher - Admin Hotspot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="/css/responsive-admin.css" rel="stylesheet">
+    <style>
+        body { background: #f5f6fa; }
+        .form-label { font-weight: 600; }
+        .sidebar {
+            min-height: 100vh;
+            background: #222e3c;
+            color: #fff;
+            padding-top: 32px;
+        }
+        .sidebar a {
+            color: #fff;
+            text-decoration: none;
+            display: block;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .sidebar a.active, .sidebar a:hover {
+            background: #3b4a5a;
+        }
+        .sidebar .sidebar-header {
+            font-size: 1.3rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            padding: 0 24px 24px 24px;
+        }
+        .main-content {
+            padding: 32px 24px;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        /* Modern Metric Cards Styling - Same as admin/dashboard */
+        .metric-card {
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+            border: none;
+            position: relative;
+            overflow: hidden;
+            background: var(--card-bg-color);
+            color: #ffffff;
+            min-height: auto;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2), 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+        
+        .metric-card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .metric-card-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin: 8px 0;
+            line-height: 1.2;
+        }
+        
+        .metric-card-label {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Card Colors - Gradient Backgrounds */
+        .metric-card-primary {
+            --card-bg-color: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+        
+        .metric-card-success {
+            --card-bg-color: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+        }
+        
+        .metric-card-danger {
+            --card-bg-color: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+            background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+        }
+        
+        .metric-card-info {
+            --card-bg-color: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .metric-card {
+                padding: 16px;
+            }
+            
+            .metric-card-value {
+                font-size: 1.5rem;
+            }
+            
+            .metric-card-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
+        }
+        .table-hover tbody tr:hover {
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+        .badge {
+            font-weight: 500;
+            padding: 0.35em 0.65em;
+        }
+        .bg-purple {
+            background-color: #6f42c1 !important;
+            color: white;
+        }
+        .filter-btn.active {
+            background-color: #0d6efd;
+            color: white;
+            border-color: #0d6efd;
+        }
+        .filter-btn:hover {
+            background-color: #0d6efd;
+            color: white;
+            border-color: #0d6efd;
+        }
+        /* Sembunyikan lengthMenu di bagian bawah tabel */
+        .dataTables_wrapper .dataTables_length:last-of-type {
+            display: none !important;
+        }
+        /* Pastikan hanya satu lengthMenu yang terlihat di bagian atas */
+        .dataTables_wrapper > .row:first-child .dataTables_length {
+            display: block !important;
+        }
+        .dataTables_wrapper > .row:last-child .dataTables_length {
+            display: none !important;
+        }
+        /* Alternatif: sembunyikan semua lengthMenu kecuali yang pertama */
+        .dataTables_wrapper .dataTables_length ~ .dataTables_length {
+            display: none !important;
+        }
+    </style>
+</head>
+<body data-company-header="<%= company_header || 'Nama Hotspot' %>" data-admin-kontak="<%= adminKontak || 'Kontak Admin' %>">
+<div class="container-fluid">
+    <div class="row">
+        <!-- Include Responsive Admin Sidebar -->
+        <%- include('partials/admin-responsive-sidebar', { page: 'list-voucher', settings: settings }) %>
+        
+        <main class="col-md-10 main-content ms-sm-auto">
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0"><i class="bi bi-list-ul me-2"></i>List Voucher</h1>
+                    <a href="/admin/hotspot" class="btn btn-primary">
+                        <i class="bi bi-arrow-left me-2"></i> Kembali ke Hotspot
+                    </a>
+                </div>
+            </div>
+
+            <!-- Notifikasi -->
+            <% if (success) { %>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i> <%= success %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% } %>
+            
+            <% if (error) { %>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i> <%= error %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% } %>
+
+            <!-- Statistik Voucher -->
+            <div class="row mb-4">
+                <div class="col-md-3 mb-3">
+                    <div class="metric-card metric-card-primary">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-people"></i>
+                        </div>
+                        <div class="metric-card-value" id="totalUsers"><%= allUsers ? allUsers.length : 0 %></div>
+                        <div class="metric-card-label">Total User Hotspot</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="metric-card metric-card-success">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-person-check"></i>
+                        </div>
+                        <div class="metric-card-value" id="activeUsers"><%= users ? users.length : 0 %></div>
+                        <div class="metric-card-label">User Aktif</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="metric-card metric-card-danger">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-person-x"></i>
+                        </div>
+                        <div class="metric-card-value" id="offlineUsers"><%= allUsers && users ? (allUsers.length - users.length) : 0 %></div>
+                        <div class="metric-card-label">User Offline</div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="metric-card metric-card-info">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-list-ul"></i>
+                        </div>
+                        <div class="metric-card-value" id="profileCount"><%= profiles ? profiles.length : 0 %></div>
+                        <div class="metric-card-label">Total Profile</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-12">
+                    <div class="card mb-4 shadow-sm">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="bi bi-people-fill me-2"></i>Daftar User Hotspot</h5>
+                            <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                                <i class="bi bi-plus-circle me-1"></i>Tambah User
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="p-3 border-bottom bg-light">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-auto">
+                                        <label for="voucherCategoryFilter" class="form-label mb-0 small text-muted">Filter Voucher</label>
+                                    </div>
+                                    <div class="col-auto">
+                                        <select class="form-select form-select-sm" id="voucherCategoryFilter">
+                                            <option value="all">Semua Voucher</option>
+                                            <option value="stock">Stok Voucher</option>
+                                            <option value="sold">Voucher Terjual</option>
+                                            <option value="online">Voucher Online</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto ms-auto">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <span class="small text-muted">Terpilih: <span id="selectedCount">0</span></span>
+                                            <button class="btn btn-danger btn-sm" id="bulkDeleteVoucher" disabled>
+                                                <i class="bi bi-trash me-1"></i>Hapus Voucher
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-responsive" style="overflow-x: auto;">
+                                <table class="table table-bordered table-hover" id="hotspotTable" style="width:100%; min-width:1800px;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-center"><input type="checkbox" class="form-check-input" id="selectAllVouchers"></th>
+                                            <th>No</th>
+                                            <th>Username</th>
+                                            <th>Password</th>
+                                            <th>Profile</th>
+                                            <th>Status</th>
+                                            <th>IP Address</th>
+                                            <th>Server Hotspot</th>
+                                            <th>Route NAS</th>
+                                            <th>Start Time</th>
+                                            <th>Last Update</th>
+                                            <th>Up Time</th>
+                                            <th>Validity</th>
+                                            <th>Upload</th>
+                                            <th>Download</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% allUsers.forEach(function(user, i) { %>
+                                        <tr data-status="<%= user.voucher_status || 'BARU' %>" data-category="<%= 
+                                            user.voucher_status === 'BARU' ? 'stok' : 
+                                            (user.voucher_status === 'ONLINE' || user.voucher_status === 'STAND BY' || user.voucher_status === 'EXPIRED' ? 'terjual' : 'all')
+                                        %>" data-username="<%= user.name %>" data-router-id="<%= user.nas_id || '' %>">
+                                            <td class="text-center">
+                                                <input type="checkbox"
+                                                       class="form-check-input voucher-select-checkbox"
+                                                       data-username="<%= user.name %>"
+                                                       data-router-id="<%= user.nas_id || '' %>"
+                                                       data-voucher-status="<%= (user.voucher_status || '').toLowerCase() %>"
+                                                       data-connection-status="<%= (user.voucher_status || '').toLowerCase() %>"
+                                                       data-start-time="<%= user.start_time && user.start_time !== 'N/A' ? user.start_time : '' %>"
+                                                       value="<%= user.name %>">
+                                            </td>
+                                            <td><%= i+1 %></td>
+                                            <td><%= user.name %></td>
+                                            <td><%= user.password %></td>
+                                            <td><%= user.profile %></td>
+                                            <td>
+                                                <% 
+                                                let statusClass = '';
+                                                let statusText = '';
+                                                let statusTitle = '';
+                                                switch(user.voucher_status) {
+                                                    case 'ONLINE':
+                                                        statusClass = 'bg-success';
+                                                        statusText = 'ONLINE';
+                                                        statusTitle = 'Voucher yang aktif';
+                                                        break;
+                                                    case 'STAND BY':
+                                                        statusClass = 'bg-warning';
+                                                        statusText = 'STAND BY';
+                                                        statusTitle = 'Voucher yang sudah dipakai tetapi offline dan masih ada masa pakai (UpTime)';
+                                                        break;
+                                                    case 'EXPIRED':
+                                                        statusClass = 'bg-danger';
+                                                        statusText = 'EXPIRED';
+                                                        statusTitle = 'Voucher yang habis uptime/habis masa aktif';
+                                                        break;
+                                                    case 'BARU':
+                                                    default:
+                                                        statusClass = 'bg-purple';
+                                                        statusText = 'BARU';
+                                                        statusTitle = 'Voucher yang belum digunakan';
+                                                        break;
+                                                }
+                                                %>
+                                                <span class="badge <%= statusClass %>" title="<%= statusTitle %>"><%= statusText %></span>
+                                            </td>
+                                            <td><%= user.ip_address || 'N/A' %></td>
+                                            <td><%= user.server_hotspot || 'N/A' %></td>
+                                            <td><%= user.nas_name || 'N/A' %> (<%= user.nas_ip || 'N/A' %>)</td>
+                                            <td>
+                                                <% 
+                                                // Start Time: Waktu mulai login pertama kali
+                                                // Tampilkan langsung dari backend (sudah diformat)
+                                                let startTimeDisplay = user.start_time || 'N/A';
+                                                %>
+                                                <%= startTimeDisplay %>
+                                            </td>
+                                            <td>
+                                                <% 
+                                                // Last Update: Waktu terakhir logout
+                                                // Tampilkan langsung dari backend (sudah diformat)
+                                                let lastUpdateDisplay = user.last_update || 'N/A';
+                                                %>
+                                                <%= lastUpdateDisplay %>
+                                            </td>
+                                            <td class="uptime-countdown"
+                                                <% if (user.is_active_for_uptime && user.start_time_for_uptime) { %>
+                                                    data-is-active="true"
+                                                    data-start-time="<%= user.start_time_for_uptime %>"
+                                                    data-uptime-used="<%= user.uptime_used_seconds || 0 %>"
+                                                <% } else if (user.uptime_used_seconds !== undefined) { %>
+                                                    data-is-active="false"
+                                                    data-uptime-used="<%= user.uptime_used_seconds || 0 %>"
+                                                <% } %>>
+                                                <% 
+                                                // Up Time: Total waktu yang sudah digunakan
+                                                let upTimeDisplay = '-';
+                                                if (user.up_time && user.up_time !== 'N/A') { 
+                                                    upTimeDisplay = user.up_time;
+                                                }
+                                                %>
+                                                <span class="uptime-text"><%= upTimeDisplay %></span>
+                                            </td>
+                                            <td class="validity-countdown" 
+                                                <% if (user.validity_end_time) { %>
+                                                    data-end-time="<%= user.validity_end_time %>"
+                                                    data-limit-uptime="<%= user['limit-uptime'] || user['limit-uptime-total'] || '' %>"
+                                                <% } %>
+                                                data-start-time="<%= user.start_time && user.start_time !== 'N/A' ? user.start_time : '' %>">
+                                                <% 
+                                                // Validity: Masa aktif dari limit-uptime
+                                                let validityDisplay = 'Unlimited';
+                                                if (user.validity && user.validity !== 'Unlimited' && user.validity !== 'N/A' && user.validity !== '') {
+                                                    validityDisplay = user.validity;
+                                                } else if (user['limit-uptime'] && user['limit-uptime'] !== '') {
+                                                    validityDisplay = user['limit-uptime'];
+                                                }
+                                                %>
+                                                <span class="validity-text"><%= validityDisplay %></span>
+                                            </td>
+                                            <td>
+                                                <% 
+                                                // Upload (bytes_out): Data yang di-upload
+                                                let uploadBytes = 0;
+                                                if (user.bytes_out && user.bytes_out !== '0' && user.bytes_out !== 'N/A') {
+                                                    uploadBytes = typeof user.bytes_out === 'string' ? parseInt(user.bytes_out) || 0 : (user.bytes_out || 0);
+                                                }
+                                                const uploadMB = uploadBytes > 0 ? (uploadBytes / (1024 * 1024)).toFixed(2) : '0.00';
+                                                %>
+                                                <%= uploadMB %> MB
+                                            </td>
+                                            <td>
+                                                <% 
+                                                // Download (bytes_in): Data yang di-download
+                                                let downloadBytes = 0;
+                                                if (user.bytes_in && user.bytes_in !== '0' && user.bytes_in !== 'N/A') {
+                                                    downloadBytes = typeof user.bytes_in === 'string' ? parseInt(user.bytes_in) || 0 : (user.bytes_in || 0);
+                                                }
+                                                const downloadMB = downloadBytes > 0 ? (downloadBytes / (1024 * 1024)).toFixed(2) : '0.00';
+                                                %>
+                                                <%= downloadMB %> MB
+                                            </td>
+                                            <td>
+                                                <button class="btn btn-sm btn-warning edit-user-btn" data-username="<%= user.name %>" data-password="<%= user.password %>" data-profile="<%= user.profile %>" data-router-id="<%= user.nas_id || '' %>"><i class="bi bi-pencil"></i> Edit</button>
+                                                <button class="btn btn-sm btn-danger delete-user-btn" data-username="<%= user.name %>" data-router-id="<%= user.nas_id || '' %>"><i class="bi bi-trash"></i> Hapus</button>
+                                                <% if (user.is_active) { %>
+                                                <button class="btn btn-sm btn-info disconnect-session-btn" data-username="<%= user.name %>"><i class="bi bi-x-circle"></i> Putus</button>
+                                                <% } %>
+                                            </td>
+                                        </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Modal Tambah User -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addUserModalLabel"><i class="bi bi-plus-circle me-2"></i>Tambah User Hotspot</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm" action="/admin/hotspot" method="POST">
+                    <div class="mb-3">
+                        <label for="addRouterId" class="form-label"><i class="bi bi-router me-1"></i>NAS (Router)</label>
+                        <select class="form-select" id="addRouterId" name="router_id" required>
+                            <% if (routers && routers.length > 0) { %>
+                                <% routers.forEach(function(router) { %>
+                                    <option value="<%= router.id %>"><%= router.name %> (<%= router.nas_ip %>)</option>
+                                <% }); %>
+                            <% } else { %>
+                                <option value="">Tidak ada router tersedia</option>
+                            <% } %>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addUsername" class="form-label"><i class="bi bi-person me-1"></i>Username</label>
+                        <input type="text" class="form-control" id="addUsername" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addPassword" class="form-label"><i class="bi bi-key me-1"></i>Password</label>
+                        <input type="text" class="form-control" id="addPassword" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="addProfile" class="form-label"><i class="bi bi-speedometer2 me-1"></i>Profile</label>
+                        <select class="form-select" id="addProfile" name="profile" required>
+                            <option value="">Pilih NAS terlebih dahulu</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Simpan</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Edit User -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="editUserModalLabel"><i class="bi bi-pencil-square me-2"></i>Edit User Hotspot</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm" action="/admin/hotspot/edit" method="POST">
+                    <input type="hidden" id="originalUsername" name="originalUsername">
+                    <div class="mb-3">
+                        <label for="editRouterId" class="form-label"><i class="bi bi-router me-1"></i>NAS (Router)</label>
+                        <select class="form-select" id="editRouterId" name="router_id" required>
+                            <% if (routers && routers.length > 0) { %>
+                                <% routers.forEach(function(router) { %>
+                                    <option value="<%= router.id %>"><%= router.name %> (<%= router.nas_ip %>)</option>
+                                <% }); %>
+                            <% } else { %>
+                                <option value="">Tidak ada router tersedia</option>
+                            <% } %>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editUsername" class="form-label"><i class="bi bi-person me-1"></i>Username</label>
+                        <input type="text" class="form-control" id="editUsername" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editPassword" class="form-label"><i class="bi bi-key me-1"></i>Password</label>
+                        <input type="text" class="form-control" id="editPassword" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editProfile" class="form-label"><i class="bi bi-speedometer2 me-1"></i>Profile</label>
+                        <select class="form-select" id="editProfile" name="profile" required>
+                            <option value="">Pilih NAS terlebih dahulu</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-warning"><i class="bi bi-save me-1"></i>Simpan Perubahan</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Konfirmasi Disconnect User -->
+<div class="modal fade" id="disconnectUserModal" tabindex="-1" aria-labelledby="disconnectUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="disconnectUserModalLabel">
+                    <i class="bi bi-power me-2"></i>Konfirmasi Putus Koneksi
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0 me-3">
+                        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 2rem;"></i>
+                    </div>
+                    <div>
+                        <p class="mb-1">Apakah Anda yakin ingin memutus koneksi user:</p>
+                        <h5 class="mb-0"><span id="disconnectUsername" class="fw-bold"></span>?</h5>
+                        <p class="text-muted small mt-2 mb-0">User akan langsung terputus dari jaringan hotspot.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-1"></i>Batal
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDisconnect">
+                    <i class="bi bi-power me-1"></i>Putus Koneksi
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css">
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+<!-- Script adminHotspotTable.js di-comment karena sudah di-inline di bawah -->
+<!-- <script src="/js/adminHotspotTable.js"></script> -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    // Initialize DataTable
+    if ($.fn.DataTable.isDataTable('#hotspotTable')) {
+        $('#hotspotTable').DataTable().destroy();
+    }
+    
+    const statusPriority = {
+        'ONLINE': 4,
+        'STAND BY': 3,
+        'BARU': 2,
+        'EXPIRED': 1
+    };
+
+    // Definisikan custom order untuk status voucher
+    if ($.fn.dataTable && $.fn.dataTable.ext) {
+        $.fn.dataTable.ext.order['status-voucher'] = function(settings, col) {
+            return this.api().column(col, { order: 'index' }).nodes().map(function(td) {
+                const text = $(td).text().trim();
+                return statusPriority[text] !== undefined ? statusPriority[text] : 0;
+            });
+        };
+    }
+
+    let table = $('#hotspotTable').DataTable({
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        paging: true,
+        pagingType: 'full_numbers',
+        stateSave: false,
+        scrollX: true,
+        scrollCollapse: true,
+        autoWidth: false,
+        dom: 'lfrtip',
+        order: [[5, 'desc'], [1, 'asc']],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/id.json',
+            paginate: {
+                previous: '<i class="bi bi-chevron-left"></i>',
+                next: '<i class="bi bi-chevron-right"></i>',
+                first: '<<',
+                last: '>>'
+            },
+            info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ user',
+            lengthMenu: 'Tampilkan _MENU_ user',
+            search: 'Cari:',
+            zeroRecords: 'Tidak ada user ditemukan',
+            infoEmpty: 'Menampilkan 0 sampai 0 dari 0 user',
+            infoFiltered: '(difilter dari _MAX_ total user)'
+        },
+        columnDefs: [
+            { targets: 0, orderable: false, width: '4%', className: 'text-center align-middle' },
+            { targets: 1, width: '4%', className: 'text-center text-nowrap' },
+            { targets: 2, width: '12%', className: 'text-nowrap' },
+            { targets: 3, width: '10%', className: 'text-nowrap' },
+            { targets: 4, width: '10%', className: 'text-nowrap' },
+            { targets: 5, orderDataType: 'status-voucher', width: '10%', className: 'text-center text-nowrap' },
+            { targets: 6, width: '10%', className: 'text-nowrap' },
+            { targets: 7, width: '10%', className: 'text-nowrap' },
+            { targets: 8, width: '12%', className: 'text-nowrap' },
+            { targets: 9, width: '10%', className: 'text-nowrap' },
+            { targets: 10, width: '10%', className: 'text-nowrap' },
+            { targets: 11, width: '10%', className: 'text-nowrap' },
+            { targets: 12, width: '8%', className: 'text-nowrap text-end' },
+            { targets: 13, width: '8%', className: 'text-nowrap text-end' },
+            { targets: 14, width: '8%', className: 'text-nowrap text-end' },
+            { targets: -1, orderable: false, width: '16%', className: 'text-center text-nowrap' }
+        ]
+    });
+
+    const statusColumnIndex = 5;
+
+    function extractStatus(cellHtml) {
+        return $('<div>').html(cellHtml).text().trim().toLowerCase();
+    }
+
+    function updateOnlineCount() {
+        let count = 0;
+        table.rows({ search: 'applied' }).every(function() {
+            const rowData = this.data();
+            const statusText = extractStatus(rowData[statusColumnIndex]);
+            if (statusText === 'online') count++;
+        });
+        $('#activeUsers').text(count);
+    }
+
+    function refreshSelectionState() {
+        const $checkboxes = $('.voucher-select-checkbox:visible');
+        const $selected = $checkboxes.filter(':checked');
+        const total = $checkboxes.length;
+        const selectedCount = $selected.length;
+        
+        // Update counter
+        const selectedCountEl = $('#selectedCount');
+        if (selectedCountEl.length) {
+            selectedCountEl.text(selectedCount);
+        }
+        
+        // Update tombol delete
+        const bulkDeleteBtn = $('#bulkDeleteVoucher');
+        if (bulkDeleteBtn.length) {
+            bulkDeleteBtn.prop('disabled', selectedCount === 0);
+        }
+
+        // Update select all checkbox
+        const selectAll = $('#selectAllVouchers').get(0);
+        if (selectAll) {
+            if (selectedCount === 0) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            } else if (selectedCount === total && total > 0) {
+                selectAll.checked = true;
+                selectAll.indeterminate = false;
+            } else {
+                selectAll.checked = false;
+                selectAll.indeterminate = true;
+            }
+        }
+    }
+
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+        if (settings.nTable !== table.table().node()) return true;
+        const filterValue = $('#voucherCategoryFilter').val() || 'all';
+        if (filterValue === 'all') return true;
+        const rowNode = table.row(dataIndex).node();
+        if (!rowNode) return true;
+        const $row = $(rowNode);
+        const status = ($row.data('status') || '').toString().toUpperCase(); // Gunakan data-status dari tr
+        const voucherStatus = ($row.data('voucher-status') || '').toString().toLowerCase();
+        const connectionStatus = ($row.data('connection-status') || '').toString().toLowerCase();
+        const startTime = ($row.data('start-time') || '').toString().trim();
+
+        // Filter berdasarkan kategori:
+        // BARU (Ungu) - Voucher yang belum digunakan
+        // EXPIRED (Merah) - Voucher yang habis uptime/habis masa aktif
+        // STAND BY (Kuning) - Voucher yang sudah dipakai tetapi offline dan masih ada masa pakai
+        // ONLINE (Hijau) - Voucher yang aktif
+        
+        if (filterValue === 'stock' || filterValue === 'stok') {
+            // Stok Voucher (BARU)
+            return status === 'BARU';
+        } else if (filterValue === 'sold' || filterValue === 'terjual') {
+            // Voucher Terjual (EXPIRED/STAND BY/ONLINE)
+            return status === 'ONLINE' || status === 'STAND BY' || status === 'EXPIRED';
+        } else if (filterValue === 'online') {
+            // Voucher Online (ONLINE)
+            return status === 'ONLINE';
+        } else if (filterValue === 'baru') {
+            // BARU (Ungu) - Voucher yang belum digunakan
+            return status === 'BARU';
+        } else if (filterValue === 'expired') {
+            // EXPIRED (Merah) - Voucher yang habis uptime/habis masa aktif
+            return status === 'EXPIRED';
+        } else if (filterValue === 'standby') {
+            // STAND BY (Kuning) - Voucher yang sudah dipakai tetapi offline dan masih ada masa pakai
+            return status === 'STAND BY';
+        }
+        return true;
+    });
+
+    // Filter Voucher Handler - menggunakan event delegation
+    $(document).on('change', '#voucherCategoryFilter', function() {
+        table.draw();
+        refreshSelectionState();
+    });
+
+    // Load profiles when router is selected (Add User Modal)
+    $('#addRouterId').on('change', function() {
+        const routerId = $(this).val();
+        const profileSelect = $('#addProfile');
+        
+        if (!routerId) {
+            profileSelect.html('<option value="">Pilih NAS terlebih dahulu</option>');
+            return;
+        }
+        
+        profileSelect.html('<option value="">Memuat profile...</option>');
+        
+        $.get(`/admin/mikrotik/hotspot-profiles/api?router_id=${routerId}`, function(data) {
+            if (data.success && data.profiles && data.profiles.length > 0) {
+                let options = '<option value="">Pilih Profile</option>';
+                data.profiles.forEach(function(profile) {
+                    options += `<option value="${profile.name}">${profile.name}</option>`;
+                });
+                profileSelect.html(options);
+            } else {
+                profileSelect.html('<option value="">Tidak ada profile tersedia</option>');
+            }
+        }).fail(function() {
+            profileSelect.html('<option value="">Gagal memuat profile</option>');
+        });
+    });
+
+    // Load profiles when router is selected (Edit User Modal)
+    $('#editRouterId').on('change', function() {
+        const routerId = $(this).val();
+        const profileSelect = $('#editProfile');
+        
+        if (!routerId) {
+            profileSelect.html('<option value="">Pilih NAS terlebih dahulu</option>');
+            return;
+        }
+        
+        profileSelect.html('<option value="">Memuat profile...</option>');
+        
+        $.get(`/admin/mikrotik/hotspot-profiles/api?router_id=${routerId}`, function(data) {
+            if (data.success && data.profiles && data.profiles.length > 0) {
+                let options = '<option value="">Pilih Profile</option>';
+                data.profiles.forEach(function(profile) {
+                    options += `<option value="${profile.name}">${profile.name}</option>`;
+                });
+                profileSelect.html(options);
+            } else {
+                profileSelect.html('<option value="">Tidak ada profile tersedia</option>');
+            }
+        }).fail(function() {
+            profileSelect.html('<option value="">Gagal memuat profile</option>');
+        });
+    });
+
+    // Edit user button handler
+    $(document).on('click', '.edit-user-btn', function() {
+        const username = $(this).data('username');
+        const password = $(this).data('password');
+        const profile = $(this).data('profile');
+        const routerId = $(this).data('router-id');
+        
+        $('#originalUsername').val(username);
+        $('#editUsername').val(username);
+        $('#editPassword').val(password);
+        $('#editRouterId').val(routerId).trigger('change');
+        
+        // Wait for profiles to load, then set the profile
+        setTimeout(function() {
+            $('#editProfile').val(profile);
+        }, 500);
+        
+        $('#editUserModal').modal('show');
+    });
+
+    // Delete user button handler
+    $(document).on('click', '.delete-user-btn', function() {
+        const username = $(this).data('username');
+        const routerId = $(this).data('router-id');
+        
+        if (confirm(`Yakin ingin menghapus user "${username}"?`)) {
+            const form = $('<form>', {
+                'method': 'POST',
+                'action': '/admin/hotspot/delete'
+            });
+            
+            form.append($('<input>', {
+                'type': 'hidden',
+                'name': 'username',
+                'value': username
+            }));
+            
+            if (routerId) {
+                form.append($('<input>', {
+                    'type': 'hidden',
+                    'name': 'router_id',
+                    'value': routerId
+                }));
+            }
+            
+            $('body').append(form);
+            form.submit();
+        }
+    });
+
+    // Disconnect user button handler
+    $(document).on('click', '.disconnect-session-btn', function() {
+        const username = $(this).data('username');
+        $('#disconnectUsername').text(username);
+        
+        $('#confirmDisconnect').off('click').on('click', function() {
+            $.ajax({
+                url: '/admin/hotspot/disconnect-user',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ username: username }),
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert('Gagal memutus koneksi: ' + (response.message || 'Unknown error'));
+                    }
+                },
+                error: function() {
+                    alert('Terjadi kesalahan saat memutus koneksi');
+                }
+            });
+            
+            $('#disconnectUserModal').modal('hide');
+        });
+        
+        $('#disconnectUserModal').modal('show');
+    });
+
+    // Select All Checkbox Handler - menggunakan event delegation
+    $(document).on('change', '#selectAllVouchers', function() {
+        const isChecked = $(this).is(':checked');
+        // Pilih semua checkbox yang terlihat (termasuk yang di halaman lain jika ada)
+        $('.voucher-select-checkbox').prop('checked', isChecked);
+        refreshSelectionState();
+    });
+
+    // Individual Checkbox Handler - menggunakan event delegation
+    $(document).on('change', '.voucher-select-checkbox', function() {
+        refreshSelectionState();
+    });
+
+    // Bulk Delete Handler - menggunakan event delegation
+    $(document).on('click', '#bulkDeleteVoucher', function() {
+        const selected = [];
+        $('.voucher-select-checkbox:checked').each(function() {
+            selected.push({
+                username: $(this).data('username'),
+                router_id: $(this).data('router-id') || ''
+            });
+        });
+        if (selected.length === 0) {
+            alert('Pilih minimal satu voucher yang akan dihapus.');
+            return;
+        }
+        if (!confirm('Yakin hapus ' + selected.length + ' voucher?')) {
+            return;
+        }
+        $.ajax({
+            url: '/admin/hotspot/delete-multiple',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ vouchers: selected }),
+            success: function(response) {
+                const message = (response && response.message) ? response.message : (selected.length + ' voucher berhasil dihapus.');
+                alert(message);
+                setTimeout(() => window.location.reload(), 1200);
+            },
+            error: function(xhr) {
+                let msg = 'Gagal menghapus voucher.';
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                alert(msg);
+            }
+        });
+    });
+
+    $('#hotspotTable_filter input').on('input', function() {
+        setTimeout(function() {
+            table.order([[statusColumnIndex, 'desc'], [1, 'asc']]).draw();
+        }, 120);
+    });
+
+    table.on('draw', function() {
+        updateOnlineCount();
+        refreshSelectionState();
+    });
+
+    // Inisialisasi setelah DataTables selesai
+    setTimeout(function() {
+        updateOnlineCount();
+        refreshSelectionState();
+        initValidityCountdown();
+    }, 300);
+
+    // Fungsi untuk format countdown validity
+    function formatValidityCountdown(remainingSeconds) {
+        if (remainingSeconds <= 0) {
+            return '0d 00:00:00';
+        }
+        
+        const days = Math.floor(remainingSeconds / 86400);
+        const hours = Math.floor((remainingSeconds % 86400) / 3600);
+        const minutes = Math.floor((remainingSeconds % 3600) / 60);
+        const secs = remainingSeconds % 60;
+        
+        if (days > 0) {
+            return `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        } else {
+            return `0d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+    }
+
+    // Fungsi untuk update countdown validity secara real-time
+    function updateValidityCountdown() {
+        $('.validity-countdown[data-end-time]').each(function() {
+            const $cell = $(this);
+            const endTimeStr = $cell.data('end-time');
+            
+            if (!endTimeStr) return;
+            
+            const endTime = new Date(endTimeStr);
+            const now = new Date();
+            const remainingSeconds = Math.floor((endTime.getTime() - now.getTime()) / 1000);
+            
+            if (remainingSeconds <= 0) {
+                $cell.find('.validity-text').text('0d 00:00:00');
+                $cell.find('.validity-text').css('color', '#dc3545'); // Merah jika habis
+            } else {
+                const countdown = formatValidityCountdown(remainingSeconds);
+                $cell.find('.validity-text').text(countdown);
+                
+                // Warna berdasarkan sisa waktu
+                if (remainingSeconds < 3600) { // Kurang dari 1 jam
+                    $cell.find('.validity-text').css('color', '#dc3545'); // Merah
+                } else if (remainingSeconds < 86400) { // Kurang dari 1 hari
+                    $cell.find('.validity-text').css('color', '#ffc107'); // Kuning
+                } else {
+                    $cell.find('.validity-text').css('color', ''); // Default
+                }
+            }
+        });
+    }
+
+    // Inisialisasi countdown validity
+    function initValidityCountdown() {
+        // Update pertama kali
+        updateValidityCountdown();
+        
+        // Update setiap detik
+        setInterval(function() {
+            updateValidityCountdown();
+        }, 1000);
+        
+        // Update juga saat tabel di-redraw (pagination, filter, dll)
+        table.on('draw', function() {
+            setTimeout(updateValidityCountdown, 100);
+        });
+    }
+
+    // Fungsi untuk format uptime (HH:mm:ss)
+    function formatUptime(seconds) {
+        if (!seconds || seconds < 0) return '00:00:00';
+        
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+        
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    // Fungsi untuk update uptime secara real-time
+    function updateUptimeCountdown() {
+        $('.uptime-countdown').each(function() {
+            const $cell = $(this);
+            const isActive = $cell.data('is-active') === true;
+            const startTimeStr = $cell.data('start-time');
+            const uptimeUsed = parseInt($cell.data('uptime-used') || 0);
+            
+            if (isActive && startTimeStr) {
+                // Untuk user aktif, hitung uptime real-time dari waktu login
+                const startTime = new Date(startTimeStr);
+                const now = new Date();
+                const currentUptimeSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+                const totalUptimeSeconds = currentUptimeSeconds + uptimeUsed;
+                
+                const uptimeDisplay = formatUptime(totalUptimeSeconds);
+                $cell.find('.uptime-text').text(uptimeDisplay);
+            } else if (uptimeUsed > 0) {
+                // Untuk user offline, tampilkan uptime yang sudah digunakan (statis)
+                const uptimeDisplay = formatUptime(uptimeUsed);
+                $cell.find('.uptime-text').text(uptimeDisplay);
+            } else {
+                // Jika tidak ada data, tampilkan default
+                $cell.find('.uptime-text').text('00:00:00');
+            }
+        });
+    }
+
+    // Inisialisasi countdown uptime
+    function initUptimeCountdown() {
+        // Update pertama kali
+        updateUptimeCountdown();
+        
+        // Update setiap detik
+        setInterval(function() {
+            updateUptimeCountdown();
+        }, 1000);
+        
+        // Update juga saat tabel di-redraw (pagination, filter, dll)
+        table.on('draw', function() {
+            setTimeout(updateUptimeCountdown, 100);
+        });
+    }
+
+    // Inisialisasi setelah DataTables selesai
+    setTimeout(function() {
+        updateOnlineCount();
+        refreshSelectionState();
+        initValidityCountdown();
+        initUptimeCountdown();
+    }, 300);
+
+});
+</script>
+
+</body>
+</html>
+

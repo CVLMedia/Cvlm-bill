@@ -1,7 +1,13 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const router = express.Router();
+const sqlite3 = require('sqlite3').verbose();
 const { getSetting } = require('../config/settingsManager');
 const { validateConfiguration, getValidationSummary, checkForDefaultSettings } = require('../config/configValidator');
+
+// Import logActivity from utils
+const { logActivity } = require('../utils/activityLogger');
 
 // Cache untuk admin credentials (optional, untuk performance)
 let adminCredentials = null;
@@ -35,8 +41,51 @@ function adminAuth(req, res, next) {
 }
 
 // GET: Halaman login admin
-router.get('/login', (req, res) => {
-  res.render('adminLogin', { error: null });
+router.get('/login', async (req, res) => {
+  try {
+    // Check license status untuk tampilkan warning jika trial habis
+    let licenseStatus = { status: 'valid' };
+    let licenseExpired = false;
+    
+    try {
+      // Cek apakah file licenseManager ada sebelum require
+      const licenseManagerPath = path.join(__dirname, '../config/licenseManager.js');
+      
+      if (fs.existsSync(licenseManagerPath)) {
+        const { checkLicenseStatus } = require('../config/licenseManager');
+        licenseStatus = await checkLicenseStatus();
+        licenseExpired = licenseStatus.status === 'expired';
+      } else {
+        // File tidak ada, gunakan default (valid)
+        console.log('License manager not found, using default valid status');
+      }
+    } catch (error) {
+      // License manager mungkin tidak ada atau error, abaikan error
+      console.warn('Warning: Could not check license status (license manager may not be available):', error.message);
+      // Gunakan default valid status
+      licenseStatus = { status: 'valid' };
+      licenseExpired = false;
+    }
+    
+    // Get logo and company info for login page
+    const logoFilename = getSetting('logo_filename', 'logo.png');
+    const companyHeader = getSetting('company_header', 'Billing System');
+    
+    res.render('adminLogin', { 
+      error: null,
+      licenseExpired: licenseExpired,
+      licenseStatus: licenseStatus,
+      logoFilename: logoFilename,
+      companyHeader: companyHeader
+    });
+  } catch (error) {
+    console.error('Error loading admin login page:', error);
+    res.render('adminLogin', { 
+      error: null,
+      logoFilename: getSetting('logo_filename', 'logo.png'),
+      companyHeader: getSetting('company_header', 'Billing System')
+    });
+  }
 });
 
 // Test route untuk debugging
@@ -67,6 +116,17 @@ router.post('/login', async (req, res) => {
     if (username === credentials.username && password === credentials.password) {
       req.session.isAdmin = true;
       req.session.adminUser = username;
+      req.session.admin = { username: username }; // Set untuk kompatibilitas dengan logActivity
+      
+      // Log activity
+      logActivity(
+        username,
+        'admin',
+        'login',
+        'Admin login ke sistem',
+        req.ip,
+        req.get('User-Agent')
+      ).catch(err => console.error('Failed to log login activity:', err));
       
       // Validasi konfigurasi sistem setelah login berhasil (non-blocking)
       // Jalankan validasi secara asinkron tanpa menghambat login
@@ -140,6 +200,17 @@ router.get('/', (req, res) => {
 
 // GET: Logout admin
 router.get('/logout', (req, res) => {
+  // Log activity before destroying session
+  const username = req.session?.admin?.username || req.session?.adminUser || 'admin';
+  logActivity(
+    username,
+    'admin',
+    'logout',
+    'Admin logout dari sistem',
+    req.ip,
+    req.get('User-Agent')
+  ).catch(err => console.error('Failed to log logout activity:', err));
+  
   req.session.destroy(() => {
     res.redirect('/admin/login');
   });

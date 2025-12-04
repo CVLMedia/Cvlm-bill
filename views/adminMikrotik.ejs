@@ -23,6 +23,148 @@
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
+
+        /* Modern Notification Modal - Neumorphic Style */
+        .notification-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none; /* default hidden, tidak blok UI */
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+        
+        .notification-overlay.show {
+            display: flex;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        .notification-card {
+            background: linear-gradient(145deg, #ffffff, #f0f0f0);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 
+                20px 20px 60px #d0d0d0,
+                -20px -20px 60px #ffffff,
+                inset 0 0 0 rgba(255, 255, 255, 0),
+                inset 0 0 0 rgba(0, 0, 0, 0);
+            text-align: center;
+            transform: scale(0.8);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+        
+        .notification-overlay.show .notification-card {
+            transform: scale(1);
+        }
+        
+        .notification-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            color: white;
+            position: relative;
+            box-shadow: 
+                8px 8px 16px rgba(0, 0, 0, 0.2),
+                -8px -8px 16px rgba(255, 255, 255, 0.3);
+        }
+        
+        .notification-icon.success {
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+        }
+        
+        .notification-icon.error {
+            background: linear-gradient(145deg, #f44336, #d32f2f);
+        }
+        
+        .notification-icon.warning {
+            background: linear-gradient(145deg, #ff9800, #f57c00);
+        }
+        
+        .notification-icon.info {
+            background: linear-gradient(145deg, #2196F3, #1976D2);
+        }
+        
+        .notification-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 12px;
+        }
+        
+        .notification-message {
+            font-size: 16px;
+            color: #5a6c7d;
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        
+        .notification-button {
+            background: linear-gradient(145deg, #2196F3, #1976D2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 32px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 
+                6px 6px 12px rgba(0, 0, 0, 0.15),
+                -6px -6px 12px rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        
+        .notification-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                8px 8px 16px rgba(0, 0, 0, 0.2),
+                -8px -8px 16px rgba(255, 255, 255, 0.15);
+        }
+        
+        .notification-button:active {
+            transform: translateY(0);
+            box-shadow: 
+                4px 4px 8px rgba(0, 0, 0, 0.1),
+                -4px -4px 8px rgba(255, 255, 255, 0.1);
+        }
+        
+        .notification-button.success {
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+        }
+        
+        .notification-button.error {
+            background: linear-gradient(145deg, #f44336, #d32f2f);
+        }
+        
+        .notification-button.warning {
+            background: linear-gradient(145deg, #ff9800, #f57c00);
+        }
+        
+        .notification-button-secondary {
+            background: linear-gradient(145deg, #6c757d, #5a6268) !important;
+        }
+        
+        #notificationButtons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
         .dataTables_wrapper .dataTables_filter input {
             border-radius: 6px;
             border: 1px solid #ccc;
@@ -43,22 +185,92 @@
                 font-size: 0.75rem;
             }
         }
-        .card.bg-primary, .card.bg-success, .card.bg-danger, .card.bg-info {
+        /* Modern Metric Cards Styling - Same as admin/dashboard */
+        .metric-card {
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
             border: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            transition: transform 0.2s ease-in-out;
+            position: relative;
+            overflow: hidden;
+            background: var(--card-bg-color);
+            color: #ffffff;
+            min-height: auto;
         }
-        .card.bg-primary:hover, .card.bg-success:hover, .card.bg-danger:hover, .card.bg-info:hover {
-            transform: translateY(-2px);
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2), 0 4px 6px rgba(0, 0, 0, 0.15);
         }
-        .card-title {
-            font-size: 2rem;
+        
+        .metric-card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .metric-card-value {
+            font-size: 1.75rem;
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            color: #ffffff;
+            margin: 8px 0;
+            line-height: 1.2;
         }
-        .card-text {
-            font-size: 0.9rem;
-            margin-bottom: 0;
+        
+        .metric-card-label {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Card Colors - Gradient Backgrounds */
+        .metric-card-primary {
+            --card-bg-color: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+        
+        .metric-card-success {
+            --card-bg-color: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+        }
+        
+        .metric-card-danger {
+            --card-bg-color: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+            background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+        }
+        
+        .metric-card-info {
+            --card-bg-color: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .metric-card {
+                padding: 16px;
+            }
+            
+            .metric-card-value {
+                font-size: 1.5rem;
+            }
+            
+            .metric-card-icon {
+                width: 40px;
+                height: 40px;
+                font-size: 20px;
+            }
         }
         .spin {
             animation: spin 1s linear infinite;
@@ -104,35 +316,39 @@
             <!-- Statistik User PPPoE -->
             <div class="row mb-4">
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body text-center">
-                            <h5 class="card-title" id="totalUsers">-</h5>
-                            <p class="card-text">Total User PPPoE</p>
+                    <div class="metric-card metric-card-primary">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-people"></i>
                         </div>
+                        <div class="metric-card-value" id="totalUsers">-</div>
+                        <div class="metric-card-label">Total User PPPoE</div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-success text-white">
-                        <div class="card-body text-center">
-                            <h5 class="card-title" id="activeUsers">-</h5>
-                            <p class="card-text">User Aktif</p>
+                    <div class="metric-card metric-card-success">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-person-check"></i>
                         </div>
+                        <div class="metric-card-value" id="activeUsers">-</div>
+                        <div class="metric-card-label">User Aktif</div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-danger text-white">
-                        <div class="card-body text-center">
-                            <h5 class="card-title" id="offlineUsers">-</h5>
-                            <p class="card-text">User Offline</p>
+                    <div class="metric-card metric-card-danger">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-person-x"></i>
                         </div>
+                        <div class="metric-card-value" id="offlineUsers">-</div>
+                        <div class="metric-card-label">User Offline</div>
                     </div>
                 </div>
                 <div class="col-md-3 mb-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body text-center">
-                            <h5 class="card-title" id="profileCount">-</h5>
-                            <p class="card-text">Total Profile</p>
+                    <div class="metric-card metric-card-info">
+                        <div class="metric-card-icon">
+                            <i class="bi bi-list-ul"></i>
                         </div>
+                        <div class="metric-card-value" id="profileCount">-</div>
+                        <div class="metric-card-label">Total Profile</div>
                     </div>
                 </div>
             </div>
@@ -245,6 +461,21 @@
 </div>
 <!-- Notifikasi -->
 <div id="restartNotif" class="alert d-none position-fixed top-0 end-0 m-4" style="z-index:1055; min-width:300px;"></div>
+
+<!-- Modern Notification Modal -->
+<div id="notificationModal" class="notification-overlay">
+    <div class="notification-card">
+        <div class="notification-icon" id="notificationIcon">
+            <i class="bi" id="notificationIconClass"></i>
+        </div>
+        <div class="notification-title" id="notificationTitle"></div>
+        <div class="notification-message" id="notificationMessage"></div>
+        <div id="notificationButtons">
+            <button class="notification-button" id="notificationButton" onclick="closeNotification()"></button>
+            <button class="notification-button notification-button-secondary" id="notificationButtonCancel" onclick="closeNotification()" style="display: none; margin-left: 10px;"></button>
+        </div>
+    </div>
+</div>
 <!-- Wajib: jQuery & Bootstrap JS agar fitur tombol aktif -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -254,6 +485,121 @@
 <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
 <script src="/js/adminMikrotikTable.js"></script>
 <script>
+// Modern Notification Function
+function showNotification(type, title, message, buttonText, callback) {
+  const modal = document.getElementById('notificationModal');
+  const icon = document.getElementById('notificationIcon');
+  const iconClass = document.getElementById('notificationIconClass');
+  const titleEl = document.getElementById('notificationTitle');
+  const messageEl = document.getElementById('notificationMessage');
+  const button = document.getElementById('notificationButton');
+  const buttonCancel = document.getElementById('notificationButtonCancel');
+
+  // Hide cancel button for simple notifications
+  buttonCancel.style.display = 'none';
+
+  // Set icon
+  icon.className = 'notification-icon ' + type;
+  if (type === 'success') {
+    iconClass.className = 'bi bi-check-circle-fill';
+  } else if (type === 'error') {
+    iconClass.className = 'bi bi-x-circle-fill';
+  } else if (type === 'warning') {
+    iconClass.className = 'bi bi-exclamation-triangle-fill';
+  } else {
+    iconClass.className = 'bi bi-info-circle-fill';
+  }
+
+  // Set content
+  titleEl.textContent = title;
+  messageEl.textContent = message;
+  button.textContent = buttonText;
+  button.className = 'notification-button ' + type;
+
+  // Show modal
+  modal.classList.add('show');
+
+  // Set button click handler
+  button.onclick = function() {
+    closeNotification();
+    if (callback && typeof callback === 'function') {
+      callback();
+    }
+  };
+
+  // Auto close after 5 seconds if no callback
+  if (!callback) {
+    setTimeout(function() {
+      closeNotification();
+    }, 5000);
+  }
+}
+
+// Confirm Notification Function (with 2 buttons)
+function showConfirmNotification(type, title, message, confirmText, cancelText, confirmCallback) {
+  const modal = document.getElementById('notificationModal');
+  const icon = document.getElementById('notificationIcon');
+  const iconClass = document.getElementById('notificationIconClass');
+  const titleEl = document.getElementById('notificationTitle');
+  const messageEl = document.getElementById('notificationMessage');
+  const button = document.getElementById('notificationButton');
+  const buttonCancel = document.getElementById('notificationButtonCancel');
+
+  // Show both buttons for confirm
+  buttonCancel.style.display = 'inline-block';
+
+  // Set icon
+  icon.className = 'notification-icon ' + type;
+  if (type === 'success') {
+    iconClass.className = 'bi bi-check-circle-fill';
+  } else if (type === 'error') {
+    iconClass.className = 'bi bi-x-circle-fill';
+  } else if (type === 'warning') {
+    iconClass.className = 'bi bi-exclamation-triangle-fill';
+  } else {
+    iconClass.className = 'bi bi-info-circle-fill';
+  }
+
+  // Set content
+  titleEl.textContent = title;
+  messageEl.textContent = message;
+  button.textContent = confirmText;
+  button.className = 'notification-button ' + type;
+  buttonCancel.textContent = cancelText;
+
+  // Show modal
+  modal.classList.add('show');
+
+  // Set button click handlers
+  button.onclick = function() {
+    closeNotification();
+    if (confirmCallback && typeof confirmCallback === 'function') {
+      confirmCallback();
+    }
+  };
+
+  buttonCancel.onclick = function() {
+    closeNotification();
+  };
+}
+
+function closeNotification() {
+  const modal = document.getElementById('notificationModal');
+  modal.classList.remove('show');
+}
+
+// Close on overlay click
+document.addEventListener('DOMContentLoaded', function() {
+  const modal = document.getElementById('notificationModal');
+  if (modal) {
+    modal.addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeNotification();
+      }
+    });
+  }
+});
+
 $(function() {
   // Load profiles ke select
   function loadProfiles(selectedProfile) {
@@ -272,7 +618,7 @@ $(function() {
         // Update profile count in statistics card
         $('#profileCount').text(res.profiles.length);
       } else {
-        alert('Gagal ambil daftar profile PPPoE: ' + (res.message || 'Unknown error'));
+        showNotification('error', 'Error!', 'Gagal ambil daftar profile PPPoE: ' + (res.message || 'Unknown error'), 'Try again');
       }
     });
   }
@@ -305,27 +651,30 @@ $(function() {
     const router_id = $('#router_id').val();
     $.post(url, { id, username, password, profile, router_id }, function(res) {
       if(res.success) {
-        alert('User berhasil disimpan!');
-        location.reload();
+        showNotification('success', 'Success!', 'User PPPoE berhasil disimpan!', 'Continue', function() {
+          location.reload();
+        });
       } else {
-        alert('Gagal menyimpan user: ' + (res.message || 'Unknown error'));
+        showNotification('error', 'Error!', 'Gagal menyimpan user: ' + (res.message || 'Unknown error'), 'Try again');
       }
     });
   });
   // Hapus User PPPoE
   $(document).on('click', '.delete-user-btn', function() {
     const username = $(this).data('username');
-    if(confirm('Yakin ingin menghapus user PPPoE "' + username + '"?')) {
-      const id = $(this).data('id');
+    const id = $(this).data('id');
+
+    showConfirmNotification('warning', 'Konfirmasi!', 'Yakin ingin menghapus user PPPoE \"' + username + '\"?', 'Hapus', 'Batal', function() {
       $.post('/admin/mikrotik/delete-user', { id }, function(res) {
         if(res.success) {
-          alert('User berhasil dihapus!');
-          location.reload();
+          showNotification('success', 'Success!', 'User PPPoE berhasil dihapus!', 'Continue', function() {
+            location.reload();
+          });
         } else {
-          alert('Gagal menghapus user: ' + (res.message || 'Unknown error'));
+          showNotification('error', 'Error!', 'Gagal menghapus user: ' + (res.message || 'Unknown error'), 'Try again');
         }
       });
-    }
+    });
   });
   
   // Load profiles on page load to update statistics
@@ -369,7 +718,7 @@ $(function() {
 </script>
 <script>
 // Hamburger & sidebar logic
-const hamburger = document.getElementById('hamburgerBtn');
+        const hamburger = document.getElementById('hamburgerBtn');
 const sidebar = document.getElementById('adminSidebar');
 const overlay = document.getElementById('sidebarOverlay');
 if (hamburger && sidebar && overlay) {
@@ -389,7 +738,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.disconnect-session-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       const username = this.getAttribute('data-username');
-      if (confirm('Yakin ingin memutuskan sesi aktif user ' + username + '?')) {
+      showConfirmNotification('warning', 'Konfirmasi!', 'Yakin ingin memutuskan sesi aktif user ' + username + '?', 'Putuskan', 'Batal', function() {
         fetch('/admin/mikrotik/disconnect-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -406,16 +755,17 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(data => {
           if (data.success) {
-            alert('Sesi user ' + username + ' berhasil diputuskan!');
-            location.reload();
+            showNotification('success', 'Success!', 'Sesi user ' + username + ' berhasil diputuskan!', 'Continue', function() {
+              location.reload();
+            });
           } else {
-            alert('Gagal memutuskan sesi: ' + data.message);
+            showNotification('error', 'Error!', 'Gagal memutuskan sesi: ' + data.message, 'Try again');
           }
         })
         .catch(err => {
-          alert('Terjadi error: ' + err.message);
+          showNotification('error', 'Error!', 'Terjadi error: ' + err.message, 'Try again');
         });
-      }
+      });
     });
   });
 });

@@ -62,9 +62,20 @@ function formatMessageWithHeaderFooter(message, includeHeader = true, includeFoo
 }
 
 // Fungsi untuk mengirim pesan
-async function sendMessage(number, message) {
+async function sendMessage(number, message, useGatewayManager = true) {
     console.log(`📱 Attempting to send WhatsApp message to: ${number}`);
     console.log(`📱 Message preview: ${typeof message === 'string' ? message.substring(0, 100) + '...' : 'Object message'}`);
+    
+    // Try gateway manager first if enabled
+    if (useGatewayManager) {
+        try {
+            const gatewayManager = require('./whatsapp-gateway-manager');
+            const result = await gatewayManager.sendMessage(number, message);
+            return result;
+        } catch (error) {
+            console.error('❌ Error via gateway manager, fallback ke Baileys langsung:', error);
+        }
+    }
     
     if (!sock) {
         console.error('❌ WhatsApp belum terhubung - sock instance is null');

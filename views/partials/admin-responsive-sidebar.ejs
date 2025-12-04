@@ -49,86 +49,189 @@
     </div>
     
     <!-- Navigation Links -->
+    <!-- Dashboard -->
     <a href="/admin/dashboard" class="<%= typeof page !== 'undefined' && page === 'dashboard' ? 'active' : '' %>">
         <i class="bi bi-house"></i> Dashboard
     </a>
+    
+    <!-- Billing & Accounting -->
     <a href="/admin/billing/dashboard" class="<%= typeof page !== 'undefined' && page === 'billing' ? 'active' : '' %>">
-        <i class="bi bi-receipt"></i> Billing
+        <i class="bi bi-receipt"></i> Billing & Accounting
     </a>
-    <a href="/admin/agents" class="<%= typeof page !== 'undefined' && page === 'agents' ? 'active' : '' %>">
-        <i class="bi bi-person-badge-fill"></i> Web Agent
-    </a>
-    <a href="/admin/agent-registrations" class="<%= typeof page !== 'undefined' && page === 'agent-registrations' ? 'active' : '' %>">
-        <i class="bi bi-person-plus"></i> Pendaftaran Agent
-    </a>
-    <a href="/admin/installations" class="<%= typeof page !== 'undefined' && page === 'installations' ? 'active' : '' %>">
-        <i class="bi bi-tools"></i> Installation Jobs
-    </a>
-    <a href="/admin/technicians" class="<%= typeof page !== 'undefined' && page === 'technicians' ? 'active' : '' %>">
-        <i class="bi bi-people-fill"></i> Kelola Teknisi
-    </a>
-    <a href="/admin/cable-network/odp" class="<%= typeof page !== 'undefined' && page === 'cable-network-odp' ? 'active' : '' %>">
-        <i class="bi bi-broadcast"></i> ODP Management
-    </a>
-    <a href="/admin/cable-network/cables" class="<%= typeof page !== 'undefined' && page === 'cable-network-cables' ? 'active' : '' %>">
-        <i class="bi bi-diagram-3"></i> Cable Routes
-    </a>
-    <a href="/admin/cable-network/analytics" class="<%= typeof page !== 'undefined' && page === 'cable-network-analytics' ? 'active' : '' %>">
-        <i class="bi bi-bar-chart-alt-2"></i> Network Analytics
-    </a>
-    <a href="/admin/billing/mapping-new" class="<%= typeof page !== 'undefined' && page === 'mapping-new' ? 'active' : '' %>">
-        <i class="bi bi-map"></i> Network Mapping
-    </a>
-    <a href="/admin/genieacs" class="<%= typeof page !== 'undefined' && page === 'genieacs' ? 'active' : '' %>">
-        <i class="bi bi-hdd-network"></i> GenieACS
-    </a>
-    <a href="/admin/genieacs-servers" class="<%= typeof page !== 'undefined' && page === 'genieacs-servers' ? 'active' : '' %>">
-        <i class="bi bi-server"></i> GenieACS Servers
-    </a>
-    <a href="/admin/mikrotik" class="<%= typeof page !== 'undefined' && page === 'mikrotik' ? 'active' : '' %>">
-        <i class="bi bi-router"></i> PPPoE
-    </a>
-    <a href="/admin/mikrotik/profiles" class="<%= typeof page !== 'undefined' && page === 'mikrotik-profiles' ? 'active' : '' %>">
-        <i class="bi bi-person-badge"></i> Profile PPPoE
-    </a>
-    <a href="/admin/mikrotik/hotspot-profiles" class="<%= typeof page !== 'undefined' && page === 'hotspot-profiles' ? 'active' : '' %>">
-        <i class="bi bi-wifi"></i> Profile Hotspot
-    </a>
-    <a href="/admin/hotspot" class="<%= typeof page !== 'undefined' && page === 'hotspot' ? 'active' : '' %>">
-        <i class="bi bi-wifi"></i> Hotspot
-    </a>
-    <a href="/admin/hotspot/voucher" class="<%= typeof page !== 'undefined' && page === 'voucher' ? 'active' : '' %>">
-        <i class="bi bi-ticket-perforated"></i> Voucher Hotspot
-    </a>
-    <a href="/admin/trouble" class="<%= typeof page !== 'undefined' && page === 'trouble' ? 'active' : '' %>">
-        <i class="bi bi-exclamation-triangle"></i> Trouble Report
-    </a>
-    <a href="/admin/settings" class="<%= typeof page !== 'undefined' && page === 'setting' ? 'active' : '' %>">
-        <i class="bi bi-gear"></i> Setting
-    </a>
-    <a href="/admin/routers" class="<%= typeof page !== 'undefined' && page === 'routers' ? 'active' : '' %>">
-        <i class="bi bi-hdd-network"></i> Mikrotik Setup
-    </a>
-    <a href="/admin/radius"<%= typeof page !== 'undefined' && page === 'routers' ? 'active' : '' %>">
-        <i class="bi bi-hdd-network"></i> Radius/Api Setup
-    </a>
-    <a href="/admin/cache" class="<%= typeof page !== 'undefined' && page === 'cache' ? 'active' : '' %>">
-        <i class="bi bi-database"></i> Cache Management
-    </a>
-    <a href="#" id="restartMikrotikBtn">
-        <i class="bi bi-arrow-repeat"></i> Restart Mikrotik
+    
+    <!-- PPP CONNECTION -->
+    <% const pppPages = ['mikrotik', 'mikrotik-profiles', 'genieacs-monitor']; %>
+    <% const pppExpanded = typeof page !== 'undefined' && pppPages.includes(page); %>
+    <div class="sidebar-label d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse"
+         data-bs-target="#pppConnectionCollapse"
+         aria-expanded="<%= pppExpanded ? 'true' : 'false' %>"
+         aria-controls="pppConnectionCollapse"
+         style="cursor:pointer;">
+        <span><i class="bi bi-router me-2"></i>PPP CONNECTION</span>
+        <i class="bi <%= pppExpanded ? 'bi-chevron-up' : 'bi-chevron-down' %> toggle-arrow"></i>
+    </div>
+    <div class="collapse <%= pppExpanded ? 'show' : '' %>" id="pppConnectionCollapse">
+        <a href="/admin/mikrotik" class="<%= typeof page !== 'undefined' && page === 'mikrotik' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-person"></i> User PPPoE
+        </a>
+        <a href="/admin/mikrotik/profiles" class="<%= typeof page !== 'undefined' && page === 'mikrotik-profiles' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-person-badge"></i> Profile PPPoE
+        </a>
+        <a href="/admin/genieacs-monitor" class="<%= typeof page !== 'undefined' && page === 'genieacs-monitor' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-hdd-network"></i> Monitor GenieACS
+        </a>
+    </div>
+    
+    <!-- HOTSPOT & VOUCHER -->
+    <% const hotspotPages = ['hotspot-settings','hotspot-master','hotspot-users','hotspot-profiles','hotspot-server-profiles','voucher-template', 'hotspot', 'list-voucher', 'voucher']; %>
+    <% const hotspotExpanded = typeof page !== 'undefined' && hotspotPages.includes(page); %>
+    <div class="sidebar-label d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse"
+         data-bs-target="#responsiveHotspotCollapse"
+         aria-expanded="<%= hotspotExpanded ? 'true' : 'false' %>"
+         aria-controls="responsiveHotspotCollapse"
+         style="cursor:pointer;">
+        <span><i class="bi bi-wifi me-2"></i>HOTSPOT & VOUCHER</span>
+        <i class="bi <%= hotspotExpanded ? 'bi-chevron-up' : 'bi-chevron-down' %> toggle-arrow"></i>
+    </div>
+    <div class="collapse <%= hotspotExpanded ? 'show' : '' %>" id="responsiveHotspotCollapse">
+        <a href="/admin/mikrotik/hotspot-server-profiles" class="<%= typeof page !== 'undefined' && page === 'hotspot-server-profiles' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-server"></i> Server Hotspot
+        </a>
+        <a href="/admin/mikrotik/hotspot-profiles" class="<%= typeof page !== 'undefined' && page === 'hotspot-profiles' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-wifi"></i> Users Profiles
+        </a>
+        <a href="/admin/hotspot/voucher" class="<%= typeof page !== 'undefined' && page === 'voucher' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-sliders"></i> Buat Voucher
+        </a>
+        <a href="/admin/hotspot/list-voucher" class="<%= typeof page !== 'undefined' && page === 'list-voucher' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-people"></i> List Voucher
+        </a>
+        <a href="/admin/hotspot" class="<%= typeof page !== 'undefined' && page === 'hotspot' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-collection"></i> Voucher Online
+        </a>
+        <a href="/admin/hotspot/voucher-template" class="<%= typeof page !== 'undefined' && page === 'voucher-template' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-file-earmark-image"></i> Print Voucher
+        </a>
+    </div>
+    
+    <!-- AGENT -->
+    <% const agentPages = ['agents', 'agent-registrations']; %>
+    <% const agentExpanded = typeof page !== 'undefined' && agentPages.includes(page); %>
+    <div class="sidebar-label d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse"
+         data-bs-target="#agentCollapse"
+         aria-expanded="<%= agentExpanded ? 'true' : 'false' %>"
+         aria-controls="agentCollapse"
+         style="cursor:pointer;">
+        <span><i class="bi bi-person-badge-fill me-2"></i>AGENT</span>
+        <i class="bi <%= agentExpanded ? 'bi-chevron-up' : 'bi-chevron-down' %> toggle-arrow"></i>
+    </div>
+    <div class="collapse <%= agentExpanded ? 'show' : '' %>" id="agentCollapse">
+        <a href="/admin/agent-registrations" class="<%= typeof page !== 'undefined' && page === 'agent-registrations' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-person-plus"></i> Pendaftaran Agent
+        </a>
+        <a href="/admin/agents" class="<%= typeof page !== 'undefined' && page === 'agents' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-person-badge-fill"></i> Web Agent
+        </a>
+    </div>
+    
+    <!-- TEKNISI -->
+    <% const teknisiPages = ['technicians', 'installations', 'trouble']; %>
+    <% const teknisiExpanded = typeof page !== 'undefined' && teknisiPages.includes(page); %>
+    <div class="sidebar-label d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse"
+         data-bs-target="#teknisiCollapse"
+         aria-expanded="<%= teknisiExpanded ? 'true' : 'false' %>"
+         aria-controls="teknisiCollapse"
+         style="cursor:pointer;">
+        <span><i class="bi bi-people-fill me-2"></i>TEKNISI</span>
+        <i class="bi <%= teknisiExpanded ? 'bi-chevron-up' : 'bi-chevron-down' %> toggle-arrow"></i>
+    </div>
+    <div class="collapse <%= teknisiExpanded ? 'show' : '' %>" id="teknisiCollapse">
+        <a href="/admin/technicians" class="<%= typeof page !== 'undefined' && page === 'technicians' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-people-fill"></i> Kelola Teknisi
+        </a>
+        <a href="/admin/installations" class="<%= typeof page !== 'undefined' && page === 'installations' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-tools"></i> Installation Jobs
+        </a>
+        <a href="/admin/trouble" class="<%= typeof page !== 'undefined' && page === 'trouble' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-exclamation-triangle"></i> Trouble Report
+        </a>
+    </div>
+    
+    <!-- TOOLS REPORTING -->
+    <% const toolsPages = ['cable-network-odp', 'cable-network-cables', 'cable-network-analytics', 'mapping-new']; %>
+    <% const toolsExpanded = typeof page !== 'undefined' && toolsPages.includes(page); %>
+    <div class="sidebar-label d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse"
+         data-bs-target="#toolsCollapse"
+         aria-expanded="<%= toolsExpanded ? 'true' : 'false' %>"
+         aria-controls="toolsCollapse"
+         style="cursor:pointer;">
+        <span><i class="bi bi-tools me-2"></i>TOOLS REPORTING</span>
+        <i class="bi <%= toolsExpanded ? 'bi-chevron-up' : 'bi-chevron-down' %> toggle-arrow"></i>
+    </div>
+    <div class="collapse <%= toolsExpanded ? 'show' : '' %>" id="toolsCollapse">
+        <a href="/admin/cable-network/odp" class="<%= typeof page !== 'undefined' && page === 'cable-network-odp' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-broadcast"></i> ODP Management
+        </a>
+        <a href="/admin/cable-network/cables" class="<%= typeof page !== 'undefined' && page === 'cable-network-cables' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-diagram-3"></i> Cable Routes
+        </a>
+        <a href="/admin/cable-network/analytics" class="<%= typeof page !== 'undefined' && page === 'cable-network-analytics' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-bar-chart-alt-2"></i> Network Analytics
+        </a>
+        <a href="/admin/billing/mapping-new" class="<%= typeof page !== 'undefined' && page === 'mapping-new' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-map"></i> Network Mapping
+        </a>
+    </div>
+    
+    <!-- SETTINGAN -->
+    <% const settingPages = ['setting', 'connection-settings', 'cache', 'routers', 'genieacs']; %>
+    <% const settingExpanded = typeof page !== 'undefined' && settingPages.includes(page); %>
+    <div class="sidebar-label d-flex justify-content-between align-items-center"
+         data-bs-toggle="collapse"
+         data-bs-target="#settingCollapse"
+         aria-expanded="<%= settingExpanded ? 'true' : 'false' %>"
+         aria-controls="settingCollapse"
+         style="cursor:pointer;">
+        <span><i class="bi bi-gear me-2"></i>SETTINGAN</span>
+        <i class="bi <%= settingExpanded ? 'bi-chevron-up' : 'bi-chevron-down' %> toggle-arrow"></i>
+    </div>
+    <div class="collapse <%= settingExpanded ? 'show' : '' %>" id="settingCollapse">
+        <a href="/admin/settings" class="<%= typeof page !== 'undefined' && page === 'setting' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-gear"></i> Setting Umum
+        </a>
+        <a href="/admin/routers" class="<%= typeof page !== 'undefined' && page === 'routers' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-router"></i> Router Mikrotik
+        </a>
+        <a href="/admin/genieacs" class="<%= typeof page !== 'undefined' && page === 'genieacs' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-server"></i> GenieACS Servers
+        </a>
+        <a href="#" id="restartMikrotikBtn" class="submenu" style="padding-left: 3rem;">
+            <i class="bi bi-arrow-repeat"></i> Restart Mikrotik
+        </a>
+        <a href="/admin/cache" class="<%= typeof page !== 'undefined' && page === 'cache' ? 'active submenu' : 'submenu' %>" style="padding-left: 3rem;">
+            <i class="bi bi-database"></i> Cache Management
+        </a>
+    </div>
+    <a href="/admin/backup-logs" class="<%= typeof page !== 'undefined' && page === 'backup-logs' ? 'active' : '' %>">
+        <i class="bi bi-database"></i> Backup & Logs
     </a>
     <a href="/admin/logout">
         <i class="bi bi-box-arrow-right"></i> Logout
     </a>
     <div class="mt-2" style="padding: 0 24px;">
-        <div class="mb-2">
-            <label class="form-label text-light" style="font-size: 12px;">Branch</label>
-            <input type="text" id="gitBranchInput" class="form-control form-control-sm" placeholder="mis. main" style="background:rgba(255,255,255,0.2);border:0;color:#fff;">
+        <button id="btnRestartBilling" class="btn btn-sm btn-primary w-100 mb-2">
+            <i class="bi bi-arrow-repeat"></i> Restart Billing System
+        </button>
+        <div id="billingRestartResult" class="text-light small mb-2" style="display:none;"></div>
+        <div class="server-time-box text-light mb-3">
+            <div class="text-uppercase small opacity-75">Jam Server</div>
+            <div id="serverTimeValue" class="fw-bold fs-6">--:--:--</div>
         </div>
-        <button id="btnCheckUpdate" class="btn btn-sm btn-warning w-100 mb-2"><i class="bi bi-arrow-clockwise"></i> Check Update</button>
-        <button id="btnRunUpdate" class="btn btn-sm btn-danger w-100"><i class="bi bi-cloud-download"></i> Update & Restart</button>
-        <div id="updateResult" class="text-light mt-2" style="white-space: pre-wrap; font-size: 12px; display:none;"></div>
     </div>
     
     <!-- Version Info Panel -->
@@ -474,6 +577,59 @@
     }
 }
 
+/* Sidebar Label Styling */
+.sidebar-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.7);
+    padding: 8px 24px 4px 24px;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+    margin: 4px 0;
+}
+
+.sidebar-label:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.95);
+    transform: translateX(3px);
+    cursor: pointer;
+}
+
+.sidebar-label:active {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateX(5px);
+}
+
+/* Submenu styling */
+.sidebar a.submenu {
+    font-size: 0.9rem;
+    padding: 10px 24px 10px 3rem;
+    opacity: 0.9;
+}
+
+.sidebar a.submenu:hover,
+.sidebar a.submenu.active {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.sidebar a.submenu.active {
+    font-weight: 600;
+    border-left: 3px solid rgba(255, 255, 255, 0.8);
+}
+
+.server-time-box {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+
+.server-time-box #serverTimeValue {
+    letter-spacing: 0.5px;
+}
+
 /* Cards */
 .card {
     border: none;
@@ -764,86 +920,215 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
+    // Function to handle collapse toggle icons
+    function setupCollapseToggle(collapseId) {
+        var toggler = document.querySelector('[data-bs-target="#' + collapseId + '"]');
+        var collapseEl = document.getElementById(collapseId);
+        if (toggler && collapseEl && typeof bootstrap !== 'undefined') {
+            var icon = toggler.querySelector('.toggle-arrow');
+            collapseEl.addEventListener('show.bs.collapse', function () {
+                if (icon) {
+                    icon.classList.remove('bi-chevron-down');
+                    icon.classList.add('bi-chevron-up');
+                }
+            });
+            collapseEl.addEventListener('hide.bs.collapse', function () {
+                if (icon) {
+                    icon.classList.remove('bi-chevron-up');
+                    icon.classList.add('bi-chevron-down');
+                }
+            });
+        }
+    }
+    
+    // Setup all collapse toggles
+    setupCollapseToggle('pppConnectionCollapse');
+    setupCollapseToggle('responsiveHotspotCollapse');
+    setupCollapseToggle('agentCollapse');
+    setupCollapseToggle('teknisiCollapse');
+    setupCollapseToggle('toolsCollapse');
+    setupCollapseToggle('settingCollapse');
+    
     // Restart Mikrotik functionality (preserve existing functionality)
     const restartBtn = document.getElementById('restartMikrotikBtn');
     if (restartBtn) {
         restartBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            if (confirm('Apakah Anda yakin ingin restart Mikrotik?')) {
-                fetch('/admin/mikrotik/restart', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert('Mikrotik berhasil direstart');
-                    } else {
-                        alert('Gagal restart Mikrotik: ' + data.message);
+            if (typeof showConfirmAlert !== 'undefined') {
+                showConfirmAlert(
+                    'Konfirmasi Restart',
+                    'Apakah Anda yakin ingin restart Mikrotik?',
+                    'Ya, Restart',
+                    'Batal',
+                    function() {
+                        fetch('/admin/mikrotik/restart', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                showSuccessAlert('Berhasil!', 'Mikrotik berhasil direstart');
+                            } else {
+                                showErrorAlert('Gagal', 'Gagal restart Mikrotik: ' + data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            showErrorAlert('Error', 'Terjadi kesalahan saat restart Mikrotik');
+                        });
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Terjadi kesalahan saat restart Mikrotik');
-                });
+                );
+            } else {
+                // Fallback jika SweetAlert belum dimuat
+                if (confirm('Apakah Anda yakin ingin restart Mikrotik?')) {
+                    fetch('/admin/mikrotik/restart', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('Mikrotik berhasil direstart');
+                        } else {
+                            alert('Gagal restart Mikrotik: ' + data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert('Terjadi kesalahan saat restart Mikrotik');
+                    });
+                }
             }
         });
     }
     
-    // System Update handlers
-    const btnCheck = document.getElementById('btnCheckUpdate');
-    const btnUpdate = document.getElementById('btnRunUpdate');
-    const resultBox = document.getElementById('updateResult');
+    const restartBillingBtn = document.getElementById('btnRestartBilling');
+    const restartResultBox = document.getElementById('billingRestartResult');
+    const serverTimeValue = document.getElementById('serverTimeValue');
+    let serverTimeOffset = null;
 
-    function showUpdateResult(text, success = true) {
-        if (!resultBox) return;
-        resultBox.style.display = 'block';
-        resultBox.style.color = success ? '#c8e6c9' : '#ffcdd2';
-        resultBox.textContent = text;
+    function showRestartResult(text, success = true) {
+        if (!restartResultBox) return;
+        restartResultBox.style.display = 'block';
+        restartResultBox.style.color = success ? '#c8e6c9' : '#ffcdd2';
+        restartResultBox.textContent = text;
     }
 
-    if (btnCheck) {
-        btnCheck.addEventListener('click', async function() {
+    function renderServerTime() {
+        if (serverTimeOffset === null || !serverTimeValue) return;
+        
+        // Hitung waktu server saat ini dengan offset
+        // serverTimeOffset adalah selisih antara waktu server UTC dengan waktu client UTC
+        // Server timezone adalah WIB (UTC+7), jadi waktu server WIB = waktu server UTC + 7 jam
+        const serverTimeUTCNow = Date.now() + serverTimeOffset;
+        const wibOffset = 7 * 60 * 60 * 1000; // 7 jam dalam milliseconds (WIB = UTC+7)
+        const serverTimeWIB = new Date(serverTimeUTCNow + wibOffset);
+        
+        // Format waktu WIB
+        const day = String(serverTimeWIB.getUTCDate()).padStart(2, '0');
+        const month = String(serverTimeWIB.getUTCMonth() + 1).padStart(2, '0');
+        const year = serverTimeWIB.getUTCFullYear();
+        const hour = String(serverTimeWIB.getUTCHours()).padStart(2, '0');
+        const minute = String(serverTimeWIB.getUTCMinutes()).padStart(2, '0');
+        const second = String(serverTimeWIB.getUTCSeconds()).padStart(2, '0');
+        
+        serverTimeValue.textContent = `${day}/${month}/${year} ${hour}:${minute}:${second} WIB`;
+    }
+
+    async function fetchServerInfo() {
+        try {
+            const fetchStartTime = Date.now(); // Waktu saat request dimulai
+            const res = await fetch('/admin/billing/system/server-info');
+            const fetchEndTime = Date.now(); // Waktu saat response diterima
+            const fetchDuration = fetchEndTime - fetchStartTime; // Durasi fetch (untuk kompensasi latency)
+            
+            const data = await res.json();
+            if (!data.success) {
+                throw new Error(data.message || 'Gagal mengambil info server');
+            }
+            
+            // Server mengirim waktu dalam UTC (serverTimeUnix)
+            // Server timezone adalah WIB (UTC+7), jadi waktu server = UTC + 7 jam
+            // Untuk mendapatkan waktu server saat ini, kita perlu:
+            // 1. Ambil waktu server UTC saat ini
+            // 2. Tambahkan 7 jam untuk WIB
+            // 3. Hitung offset dengan waktu client
+            if (data.serverTimeUnix) {
+                // Waktu server UTC saat ini (dengan kompensasi latency)
+                const serverTimeUTCNow = data.serverTimeUnix + (fetchDuration / 2);
+                // Waktu client UTC saat ini
+                const clientTimeUTCNow = fetchEndTime;
+                // Offset = selisih waktu server UTC dengan client UTC
+                serverTimeOffset = serverTimeUTCNow - clientTimeUTCNow;
+                renderServerTime();
+            } else if (data.serverTimeIso) {
+                // Fallback ke ISO jika serverTimeUnix tidak ada
+                const serverTimeUTC = new Date(data.serverTimeIso).getTime();
+                const estimatedServerTimeNow = serverTimeUTC + (fetchDuration / 2);
+                const clientTimeUTC = fetchEndTime;
+                serverTimeOffset = estimatedServerTimeNow - clientTimeUTC;
+                renderServerTime();
+            }
+        } catch (error) {
+            // Fallback: gunakan waktu client dengan offset 0
+            console.warn('Failed to fetch server time, using client time:', error);
+            serverTimeOffset = 0;
+            if (serverTimeValue) {
+                // Tampilkan waktu client dalam format WIB
+                renderServerTime();
+            }
+        }
+    }
+
+    if (restartBillingBtn) {
+        async function performRestart() {
             try {
-                showUpdateResult('Checking updates...', true);
-                const b = (document.getElementById('gitBranchInput') && document.getElementById('gitBranchInput').value.trim()) || '';
-                const url = b ? `/admin/billing/system/check-update?branch=${encodeURIComponent(b)}` : '/admin/billing/system/check-update';
-                const res = await fetch(url);
+                restartBillingBtn.disabled = true;
+                restartBillingBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Restarting...';
+                showRestartResult('Memproses restart...', true);
+                const res = await fetch('/admin/billing/system/restart', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
                 const data = await res.json();
                 if (!data.success) {
-                    showUpdateResult('Check update failed: ' + (data.message || 'Unknown error'), false);
-                    return;
+                    showRestartResult('Restart gagal: ' + (data.message || 'Unknown error') + '\n' + (data.error || ''), false);
+                } else {
+                    showRestartResult('Restart berhasil dijalankan.', true);
+                    await fetchServerInfo();
                 }
-                const summary = data.hasUpdate
-                    ? `Update tersedia di branch ${data.branch}.\nLocal: ${data.local}\nRemote: ${data.remote}\nCommits:\n${data.commits || '(no list)'}`
-                    : `Tidak ada update.\nBranch: ${data.branch}\nLocal == Remote: ${data.local}`;
-                showUpdateResult(summary, true);
-            } catch (e) {
-                showUpdateResult('Check update error: ' + e.message, false);
+            } catch (error) {
+                showRestartResult('Restart error: ' + error.message, false);
+            } finally {
+                restartBillingBtn.disabled = false;
+                restartBillingBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Restart Billing System';
+            }
+        }
+        
+        restartBillingBtn.addEventListener('click', async () => {
+            if (typeof showConfirmAlert !== 'undefined') {
+                showConfirmAlert(
+                    'Konfirmasi Restart',
+                    'Restart layanan billing sekarang?',
+                    'Ya, Restart',
+                    'Batal',
+                    function() {
+                        performRestart();
+                    }
+                );
+            } else {
+                // Fallback jika SweetAlert belum dimuat
+                if (confirm('Restart layanan billing sekarang?')) {
+                    performRestart();
+                }
             }
         });
     }
 
-    if (btnUpdate) {
-        btnUpdate.addEventListener('click', async function() {
-            if (!confirm('Peringatan: mohon backup file settings.json terlebih dahulu. Lanjutkan update & restart?')) return;
-            try {
-                showUpdateResult('Running update... this may take a while.', true);
-                const b = (document.getElementById('gitBranchInput') && document.getElementById('gitBranchInput').value.trim()) || '';
-                const res = await fetch('/admin/billing/system/update', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ branch: b || undefined }) });
-                const data = await res.json();
-                if (!data.success) {
-                    showUpdateResult('Update failed: ' + (data.message || 'Unknown error') + '\n' + (data.error || '') + '\n' + (data.log || ''), false);
-                    return;
-                }
-                showUpdateResult('Update selesai. Aplikasi akan direload oleh PM2.\n' + (data.log || ''), true);
-            } catch (e) {
-                showUpdateResult('Update error: ' + e.message, false);
-            }
-        });
-    }
+    fetchServerInfo();
+    setInterval(renderServerTime, 1000);
     // Auto refresh logo functionality (preserve existing functionality)
     function refreshLogo() {
         const logo = document.getElementById('logoImage');

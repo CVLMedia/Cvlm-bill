@@ -189,6 +189,14 @@ async function sendCriticalNotification(device, rxPowerValue, threshold) {
   // Format pesan dengan header dan footer
   await sendToTechnicians(message, 'high');
   
+  // Send to Telegram Bot (monitoring only)
+  try {
+    const telegramMonitor = require('./telegram-monitor');
+    await telegramMonitor.sendRXPowerCritical(device, rxPowerValue, threshold);
+  } catch (telegramError) {
+    console.warn(`[RX-POWER] Failed to send Telegram notification: ${telegramError.message}`);
+  }
+  
   console.log(`🚨 Critical RX Power alert sent for device ${serialNumber} (${rxPowerValue} dBm)`);
 }
 
@@ -227,6 +235,14 @@ async function sendWarningNotification(device, rxPowerValue, threshold) {
   
   // Format pesan dengan header dan footer
   await sendToTechnicians(message, 'normal');
+  
+  // Send to Telegram Bot (monitoring only)
+  try {
+    const telegramMonitor = require('./telegram-monitor');
+    await telegramMonitor.sendRXPowerWarning(device, rxPowerValue, threshold);
+  } catch (telegramError) {
+    console.warn(`[RX-POWER] Failed to send Telegram notification: ${telegramError.message}`);
+  }
   
   console.log(`⚠️ Warning RX Power alert sent for device ${serialNumber} (${rxPowerValue} dBm)`);
 }

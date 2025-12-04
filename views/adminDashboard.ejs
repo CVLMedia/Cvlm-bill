@@ -10,6 +10,51 @@
     <style>
         body { background: #f5f6fa; }
         
+        /* License Badge Gold Styling */
+        .license-badge-gold {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            border: 2px solid #FFD700;
+            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+            color: #000;
+            font-weight: 600;
+        }
+        
+        .license-badge-gold strong {
+            color: #000 !important;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.3);
+        }
+        
+        .license-badge-gold .small {
+            color: #000 !important;
+        }
+        
+        .license-badge-gold code {
+            color: #000 !important;
+            background: rgba(255, 255, 255, 0.3) !important;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .license-badge-gold i {
+            color: #000 !important;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Responsive license badge */
+        @media (max-width: 767.98px) {
+            .license-badge-gold {
+                font-size: 0.85rem;
+                padding: 0.5rem !important;
+            }
+            
+            .license-badge-gold .small {
+                font-size: 0.7rem !important;
+            }
+            
+            .license-badge-gold i {
+                font-size: 1.2rem !important;
+            }
+        }
+        
         /* Desktop: When sidebar collapsed, ensure main content is full width */
         @media (min-width: 768px) {
             body:has(.sidebar.collapsed) .main-content {
@@ -239,6 +284,171 @@
                 transform: none;
             }
         }
+        
+        /* System Information Styling */
+        .system-gauge {
+            position: relative;
+            display: inline-block;
+            margin: 10px;
+        }
+        
+        .system-gauge canvas {
+            display: block;
+            margin: 0 auto;
+        }
+        
+        .gauge-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #666;
+            margin-top: 5px;
+            text-transform: uppercase;
+        }
+        
+        .gauge-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #333;
+            margin-top: 5px;
+        }
+        
+        .table-sm td {
+            padding: 0.5rem 0.25rem;
+            font-size: 0.9rem;
+        }
+        
+        /* Stats History Styling */
+        .stats-info {
+            background: #ffffff;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            min-height: 120px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .stats-info h6 {
+            color: #333;
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .stats-info .small {
+            font-size: 0.8rem;
+            line-height: 1.8;
+            color: #666;
+        }
+        
+        .stats-info .text-primary {
+            color: #007bff !important;
+        }
+        
+        .stats-info .text-success {
+            color: #28a745 !important;
+        }
+        
+        .stats-info .text-danger {
+            color: #dc3545 !important;
+        }
+        
+        .stats-info .text-info {
+            color: #17a2b8 !important;
+        }
+        
+        .row.mb-3.align-items-center {
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 15px;
+        }
+        
+        .row.mb-3.align-items-center:last-child {
+            border-bottom: none;
+        }
+        
+        /* Modern Metric Cards Styling - Like Image 2 */
+        .metric-card {
+            border-radius: 12px;
+            padding: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+            transition: all 0.3s ease;
+            border: none;
+            position: relative;
+            overflow: hidden;
+            background: var(--card-bg-color);
+            color: #ffffff;
+            min-height: auto;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2), 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+        
+        .metric-card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            font-size: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .metric-card-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin: 6px 0;
+            line-height: 1.2;
+        }
+        
+        .metric-card-label {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            margin-top: 2px;
+        }
+        
+        /* Card Colors - Solid Backgrounds like Image 2 */
+        .metric-card-primary {
+            --card-bg-color: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+        
+        .metric-card-success {
+            --card-bg-color: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+            background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
+        }
+        
+        .metric-card-danger {
+            --card-bg-color: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+            background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+        }
+        
+        .metric-card-secondary {
+            --card-bg-color: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
+            background: linear-gradient(135deg, #6b7280 0%, #9ca3af 100%);
+        }
+        
+        .metric-card-info {
+            --card-bg-color: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+        }
+        
+        .metric-card-warning {
+            --card-bg-color: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+            background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+        }
+        
+        /* Pink card for variety */
+        .metric-card-pink {
+            --card-bg-color: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+            background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);
+        }
     </style>
 </head>
 <body>
@@ -418,16 +628,25 @@
                 <div class="col-12">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Dashboard Sistem</h5>
-                        <div>
-                            <button type="button" class="btn btn-outline-primary btn-sm" id="validateConfigBtn">
-                                <i class="bi bi-gear-fill me-1"></i>Validasi Konfigurasi
-                            </button>
-                            <a href="/admin/settings" class="btn btn-outline-success btn-sm ms-2">
-                                <i class="bi bi-sliders me-1"></i>Pengaturan Sistem
-                            </a>
-                            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="refreshDashboardBtn">
-                                <i class="bi bi-arrow-clockwise me-1"></i>Refresh
-                            </button>
+                        <div class="d-flex align-items-center gap-3">
+                            <!-- LICENSE STATUS (GOLD) - Moved from top -->
+                            <% if (typeof licenseStatus !== 'undefined' && licenseStatus && licenseStatus.status === 'active') { %>
+                            <div class="license-badge-gold d-flex align-items-center px-3 py-2 rounded">
+                                <i class="bi bi-shield-check fs-4 me-2"></i>
+                                <strong>License Aktif</strong>
+                            </div>
+                            <% } %>
+                            <div>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="validateConfigBtn">
+                                    <i class="bi bi-gear-fill me-1"></i>Validasi Konfigurasi
+                                </button>
+                                <a href="/admin/settings" class="btn btn-outline-success btn-sm ms-2">
+                                    <i class="bi bi-sliders me-1"></i>Pengaturan Sistem
+                                </a>
+                                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" id="refreshDashboardBtn">
+                                    <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -436,78 +655,78 @@
             <!-- GENIEACS CARDS -->
             <div class="row mb-4">
               <div class="col-md-4 mb-3">
-                <div class="card text-bg-primary">
-                  <div class="card-body text-center">
-                    <i class="bi bi-hdd-network fs-2 mb-2"></i>
-                    <div class="fw-bold">Total Device GenieACS</div>
-                    <div class="fs-3" id="genieacs-total">
-                      <% if (typeof genieacsTotal !== 'undefined' && genieacsTotal !== null) { %>
-                        <%= genieacsTotal %>
-                      <% } else { %>
-                        <i class="bi bi-hourglass-split"></i> Loading...
-                      <% } %>
-                    </div>
+                <div class="metric-card metric-card-primary">
+                  <div class="metric-card-icon">
+                    <i class="bi bi-hdd-network"></i>
                   </div>
+                  <div class="metric-card-value" id="genieacs-total">
+                    <% if (typeof genieacsTotal !== 'undefined' && genieacsTotal !== null) { %>
+                      <%= genieacsTotal %>
+                    <% } else { %>
+                      <i class="bi bi-hourglass-split"></i>
+                    <% } %>
+                  </div>
+                  <div class="metric-card-label">Total Device GenieACS</div>
                 </div>
               </div>
               <div class="col-md-4 mb-3">
-                <div class="card text-bg-success">
-                  <div class="card-body text-center">
-                    <i class="bi bi-wifi fs-2 mb-2"></i>
-                    <div class="fw-bold">Device Online</div>
-                    <div class="fs-3" id="genieacs-online">
-                      <% if (typeof genieacsOnline !== 'undefined' && genieacsOnline !== null) { %>
-                        <%= genieacsOnline %>
-                      <% } else { %>
-                        <i class="bi bi-hourglass-split"></i> Loading...
-                      <% } %>
-                    </div>
+                <div class="metric-card metric-card-success">
+                  <div class="metric-card-icon">
+                    <i class="bi bi-wifi"></i>
                   </div>
+                  <div class="metric-card-value" id="genieacs-online">
+                    <% if (typeof genieacsOnline !== 'undefined' && genieacsOnline !== null) { %>
+                      <%= genieacsOnline %>
+                    <% } else { %>
+                      <i class="bi bi-hourglass-split"></i>
+                    <% } %>
+                  </div>
+                  <div class="metric-card-label">Device Online</div>
                 </div>
               </div>
               <div class="col-md-4 mb-3">
-                <div class="card text-bg-danger">
-                  <div class="card-body text-center">
-                    <i class="bi bi-wifi-off fs-2 mb-2"></i>
-                    <div class="fw-bold">Device Offline</div>
-                    <div class="fs-3" id="genieacs-offline">
-                      <% if (typeof genieacsOffline !== 'undefined' && genieacsOffline !== null) { %>
-                        <%= genieacsOffline %>
-                      <% } else { %>
-                        <i class="bi bi-hourglass-split"></i> Loading...
-                      <% } %>
-                    </div>
+                <div class="metric-card metric-card-danger">
+                  <div class="metric-card-icon">
+                    <i class="bi bi-wifi-off"></i>
                   </div>
+                  <div class="metric-card-value" id="genieacs-offline">
+                    <% if (typeof genieacsOffline !== 'undefined' && genieacsOffline !== null) { %>
+                      <%= genieacsOffline %>
+                    <% } else { %>
+                      <i class="bi bi-hourglass-split"></i>
+                    <% } %>
+                  </div>
+                  <div class="metric-card-label">Device Offline</div>
                 </div>
               </div>
             </div>
             <!-- MIKROTIK CARDS -->
             <div class="row mb-4">
               <div class="col-md-4 mb-3">
-                <div class="card text-bg-secondary">
-                  <div class="card-body text-center">
-                    <i class="bi bi-person-badge fs-2 mb-2"></i>
-                    <div class="fw-bold">Total User PPPoE</div>
-                    <div class="fs-3" id="mikrotik-total"><%= typeof mikrotikTotal !== 'undefined' ? mikrotikTotal : '-' %></div>
+                <div class="metric-card metric-card-pink">
+                  <div class="metric-card-icon">
+                    <i class="bi bi-people"></i>
                   </div>
+                  <div class="metric-card-value" id="mikrotik-total"><%= typeof mikrotikTotal !== 'undefined' ? mikrotikTotal : '-' %></div>
+                  <div class="metric-card-label">Total User PPPoE</div>
                 </div>
               </div>
               <div class="col-md-4 mb-3">
-                <div class="card text-bg-success">
-                  <div class="card-body text-center">
-                    <i class="bi bi-person-check fs-2 mb-2"></i>
-                    <div class="fw-bold">PPPoE Aktif</div>
-                    <div class="fs-3" id="mikrotik-aktif"><%= typeof mikrotikAktif !== 'undefined' ? mikrotikAktif : '-' %></div>
+                <div class="metric-card metric-card-info">
+                  <div class="metric-card-icon">
+                    <i class="bi bi-person-check"></i>
                   </div>
+                  <div class="metric-card-value" id="mikrotik-aktif"><%= typeof mikrotikAktif !== 'undefined' ? mikrotikAktif : '-' %></div>
+                  <div class="metric-card-label">PPPoE Aktif</div>
                 </div>
               </div>
               <div class="col-md-4 mb-3">
-                <div class="card text-bg-danger">
-                  <div class="card-body text-center">
-                    <i class="bi bi-person-x fs-2 mb-2"></i>
-                    <div class="fw-bold">PPPoE Offline</div>
-                    <div class="fs-3" id="mikrotik-offline"><%= typeof mikrotikOffline !== 'undefined' ? mikrotikOffline : '-' %></div>
+                <div class="metric-card metric-card-danger">
+                  <div class="metric-card-icon">
+                    <i class="bi bi-person-x"></i>
                   </div>
+                  <div class="metric-card-value" id="mikrotik-offline"><%= typeof mikrotikOffline !== 'undefined' ? mikrotikOffline : '-' %></div>
+                  <div class="metric-card-label">PPPoE Offline</div>
                 </div>
               </div>
             </div>
@@ -542,6 +761,271 @@
                       <div class="col-12 text-center text-muted py-5">
                         <i class="bi bi-router" style="font-size: 3rem;"></i>
                         <p class="mt-3">Pilih NAS untuk memulai monitoring</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- System Information Dashboard -->
+            <div class="row mb-4">
+              <div class="col-md-12">
+                <div class="card">
+                  <div class="card-header bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <div class="fw-bold" style="font-size: 1.1rem;"><i class="bi bi-info-circle"></i> System Information</div>
+                      <button id="refreshSystemInfo" class="btn btn-sm btn-light"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <!-- Circular Gauges -->
+                    <div class="row mb-4">
+                      <div class="col-md-3 text-center">
+                        <div class="system-gauge">
+                          <canvas id="cpuGauge" width="150" height="150"></canvas>
+                          <div class="gauge-label">CPU</div>
+                          <div class="gauge-value" id="cpuValue">0%</div>
+                        </div>
+                      </div>
+                      <div class="col-md-3 text-center">
+                        <div class="system-gauge">
+                          <canvas id="memoryGauge" width="150" height="150"></canvas>
+                          <div class="gauge-label">REAL MEMORY</div>
+                          <div class="gauge-value" id="memoryValue">0%</div>
+                        </div>
+                      </div>
+                      <div class="col-md-3 text-center">
+                        <div class="system-gauge">
+                          <canvas id="virtualMemoryGauge" width="150" height="150"></canvas>
+                          <div class="gauge-label">VIRTUAL MEMORY</div>
+                          <div class="gauge-value" id="virtualMemoryValue">0%</div>
+                        </div>
+                      </div>
+                      <div class="col-md-3 text-center">
+                        <div class="system-gauge">
+                          <canvas id="diskGauge" width="150" height="150"></canvas>
+                          <div class="gauge-label">LOCAL DISK SPACE</div>
+                          <div class="gauge-value" id="diskValue">0%</div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Detailed System Information -->
+                    <div class="row mb-4">
+                      <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">System Information</h6>
+                        <table class="table table-sm table-borderless">
+                          <tr>
+                            <td class="text-muted" style="width: 40%;">System hostname:</td>
+                            <td id="sysHostname">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">Application version:</td>
+                            <td id="sysVersion">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">Time on system:</td>
+                            <td id="sysTime">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">Processor information:</td>
+                            <td id="sysProcessor">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">Running processes:</td>
+                            <td id="sysProcesses">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">Real memory:</td>
+                            <td id="sysRealMemory">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">Local disk space:</td>
+                            <td id="sysDiskSpace">-</td>
+                          </tr>
+                        </table>
+                      </div>
+                      <div class="col-md-6">
+                        <h6 class="fw-bold mb-3">System Details</h6>
+                        <table class="table table-sm table-borderless">
+                          <tr>
+                            <td class="text-muted" style="width: 40%;">Operating system:</td>
+                            <td id="sysOS">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">Kernel and CPU:</td>
+                            <td id="sysKernel">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">System uptime:</td>
+                            <td id="sysUptime">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">CPU load averages:</td>
+                            <td id="sysLoadAvg">-</td>
+                          </tr>
+                          <tr>
+                            <td class="text-muted">Virtual memory:</td>
+                            <td id="sysVirtualMemory">-</td>
+                          </tr>
+                        </table>
+                      </div>
+                    </div>
+                    
+                    <!-- Stats History Charts -->
+                    <div class="row mb-4">
+                      <div class="col-md-12">
+                        <h6 class="fw-bold mb-3">Stats History</h6>
+                        
+                        <!-- CPU Chart -->
+                        <div class="row mb-3 align-items-center">
+                          <div class="col-md-2">
+                            <div class="stats-info">
+                              <h6 class="mb-2 fw-bold">CPU</h6>
+                              <div class="small text-muted mb-1">Current: <span id="cpuCurrent" class="fw-bold text-primary">0%</span></div>
+                              <div class="small text-muted mb-1">Min: <span id="cpuMin" class="text-success">0%</span></div>
+                              <div class="small text-muted mb-1">Max: <span id="cpuMax" class="text-danger">0%</span></div>
+                              <div class="small text-muted">Avg: <span id="cpuAvg" class="text-info">0%</span></div>
+                            </div>
+                          </div>
+                          <div class="col-md-10">
+                            <canvas id="cpuChart" height="100"></canvas>
+                          </div>
+                        </div>
+                        
+                        <!-- Real Memory Chart -->
+                        <div class="row mb-3 align-items-center">
+                          <div class="col-md-2">
+                            <div class="stats-info">
+                              <h6 class="mb-2 fw-bold">Real Memory</h6>
+                              <div class="small text-muted mb-1">Current: <span id="memoryCurrent" class="fw-bold text-primary">0%</span></div>
+                              <div class="small text-muted mb-1">Min: <span id="memoryMin" class="text-success">0%</span></div>
+                              <div class="small text-muted mb-1">Max: <span id="memoryMax" class="text-danger">0%</span></div>
+                              <div class="small text-muted">Avg: <span id="memoryAvg" class="text-info">0%</span></div>
+                            </div>
+                          </div>
+                          <div class="col-md-10">
+                            <canvas id="memoryChart" height="100"></canvas>
+                          </div>
+                        </div>
+                        
+                        <!-- Virtual Memory Chart -->
+                        <div class="row mb-3 align-items-center">
+                          <div class="col-md-2">
+                            <div class="stats-info">
+                              <h6 class="mb-2 fw-bold">Virtual Memory</h6>
+                              <div class="small text-muted mb-1">Current: <span id="virtualMemoryCurrent" class="fw-bold text-primary">0%</span></div>
+                              <div class="small text-muted mb-1">Min: <span id="virtualMemoryMin" class="text-success">0%</span></div>
+                              <div class="small text-muted mb-1">Max: <span id="virtualMemoryMax" class="text-danger">0%</span></div>
+                              <div class="small text-muted">Avg: <span id="virtualMemoryAvg" class="text-info">0%</span></div>
+                            </div>
+                          </div>
+                          <div class="col-md-10">
+                            <canvas id="virtualMemoryChart" height="100"></canvas>
+                          </div>
+                        </div>
+                        
+                        <!-- Process Chart -->
+                        <div class="row mb-3 align-items-center">
+                          <div class="col-md-2">
+                            <div class="stats-info">
+                              <h6 class="mb-2 fw-bold">Process</h6>
+                              <div class="small text-muted mb-1">Current: <span id="processCurrent" class="fw-bold text-primary">0</span></div>
+                              <div class="small text-muted mb-1">Min: <span id="processMin" class="text-success">0</span></div>
+                              <div class="small text-muted mb-1">Max: <span id="processMax" class="text-danger">0</span></div>
+                              <div class="small text-muted">Avg: <span id="processAvg" class="text-info">0</span></div>
+                            </div>
+                          </div>
+                          <div class="col-md-10">
+                            <canvas id="processChart" height="100"></canvas>
+                          </div>
+                        </div>
+                        
+                        <!-- Disk I/O Chart -->
+                        <div class="row mb-3 align-items-center">
+                          <div class="col-md-2">
+                            <div class="stats-info">
+                              <h6 class="mb-2 fw-bold">Disk I/O</h6>
+                              <div class="small text-muted mb-1">Current: <span id="diskIOCurrent" class="fw-bold text-primary">0 MiB</span></div>
+                              <div class="small text-muted mb-1">Min: <span id="diskIOMin" class="text-success">0 MiB</span></div>
+                              <div class="small text-muted mb-1">Max: <span id="diskIOMax" class="text-danger">0 MiB</span></div>
+                              <div class="small text-muted">Avg: <span id="diskIOAvg" class="text-info">0 MiB</span></div>
+                            </div>
+                          </div>
+                          <div class="col-md-10">
+                            <canvas id="diskIOChart" height="100"></canvas>
+                          </div>
+                        </div>
+                        
+                        <!-- Network I/O Chart -->
+                        <div class="row mb-3 align-items-center">
+                          <div class="col-md-2">
+                            <div class="stats-info">
+                              <h6 class="mb-2 fw-bold">Network I/O</h6>
+                              <div class="small text-muted mb-1">Current: <span id="networkIOCurrent" class="fw-bold text-primary">0 Mbps</span></div>
+                              <div class="small text-muted mb-1">Min: <span id="networkIOMin" class="text-success">0 Mbps</span></div>
+                              <div class="small text-muted mb-1">Max: <span id="networkIOMax" class="text-danger">0 Mbps</span></div>
+                              <div class="small text-muted">Avg: <span id="networkIOAvg" class="text-info">0 Mbps</span></div>
+                            </div>
+                          </div>
+                          <div class="col-md-10">
+                            <canvas id="networkIOChart" height="100"></canvas>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Network Interfaces -->
+                    <div class="row mb-4">
+                      <div class="col-md-12">
+                        <h6 class="fw-bold mb-3">Network Interfaces</h6>
+                        <div class="table-responsive">
+                          <table class="table table-sm table-bordered" id="networkInterfacesTable">
+                            <thead>
+                              <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Interface Speed</th>
+                                <th>IPv4 Address</th>
+                                <th>IPv6 Addresses</th>
+                                <th>Netmask</th>
+                                <th>Broadcast</th>
+                                <th>Active</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td colspan="7" class="text-center text-muted">Loading...</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <!-- Disk Usage -->
+                    <div class="row">
+                      <div class="col-md-12">
+                        <h6 class="fw-bold mb-3">Disk Usage</h6>
+                        <div class="table-responsive">
+                          <table class="table table-sm table-bordered" id="diskUsageTable">
+                            <thead>
+                              <tr>
+                                <th>Mounted As</th>
+                                <th>Type</th>
+                                <th>Free</th>
+                                <th>Used</th>
+                                <th>Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td colspan="5" class="text-center text-muted">Loading...</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -894,11 +1378,34 @@
                                                     `).join('')}
                                                 </select>
                                             </div>
-                                            <div class="card-body p-3" style="position: relative; height: 400px; background-color: #1a1a1a;">
-                                                <canvas id="rxBytesChart${routerId}" style="max-height: 380px;"></canvas>
-                                                <div id="noInterfaceSelected${routerId}" class="text-center text-muted py-5" style="display: none;">
-                                                    <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
-                                                    <p class="mt-2">Pilih interface untuk menampilkan grafik</p>
+                                            <div class="card-body p-3">
+                                                <div class="row align-items-center">
+                                                    <!-- Stats Info Card -->
+                                                    <div class="col-md-2">
+                                                        <div class="stats-info" id="interfaceTrafficStats${routerId}">
+                                                            <h6 class="mb-2 fw-bold" id="interfaceTrafficTitle${routerId}">-</h6>
+                                                            <div class="small text-muted mb-2 fw-bold">RX (Receive)</div>
+                                                            <div class="small text-muted mb-1">Current: <span id="rxCurrent${routerId}" class="fw-bold text-primary">0 Mbps</span></div>
+                                                            <div class="small text-muted mb-1">Min: <span id="rxMin${routerId}" class="text-success">0 Mbps</span></div>
+                                                            <div class="small text-muted mb-1">Max: <span id="rxMax${routerId}" class="text-danger">0 Mbps</span></div>
+                                                            <div class="small text-muted mb-3">Avg: <span id="rxAvg${routerId}" class="text-info">0 Mbps</span></div>
+                                                            <div class="small text-muted mb-2 fw-bold">TX (Transmit)</div>
+                                                            <div class="small text-muted mb-1">Current: <span id="txCurrent${routerId}" class="fw-bold text-primary">0 Mbps</span></div>
+                                                            <div class="small text-muted mb-1">Min: <span id="txMin${routerId}" class="text-success">0 Mbps</span></div>
+                                                            <div class="small text-muted mb-1">Max: <span id="txMax${routerId}" class="text-danger">0 Mbps</span></div>
+                                                            <div class="small text-muted">Avg: <span id="txAvg${routerId}" class="text-info">0 Mbps</span></div>
+                                                        </div>
+                                                    </div>
+                                                    <!-- Chart -->
+                                                    <div class="col-md-10">
+                                                        <div style="position: relative; height: 400px; background-color: #ffffff;">
+                                                            <canvas id="rxBytesChart${routerId}" style="max-height: 380px;"></canvas>
+                                                            <div id="noInterfaceSelected${routerId}" class="text-center text-muted py-5" style="display: none;">
+                                                                <i class="bi bi-graph-up" style="font-size: 2rem;"></i>
+                                                                <p class="mt-2">Pilih interface untuk menampilkan grafik</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1425,12 +1932,60 @@
                             
                             // Update tanpa animasi dan tanpa delay
                             chart.options.animation = false;
+                            
+                            // Update statistics
+                            updateInterfaceTrafficStats(routerId, interfaceName, tsData.rxData, tsData.txData);
                             chart.update('none', { duration: 0 });
                         }
                     } catch (e) {
                         console.error(`Error updating interface traffic for ${interfaceName}:`, e);
                     }
                 }, 5000); // Update setiap 5 detik untuk real-time
+            }
+            
+            // Update Interface Traffic Statistics
+            function updateInterfaceTrafficStats(routerId, interfaceName, rxData, txData) {
+                if (!rxData || !txData || rxData.length === 0 || txData.length === 0) return;
+                
+                // Calculate RX statistics
+                const rxCurrent = rxData[rxData.length - 1] || 0;
+                const rxMin = Math.min(...rxData);
+                const rxMax = Math.max(...rxData);
+                const rxSum = rxData.reduce((a, b) => a + b, 0);
+                const rxAvg = rxSum / rxData.length;
+                
+                // Calculate TX statistics
+                const txCurrent = txData[txData.length - 1] || 0;
+                const txMin = Math.min(...txData);
+                const txMax = Math.max(...txData);
+                const txSum = txData.reduce((a, b) => a + b, 0);
+                const txAvg = txSum / txData.length;
+                
+                // Update RX stats
+                const rxCurrentEl = document.getElementById(`rxCurrent${routerId}`);
+                const rxMinEl = document.getElementById(`rxMin${routerId}`);
+                const rxMaxEl = document.getElementById(`rxMax${routerId}`);
+                const rxAvgEl = document.getElementById(`rxAvg${routerId}`);
+                
+                if (rxCurrentEl) rxCurrentEl.textContent = rxCurrent.toFixed(2) + ' Mbps';
+                if (rxMinEl) rxMinEl.textContent = rxMin.toFixed(2) + ' Mbps';
+                if (rxMaxEl) rxMaxEl.textContent = rxMax.toFixed(2) + ' Mbps';
+                if (rxAvgEl) rxAvgEl.textContent = rxAvg.toFixed(2) + ' Mbps';
+                
+                // Update TX stats
+                const txCurrentEl = document.getElementById(`txCurrent${routerId}`);
+                const txMinEl = document.getElementById(`txMin${routerId}`);
+                const txMaxEl = document.getElementById(`txMax${routerId}`);
+                const txAvgEl = document.getElementById(`txAvg${routerId}`);
+                
+                if (txCurrentEl) txCurrentEl.textContent = txCurrent.toFixed(2) + ' Mbps';
+                if (txMinEl) txMinEl.textContent = txMin.toFixed(2) + ' Mbps';
+                if (txMaxEl) txMaxEl.textContent = txMax.toFixed(2) + ' Mbps';
+                if (txAvgEl) txAvgEl.textContent = txAvg.toFixed(2) + ' Mbps';
+                
+                // Update title
+                const titleEl = document.getElementById(`interfaceTrafficTitle${routerId}`);
+                if (titleEl) titleEl.textContent = interfaceName;
             }
             
             // Stop interface traffic update
@@ -1584,6 +2139,12 @@
                         return;
                     }
                     
+                    // Use same light blue/teal color as Stats History: rgb(23, 162, 184)
+                    const chartColor = 'rgb(23, 162, 184)'; // Light blue/teal
+                    const chartColorDark = 'rgb(18, 130, 147)'; // Slightly darker for TX
+                    const chartBg = 'rgba(23, 162, 184, 0.2)'; // Translucent fill like Stats History
+                    const chartBgDark = 'rgba(18, 130, 147, 0.2)';
+                    
                     const chart = new Chart(ctx, {
                         type: 'line',
                         data: {
@@ -1592,22 +2153,22 @@
                                 {
                                     label: 'rx',
                                     data: tsData.rxData,
-                                    borderColor: 'rgb(59, 130, 246)', // Blue
-                                    backgroundColor: 'rgba(59, 130, 246, 0.3)', // Blue dengan opacity untuk fill
-                                    borderWidth: 2,
+                                    borderColor: chartColor,
+                                    backgroundColor: chartBg,
+                                    borderWidth: 1.5,
                                     fill: true,
-                                    tension: 0.4,
-                                    pointRadius: 0, // Hide points untuk line yang lebih smooth
+                                    tension: 0.3,
+                                    pointRadius: 0,
                                     pointHoverRadius: 4
                                 },
                                 {
                                     label: 'tx',
                                     data: tsData.txData,
-                                    borderColor: 'rgb(147, 51, 234)', // Purple
-                                    backgroundColor: 'rgba(147, 51, 234, 0.3)', // Purple dengan opacity untuk fill
-                                    borderWidth: 2,
+                                    borderColor: chartColorDark,
+                                    backgroundColor: chartBgDark,
+                                    borderWidth: 1.5,
                                     fill: true,
-                                    tension: 0.4,
+                                    tension: 0.3,
                                     pointRadius: 0,
                                     pointHoverRadius: 4
                                 }
@@ -1627,8 +2188,9 @@
                                 }
                             },
                             interaction: {
-                                intersect: false,
-                                mode: 'index'
+                                mode: 'nearest',
+                                axis: 'x',
+                                intersect: false
                             },
                             plugins: {
                                 legend: {
@@ -1666,26 +2228,25 @@
                             scales: {
                                 x: {
                                     grid: {
-                                        color: 'rgba(128, 128, 128, 0.2)',
-                                        drawBorder: false
+                                        color: 'rgba(0,0,0,0.1)',
+                                        lineWidth: 1
                                     },
                                     ticks: {
-                                        maxTicksLimit: 20, // Maksimal 20 label untuk range waktu yang lebih detail
+                                        maxTicksLimit: 20,
                                         font: {
-                                            size: 9 // Sedikit lebih kecil karena lebih banyak label
+                                            size: 9
                                         },
+                                        color: '#666',
                                         callback: function(value, index) {
-                                            // Hanya tampilkan label yang tidak kosong (label setiap 5 detik)
                                             const labels = this.chart.data.labels;
                                             if (!labels || labels.length === 0) return '';
                                             if (index >= labels.length) return '';
                                             const label = labels[index];
-                                            // Tampilkan label jika tidak kosong
                                             return label || '';
                                         },
-                                        autoSkip: false, // Jangan skip label otomatis
+                                        autoSkip: false,
                                         maxRotation: 45,
-                                        minRotation: 45 // Rotate label untuk menghindari overlap
+                                        minRotation: 45
                                     }
                                 },
                                 y: {
@@ -1699,7 +2260,6 @@
                                     },
                                     ticks: {
                                         callback: function(value) {
-                                            // Format seperti di gambar: "0 b/s", "10 Mb/s", "20 Mb/s", dll
                                             if (value === 0) {
                                                 return '0 b/s';
                                             }
@@ -1711,10 +2271,12 @@
                                         font: {
                                             size: 10
                                         },
-                                        stepSize: 10 // Step setiap 10 Mb/s untuk lebih rapi
+                                        color: '#666',
+                                        stepSize: 10
                                     },
                                     grid: {
-                                        color: 'rgba(128, 128, 128, 0.2)',
+                                        color: 'rgba(0,0,0,0.1)',
+                                        lineWidth: 1,
                                         drawBorder: false
                                     }
                                 }
@@ -1727,6 +2289,11 @@
                         interfaceChartInstances[routerId] = {};
                     }
                     interfaceChartInstances[routerId][selectedInterfaceName] = chart;
+                    
+                    // Update statistics dengan data awal
+                    if (tsData.rxData.length > 0 && tsData.txData.length > 0) {
+                        updateInterfaceTrafficStats(routerId, selectedInterfaceName, tsData.rxData, tsData.txData);
+                    }
                     
                     // Start real-time update untuk interface ini
                     startInterfaceTrafficUpdate(routerId, selectedInterfaceName, chart);
@@ -2335,6 +2902,433 @@ setInterval(refreshLogo, 5000);
 document.addEventListener('DOMContentLoaded', function() {
     refreshLogo();
 });
+
+// ========== SYSTEM INFORMATION DASHBOARD ==========
+let systemInfoCharts = {};
+let systemInfoHistory = {
+    cpu: [],
+    memory: [],
+    virtualMemory: [],
+    processes: [],
+    diskIO: [],
+    networkIO: [],
+    timestamps: [],
+    lastDiskIO: 0, // Store last cumulative value
+    lastNetworkIO: 0 // Store last cumulative value
+};
+
+// Function to draw circular gauge
+function drawGauge(canvasId, value, maxValue, color) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = Math.min(centerX, centerY) - 10;
+    const percentage = Math.min((value / maxValue) * 100, 100);
+    const angle = (percentage / 100) * 2 * Math.PI - Math.PI / 2;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw background circle
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 15;
+    ctx.stroke();
+    
+    // Draw value arc
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, -Math.PI / 2, angle);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 15;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+}
+
+// Function to format bytes
+function formatBytes(bytes) {
+    if (bytes >= 1e12) return (bytes / 1e12).toFixed(2) + ' TiB';
+    if (bytes >= 1e9) return (bytes / 1e9).toFixed(2) + ' GiB';
+    if (bytes >= 1e6) return (bytes / 1e6).toFixed(2) + ' MiB';
+    if (bytes >= 1e3) return (bytes / 1e3).toFixed(2) + ' KiB';
+    return bytes.toFixed(0) + ' B';
+}
+
+// Function to create chart
+function createSystemChart(canvasId, label, color, yAxisLabel, maxValue = null) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return null;
+    
+    const ctx = canvas.getContext('2d');
+    // Convert color to rgba for background with opacity (lighter/translucent like in image)
+    const rgbMatch = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    const bgColor = rgbMatch 
+        ? `rgba(${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}, 0.2)`
+        : color + '20';
+    
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: label,
+                data: [],
+                borderColor: color,
+                backgroundColor: bgColor,
+                borderWidth: 1.5,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: maxValue,
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)',
+                        lineWidth: 1
+                    },
+                    ticks: {
+                        font: {
+                            size: 10
+                        },
+                        color: '#666'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0,0,0,0.1)',
+                        lineWidth: 1
+                    },
+                    ticks: {
+                        font: {
+                            size: 9
+                        },
+                        color: '#666',
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            },
+            interaction: {
+                mode: 'nearest',
+                axis: 'x',
+                intersect: false
+            }
+        }
+    });
+}
+
+// Initialize charts
+function initializeSystemCharts() {
+    // Light blue/teal color for charts (like in the image): rgb(23, 162, 184) or lighter
+    const chartColor = 'rgb(23, 162, 184)'; // Light blue/teal
+    systemInfoCharts.cpu = createSystemChart('cpuChart', 'CPU', chartColor, '%', 100);
+    systemInfoCharts.memory = createSystemChart('memoryChart', 'Real Memory', chartColor, '%', 100);
+    systemInfoCharts.virtualMemory = createSystemChart('virtualMemoryChart', 'Virtual Memory', chartColor, '%', 100);
+    systemInfoCharts.processes = createSystemChart('processChart', 'Processes', chartColor, 'Count', null);
+    systemInfoCharts.diskIO = createSystemChart('diskIOChart', 'Disk I/O', chartColor, 'MiB', 200);
+    systemInfoCharts.networkIO = createSystemChart('networkIOChart', 'Network I/O', chartColor, 'Mbps', 30);
+}
+
+// Helper function to calculate statistics
+function calculateStats(dataArray) {
+    if (dataArray.length === 0) return { min: 0, max: 0, avg: 0, current: 0 };
+    const current = dataArray[dataArray.length - 1];
+    const min = Math.min(...dataArray);
+    const max = Math.max(...dataArray);
+    const sum = dataArray.reduce((a, b) => a + b, 0);
+    const avg = sum / dataArray.length;
+    return { min, max, avg, current };
+}
+
+// Update charts with new data
+function updateSystemCharts(data) {
+    const now = new Date();
+    const timeLabel = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    
+    // Calculate disk I/O - use delta from previous cumulative measurement
+    let diskIOValue = 0;
+    if (data.diskIO) {
+        const currentCumulative = (data.diskIO.read || 0) + (data.diskIO.write || 0);
+        if (systemInfoHistory.lastDiskIO > 0) {
+            // Calculate delta per 5 seconds (refresh interval), convert to per second
+            const delta = currentCumulative - systemInfoHistory.lastDiskIO;
+            diskIOValue = Math.max(0, delta / 5); // MiB per second
+        }
+        systemInfoHistory.lastDiskIO = currentCumulative;
+    }
+    
+    // Calculate network I/O - use delta from previous cumulative measurement
+    let networkIOValue = 0;
+    if (data.networkIO) {
+        const currentCumulative = (data.networkIO.rx || 0) + (data.networkIO.tx || 0);
+        if (systemInfoHistory.lastNetworkIO > 0) {
+            // Calculate delta per 5 seconds (refresh interval), convert to per second
+            const delta = currentCumulative - systemInfoHistory.lastNetworkIO;
+            networkIOValue = Math.max(0, delta / 5); // Mbps per second
+        }
+        systemInfoHistory.lastNetworkIO = currentCumulative;
+    }
+    
+    // Add to history (keep last 30 points for better visualization)
+    systemInfoHistory.timestamps.push(timeLabel);
+    systemInfoHistory.cpu.push(data.cpu.usage);
+    systemInfoHistory.memory.push(data.memory.percent);
+    systemInfoHistory.virtualMemory.push(data.virtualMemory.percent);
+    systemInfoHistory.processes.push(data.processes);
+    systemInfoHistory.diskIO.push(diskIOValue);
+    systemInfoHistory.networkIO.push(networkIOValue);
+    
+    // Keep only last 30 data points
+    const maxPoints = 30;
+    if (systemInfoHistory.timestamps.length > maxPoints) {
+        systemInfoHistory.timestamps.shift();
+        systemInfoHistory.cpu.shift();
+        systemInfoHistory.memory.shift();
+        systemInfoHistory.virtualMemory.shift();
+        systemInfoHistory.processes.shift();
+        systemInfoHistory.diskIO.shift();
+        systemInfoHistory.networkIO.shift();
+    }
+    
+    // Calculate and update statistics
+    const cpuStats = calculateStats(systemInfoHistory.cpu);
+    const memoryStats = calculateStats(systemInfoHistory.memory);
+    const virtualMemoryStats = calculateStats(systemInfoHistory.virtualMemory);
+    const processStats = calculateStats(systemInfoHistory.processes);
+    const diskIOStats = calculateStats(systemInfoHistory.diskIO);
+    const networkIOStats = calculateStats(systemInfoHistory.networkIO);
+    
+    // Update statistics displays
+    document.getElementById('cpuCurrent').textContent = cpuStats.current + '%';
+    document.getElementById('cpuMin').textContent = cpuStats.min.toFixed(1) + '%';
+    document.getElementById('cpuMax').textContent = cpuStats.max.toFixed(1) + '%';
+    document.getElementById('cpuAvg').textContent = cpuStats.avg.toFixed(1) + '%';
+    
+    document.getElementById('memoryCurrent').textContent = memoryStats.current + '%';
+    document.getElementById('memoryMin').textContent = memoryStats.min.toFixed(1) + '%';
+    document.getElementById('memoryMax').textContent = memoryStats.max.toFixed(1) + '%';
+    document.getElementById('memoryAvg').textContent = memoryStats.avg.toFixed(1) + '%';
+    
+    document.getElementById('virtualMemoryCurrent').textContent = virtualMemoryStats.current + '%';
+    document.getElementById('virtualMemoryMin').textContent = virtualMemoryStats.min.toFixed(1) + '%';
+    document.getElementById('virtualMemoryMax').textContent = virtualMemoryStats.max.toFixed(1) + '%';
+    document.getElementById('virtualMemoryAvg').textContent = virtualMemoryStats.avg.toFixed(1) + '%';
+    
+    document.getElementById('processCurrent').textContent = processStats.current;
+    document.getElementById('processMin').textContent = Math.round(processStats.min);
+    document.getElementById('processMax').textContent = Math.round(processStats.max);
+    document.getElementById('processAvg').textContent = Math.round(processStats.avg);
+    
+    document.getElementById('diskIOCurrent').textContent = diskIOStats.current.toFixed(1) + ' MiB';
+    document.getElementById('diskIOMin').textContent = diskIOStats.min.toFixed(1) + ' MiB';
+    document.getElementById('diskIOMax').textContent = diskIOStats.max.toFixed(1) + ' MiB';
+    document.getElementById('diskIOAvg').textContent = diskIOStats.avg.toFixed(1) + ' MiB';
+    
+    document.getElementById('networkIOCurrent').textContent = networkIOStats.current.toFixed(2) + ' Mbps';
+    document.getElementById('networkIOMin').textContent = networkIOStats.min.toFixed(2) + ' Mbps';
+    document.getElementById('networkIOMax').textContent = networkIOStats.max.toFixed(2) + ' Mbps';
+    document.getElementById('networkIOAvg').textContent = networkIOStats.avg.toFixed(2) + ' Mbps';
+    
+    // Update charts
+    if (systemInfoCharts.cpu) {
+        systemInfoCharts.cpu.data.labels = systemInfoHistory.timestamps;
+        systemInfoCharts.cpu.data.datasets[0].data = systemInfoHistory.cpu;
+        systemInfoCharts.cpu.update('none');
+    }
+    
+    if (systemInfoCharts.memory) {
+        systemInfoCharts.memory.data.labels = systemInfoHistory.timestamps;
+        systemInfoCharts.memory.data.datasets[0].data = systemInfoHistory.memory;
+        systemInfoCharts.memory.update('none');
+    }
+    
+    if (systemInfoCharts.virtualMemory) {
+        systemInfoCharts.virtualMemory.data.labels = systemInfoHistory.timestamps;
+        systemInfoCharts.virtualMemory.data.datasets[0].data = systemInfoHistory.virtualMemory;
+        systemInfoCharts.virtualMemory.update('none');
+    }
+    
+    if (systemInfoCharts.processes) {
+        systemInfoCharts.processes.data.labels = systemInfoHistory.timestamps;
+        systemInfoCharts.processes.data.datasets[0].data = systemInfoHistory.processes;
+        systemInfoCharts.processes.update('none');
+    }
+    
+    if (systemInfoCharts.diskIO) {
+        systemInfoCharts.diskIO.data.labels = systemInfoHistory.timestamps;
+        systemInfoCharts.diskIO.data.datasets[0].data = systemInfoHistory.diskIO;
+        systemInfoCharts.diskIO.update('none');
+    }
+    
+    if (systemInfoCharts.networkIO) {
+        systemInfoCharts.networkIO.data.labels = systemInfoHistory.timestamps;
+        systemInfoCharts.networkIO.data.datasets[0].data = systemInfoHistory.networkIO;
+        systemInfoCharts.networkIO.update('none');
+    }
+}
+
+// Fetch and update system information
+async function fetchSystemInfo() {
+    try {
+        const response = await fetch('/admin/dashboard/api/system-info');
+        
+        if (!response.ok) {
+            console.error('HTTP error:', response.status, response.statusText);
+            const text = await response.text();
+            console.error('Response:', text.substring(0, 200));
+            return;
+        }
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            console.error('Failed to fetch system info:', result.message);
+            return;
+        }
+        
+        const data = result.data;
+        
+        // Update gauges
+        drawGauge('cpuGauge', data.cpu.usage, 100, '#36a2eb');
+        drawGauge('memoryGauge', data.memory.percent, 100, '#ff6384');
+        drawGauge('virtualMemoryGauge', data.virtualMemory.percent, 100, '#4bc0c0');
+        
+        // Find root disk
+        const rootDisk = data.disk.find(d => d.mounted === '/') || data.disk[0];
+        if (rootDisk) {
+            drawGauge('diskGauge', rootDisk.percent, 100, '#9966ff');
+        }
+        
+        // Update gauge values
+        document.getElementById('cpuValue').textContent = data.cpu.usage + '%';
+        document.getElementById('memoryValue').textContent = data.memory.percent + '%';
+        document.getElementById('virtualMemoryValue').textContent = data.virtualMemory.percent + '%';
+        if (rootDisk) {
+            document.getElementById('diskValue').textContent = rootDisk.percent + '%';
+        }
+        
+        // Update detailed information
+        document.getElementById('sysHostname').textContent = data.hostname + ' (' + (data.network[0]?.ipv4 || 'N/A') + ')';
+        document.getElementById('sysVersion').textContent = data.version;
+        document.getElementById('sysTime').textContent = data.time;
+        document.getElementById('sysProcessor').textContent = data.cpu.model + ', ' + data.cpu.cores + ' cores';
+        document.getElementById('sysProcesses').textContent = data.processes;
+        document.getElementById('sysRealMemory').textContent = 
+            formatBytes(data.memory.used) + ' used / ' + 
+            formatBytes(data.memory.cached || 0) + ' cached / ' + 
+            formatBytes(data.memory.total) + ' total';
+        if (rootDisk) {
+            document.getElementById('sysDiskSpace').textContent = 
+                formatBytes(rootDisk.used) + ' used / ' + 
+                formatBytes(rootDisk.free) + ' free / ' + 
+                formatBytes(rootDisk.total) + ' total';
+        }
+        
+        document.getElementById('sysOS').textContent = data.os;
+        document.getElementById('sysKernel').textContent = data.kernel + ' on ' + data.arch;
+        document.getElementById('sysUptime').textContent = data.uptimeFormatted;
+        document.getElementById('sysLoadAvg').textContent = 
+            data.cpu.loadAvg['1min'] + ' (1 min) ' + 
+            data.cpu.loadAvg['5min'] + ' (5 mins) ' + 
+            data.cpu.loadAvg['15min'] + ' (15 mins)';
+        document.getElementById('sysVirtualMemory').textContent = 
+            formatBytes(data.virtualMemory.used) + ' used / ' + 
+            formatBytes(data.virtualMemory.total) + ' total';
+        
+        // Update network interfaces table
+        const networkTable = document.querySelector('#networkInterfacesTable tbody');
+        if (networkTable && data.network.length > 0) {
+            networkTable.innerHTML = data.network.map(iface => `
+                <tr>
+                    <td>${iface.name}</td>
+                    <td>${iface.type}</td>
+                    <td>${iface.interfaceSpeed || 'N/A'}</td>
+                    <td>${iface.ipv4}</td>
+                    <td>${iface.ipv6 && iface.ipv6.length > 0 ? iface.ipv6.join('<br>') : '-'}</td>
+                    <td>${iface.netmask}</td>
+                    <td>${iface.broadcast || '-'}</td>
+                    <td>${iface.active ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Inactive</span>'}</td>
+                </tr>
+            `).join('');
+        } else if (networkTable) {
+            networkTable.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No network interfaces found</td></tr>';
+        }
+        
+        // Update disk usage table
+        const diskTable = document.querySelector('#diskUsageTable tbody');
+        if (diskTable && data.disk.length > 0) {
+            diskTable.innerHTML = data.disk.map(disk => `
+                <tr>
+                    <td>${disk.mounted}</td>
+                    <td>${disk.type}</td>
+                    <td>${disk.percent}% (${formatBytes(disk.free)})</td>
+                    <td>${formatBytes(disk.used)}</td>
+                    <td>${formatBytes(disk.total)}</td>
+                </tr>
+            `).join('');
+        } else if (diskTable) {
+            diskTable.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No disk information available</td></tr>';
+        }
+        
+        // Update charts
+        updateSystemCharts(data);
+        
+    } catch (error) {
+        console.error('Error fetching system info:', error);
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait for Chart.js to be loaded
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet, waiting...');
+        setTimeout(function() {
+            if (typeof Chart !== 'undefined') {
+                initializeSystemCharts();
+                fetchSystemInfo();
+                setupSystemInfoRefresh();
+            } else {
+                console.error('Chart.js failed to load');
+            }
+        }, 500);
+    } else {
+        initializeSystemCharts();
+        fetchSystemInfo();
+        setupSystemInfoRefresh();
+    }
+});
+
+// Setup refresh functionality
+function setupSystemInfoRefresh() {
+    // Refresh button
+    const refreshBtn = document.getElementById('refreshSystemInfo');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', fetchSystemInfo);
+    }
+    
+    // Auto-refresh every 5 seconds
+    setInterval(fetchSystemInfo, 5000);
+}
 </script>
             </main>
     </div>

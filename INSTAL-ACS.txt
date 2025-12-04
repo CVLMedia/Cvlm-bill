@@ -1,0 +1,29 @@
+JALANKAN PERINTAH INI
+=========================================================
+
+apt install git curl -y
+
+git clone https://github.com/enosrotua/cvlgenieACS.git
+
+cd cvlgenieACS
+
+chmod +x *.sh
+
+bash darkmode.sh
+
+=====================================
+Akses GenieACS
+=====================================
+URL: http://YOUR_SERVER_IP:3000
+Username: admin
+Password: admin
+
+
+# Ganti logo
+bash change-logo.sh
+
+# Ganti tema/background color
+bash change-theme.sh
+
+# Management suite lengkap
+bash genieacs-manager.sh

@@ -3,6 +3,7 @@ const { sendTechnicianMessage } = require('./sendMessage');
 const mikrotik = require('./mikrotik');
 const { getMikrotikConnection } = require('./mikrotik');
 const cacheManager = require('./cacheManager');
+const { getSetting } = require('./settingsManager');
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 
@@ -110,12 +111,12 @@ async function getDefaultGenieacsServer() {
 
 function sanitizeGenieacsServer(server) {
     if (!server || !server.url) {
-        throw new Error('GenieACS server belum dikonfigurasi. Silakan tambah melalui /admin/genieacs-servers');
+        throw new Error('GenieACS server belum dikonfigurasi. Silakan tambah melalui /admin/routers');
     }
 
     const base = String(server.url || '').trim();
     if (!base) {
-        throw new Error('GenieACS server URL kosong. Perbarui konfigurasi di /admin/genieacs-servers');
+        throw new Error('GenieACS server URL kosong. Perbarui konfigurasi di /admin/routers');
     }
 
     if (!/^https?:\/\//i.test(base)) {
@@ -135,7 +136,7 @@ async function resolveGenieacsServer(genieacsServer = null) {
 
     const defaultServer = await getDefaultGenieacsServer();
     if (!defaultServer) {
-        throw new Error('Tidak ada GenieACS server yang terkonfigurasi. Tambahkan server di /admin/genieacs-servers');
+        throw new Error('Tidak ada GenieACS server yang terkonfigurasi. Tambahkan server di /admin/routers');
     }
 
     return sanitizeGenieacsServer(defaultServer);

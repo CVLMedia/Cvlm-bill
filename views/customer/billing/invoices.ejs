@@ -90,9 +90,9 @@
                                                 <td>
                                                     <div class="btn-group" role="group">
                                                         <% if (invoice.status === 'unpaid') { %>
-                                                            <a href="/customer/billing/invoices/<%= invoice.id %>" class="btn btn-sm btn-success">
+                                                            <button type="button" class="btn btn-sm btn-success" onclick="openPaymentModal(<%= invoice.id %>, '<%= invoice.invoice_number %>', <%= invoice.amount %>)">
                                                                 <i class="bi bi-credit-card"></i> Bayar
-                                                            </a>
+                                                            </button>
                                                         <% } %>
                                                         <a href="/customer/billing/invoices/<%= invoice.id %>" class="btn btn-sm btn-outline-primary">
                                                             <i class="bi bi-eye"></i> Detail
@@ -162,8 +162,310 @@
         </div>
     </footer>
 
+    <!-- Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="paymentModalLabel">
+                        <i class="bi bi-credit-card"></i> Pilih Metode Pembayaran
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <strong>No. Tagihan:</strong> <span id="modal-invoice-number"></span><br>
+                        <strong>Jumlah:</strong> <span id="modal-invoice-amount"></span>
+                    </div>
+                    <div id="payment-methods-container">
+                        <div class="text-center py-3">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading payment methods...</span>
+                            </div>
+                            <p class="mt-2 mb-0">Memuat metode pembayaran...</p>
+                        </div>
+                    </div>
+                    <div id="payment-processing" class="text-center" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 mb-0">Memproses pembayaran...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/customer-mobile.js"></script>
+    <script>
+        let currentInvoiceId = null;
+        let currentInvoiceAmount = 0;
+
+        function openPaymentModal(invoiceId, invoiceNumber, amount) {
+            currentInvoiceId = invoiceId;
+            currentInvoiceAmount = amount;
+            document.getElementById('modal-invoice-number').textContent = invoiceNumber;
+            document.getElementById('modal-invoice-amount').textContent = 'Rp ' + Math.round(amount).toLocaleString('id-ID');
+            
+            const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+            modal.show();
+            
+            // Load payment methods when modal is shown
+            loadPaymentMethods();
+        }
+
+        // Load payment methods dynamically
+        async function loadPaymentMethods() {
+            try {
+                const response = await fetch('/customer/billing/api/payment-methods');
+                const result = await response.json();
+                
+                if (result.success && result.methodsByGateway) {
+                    renderPaymentMethods(result.methodsByGateway);
+                } else if (result.success && result.methods) {
+                    // Fallback untuk kompatibilitas
+                    renderPaymentMethods(result.methods);
+                } else {
+                    showPaymentMethodsError('Gagal memuat metode pembayaran: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error loading payment methods:', error);
+                showPaymentMethodsError('Terjadi kesalahan saat memuat metode pembayaran');
+            }
+        }
+        
+        function renderPaymentMethods(methodsByGateway) {
+            const container = document.getElementById('payment-methods-container');
+            
+            // Check if methodsByGateway is an object (grouped) or array (legacy)
+            let isGrouped = methodsByGateway && typeof methodsByGateway === 'object' && !Array.isArray(methodsByGateway);
+            
+            if (!isGrouped) {
+                // Legacy format: array of methods
+                const methods = methodsByGateway || [];
+                if (methods.length === 0) {
+                    container.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            Tidak ada metode pembayaran yang tersedia saat ini.
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '<div class="row g-2 mb-3">';
+                methods.forEach(method => {
+                    const isDisabled = method.minimum_amount && currentInvoiceAmount < method.minimum_amount;
+                    const disabledClass = isDisabled ? 'disabled' : '';
+                    const disabledTitle = isDisabled ? `Minimal pembayaran: Rp ${method.minimum_amount?.toLocaleString('id-ID')}` : '';
+                    
+                    html += `
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-${method.color} w-100 payment-method ${disabledClass}" 
+                                    data-gateway="${method.gateway}" 
+                                    data-method="${method.method}"
+                                    ${isDisabled ? 'disabled' : ''}
+                                    title="${disabledTitle}">
+                                <i class="${method.icon}"></i><br>
+                                <small>${method.name}</small>
+                                <br><small class="text-muted">Fee: ${method.fee_customer || 'Gratis'}</small>
+                                ${isDisabled ? `<br><small class="text-danger">Min: Rp ${method.minimum_amount?.toLocaleString('id-ID')}</small>` : ''}
+                            </button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+                bindPaymentMethodEvents();
+                return;
+            }
+            
+            // New format: grouped by gateway
+            const gateways = Object.keys(methodsByGateway);
+            if (gateways.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Tidak ada metode pembayaran yang tersedia saat ini.
+                    </div>
+                `;
+                return;
+            }
+            
+            const gatewayNames = {
+                'duitku': 'Duitku',
+                'tripay': 'Tripay',
+                'midtrans': 'Midtrans',
+                'xendit': 'Xendit'
+            };
+            
+            let html = '';
+            
+            // Pisahkan Duitku dari gateway lain
+            const duitkuMethods = methodsByGateway.duitku || [];
+            const otherGateways = gateways.filter(g => g !== 'duitku');
+            
+            // Kolom Duitku (jika ada)
+            if (duitkuMethods.length > 0) {
+                html += `
+                    <div class="mb-4">
+                        <h6 class="mb-3">
+                            <i class="bi bi-wallet2 text-success"></i> 
+                            <strong>Duitku</strong>
+                        </h6>
+                        <div class="row g-2">
+                `;
+                
+                duitkuMethods.forEach(method => {
+                    const isDisabled = method.minimum_amount && currentInvoiceAmount < method.minimum_amount;
+                    const disabledClass = isDisabled ? 'disabled' : '';
+                    const disabledTitle = isDisabled ? `Minimal pembayaran: Rp ${method.minimum_amount?.toLocaleString('id-ID')}` : '';
+                    const iconHtml = method.image_url 
+                        ? `<img src="${method.image_url}" alt="${method.name}" class="mb-1" style="height:24px;object-fit:contain;">`
+                        : `<i class="${method.icon}"></i>`;
+                    
+                    html += `
+                        <div class="col-md-6 col-lg-4">
+                            <button class="btn btn-outline-${method.color} w-100 payment-method ${disabledClass}" 
+                                    data-gateway="${method.gateway}" 
+                                    data-method="${method.method}"
+                                    ${isDisabled ? 'disabled' : ''}
+                                    title="${disabledTitle}">
+                                ${iconHtml}<br>
+                                <small>${method.name}</small>
+                                <br><small class="text-muted">Fee: ${method.fee_customer || 'Gratis'}</small>
+                                ${isDisabled ? `<br><small class="text-danger">Min: Rp ${method.minimum_amount?.toLocaleString('id-ID')}</small>` : ''}
+                            </button>
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Kolom untuk gateway lainnya (Tripay, Midtrans, Xendit, dll)
+            otherGateways.forEach(gateway => {
+                const gatewayMethods = methodsByGateway[gateway] || [];
+                if (gatewayMethods.length > 0) {
+                    html += `
+                        <div class="mb-4">
+                            <h6 class="mb-3">
+                                <i class="bi bi-credit-card text-primary"></i> 
+                                <strong>${gatewayNames[gateway] || gateway.toUpperCase()}</strong>
+                            </h6>
+                            <div class="row g-2">
+                    `;
+                    
+                    gatewayMethods.forEach(method => {
+                        const isDisabled = method.minimum_amount && currentInvoiceAmount < method.minimum_amount;
+                        const disabledClass = isDisabled ? 'disabled' : '';
+                        const disabledTitle = isDisabled ? `Minimal pembayaran: Rp ${method.minimum_amount?.toLocaleString('id-ID')}` : '';
+                        
+                        html += `
+                            <div class="col-md-6 col-lg-4">
+                                <button class="btn btn-outline-${method.color} w-100 payment-method ${disabledClass}" 
+                                        data-gateway="${method.gateway}" 
+                                        data-method="${method.method}"
+                                        ${isDisabled ? 'disabled' : ''}
+                                        title="${disabledTitle}">
+                                    <i class="${method.icon}"></i><br>
+                                    <small>${method.name}</small>
+                                    <br><small class="text-muted">Fee: ${method.fee_customer || 'Gratis'}</small>
+                                    ${isDisabled ? `<br><small class="text-danger">Min: Rp ${method.minimum_amount?.toLocaleString('id-ID')}</small>` : ''}
+                                </button>
+                            </div>
+                        `;
+                    });
+                    
+                    html += `
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            container.innerHTML = html;
+            
+            // Bind event listeners to new buttons
+            bindPaymentMethodEvents();
+        }
+        
+        function showPaymentMethodsError(message) {
+            const container = document.getElementById('payment-methods-container');
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-circle"></i>
+                    ${message}
+                </div>
+                <button class="btn btn-outline-primary w-100" onclick="loadPaymentMethods()">
+                    <i class="bi bi-arrow-clockwise"></i> Coba Lagi
+                </button>
+            `;
+        }
+        
+        // Handle payment method selection
+        function bindPaymentMethodEvents() {
+            document.querySelectorAll('.payment-method').forEach(button => {
+                button.addEventListener('click', async function() {
+                    if (this.disabled) return;
+                    
+                    const gateway = this.dataset.gateway;
+                    const method = this.dataset.method;
+                    const invoiceId = currentInvoiceId;
+                    
+                    // Show loading
+                    document.getElementById('payment-processing').style.display = 'block';
+                    this.disabled = true;
+                    
+                    try {
+                        const response = await fetch('/customer/billing/create-payment', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                invoice_id: invoiceId,
+                                gateway: gateway,
+                                method: method
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            // Redirect to payment URL
+                            if (result.data && result.data.payment_url) {
+                                window.open(result.data.payment_url, '_blank');
+                                
+                                // Close modal and refresh page after 2 seconds
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+                                if (modal) modal.hide();
+                                
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 2000);
+                            } else {
+                                alert('Error: Payment URL tidak ditemukan');
+                            }
+                        } else {
+                            alert('Error: ' + (result.message || 'Gagal membuat pembayaran'));
+                        }
+                    } catch (error) {
+                        console.error('Payment error:', error);
+                        alert('Terjadi kesalahan saat membuat pembayaran: ' + error.message);
+                    } finally {
+                        // Hide loading
+                        document.getElementById('payment-processing').style.display = 'none';
+                        this.disabled = false;
+                    }
+                });
+            });
+        }
+    </script>
 
     <!-- Bottom nav (mobile) 5 menu -->
     <nav class="bottom-nav d-md-none">

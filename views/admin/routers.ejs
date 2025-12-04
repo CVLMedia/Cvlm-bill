@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>NAS (RADIUS)</title>
+  <title>Set Koneksi</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -14,64 +14,79 @@
     <%- include('../partials/admin-responsive-sidebar', { page: 'routers', settings: settings || {} }) %>
     <main class="col-md-10 ms-sm-auto main-content">
       <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0"><i class="bi bi-hdd-network me-2"></i>NAS (RADIUS)</h4>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRouterModal"><i class="bi bi-plus"></i> Tambah NAS</button>
+        <h4 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Set Koneksi</h4>
+        <div>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRouterModal"><i class="bi bi-plus"></i> Tambah Router</button>
+        </div>
       </div>
-      <div class="card p-3">
-        <div class="table-responsive">
-          <table class="table table-striped align-middle">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Nama</th>
-                <th>NAS IP</th>
-                <th>NAS Identifier</th>
-                <th>Lokasi</th>
-                <th>POP</th>
-                <th>Port</th>
-                <th>User API</th>
-                <th>Password API</th>
-                <th>GenieACS Server</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% (routers||[]).forEach(function(r,i){ %>
+      
+      <!-- Router Mikrotik Section -->
+      <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="bi bi-router me-2"></i>Router Mikrotik</h5>
+        </div>
+        <div class="card-body p-3">
+          <div class="table-responsive">
+            <table class="table table-striped align-middle">
+              <thead>
                 <tr>
-                  <td><%= i+1 %></td>
-                  <td><%= r.name %></td>
-                  <td><%= r.nas_ip %></td>
-                  <td><%= r.nas_identifier || '' %></td>
-                  <td><%= r.location || '' %></td>
-                  <td><%= r.pop || '' %></td>
-                  <td><%= r.port || 8728 %></td>
-                  <td><%= r.user || '' %></td>
-                  <td><%= r.password ? '***' : '' %></td>
-                  <td>
-                    <% if (r.genieacs_server_name) { %>
-                      <span class="badge bg-info"><%= r.genieacs_server_name %></span><br>
-                      <small class="text-muted"><%= r.genieacs_server_url %></small>
-                    <% } else { %>
-                      <span class="text-muted">-</span>
-                    <% } %>
-                  </td>
-                  <td>
-                    <button class="btn btn-sm btn-outline-secondary" onclick='openEdit(<%- JSON.stringify(r) %>)'><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-info" onclick='testRouter(<%= r.id %>)'><i class="bi bi-activity"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick='deleteRouter(<%= r.id %>)'><i class="bi bi-trash"></i></button>
-                  </td>
+                  <th>#</th>
+                  <th>Nama</th>
+                  <th>NAS IP</th>
+                  <th>NAS Identifier</th>
+                  <th>Lokasi</th>
+                  <th>POP</th>
+                  <th>Port</th>
+                  <th>User API</th>
+                  <th>Password API</th>
+                  <th>GenieACS Server</th>
+                  <th>Aksi</th>
                 </tr>
-              <% }) %>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                <% if (typeof routers !== 'undefined' && routers && routers.length > 0) { %>
+                  <% routers.forEach(function(r,i){ %>
+                    <tr>
+                      <td><%= i+1 %></td>
+                      <td><%= r.name %></td>
+                      <td><%= r.nas_ip %></td>
+                      <td><%= r.nas_identifier || '' %></td>
+                      <td><%= r.location || '' %></td>
+                      <td><%= r.pop || '' %></td>
+                      <td><%= r.port || 8728 %></td>
+                      <td><%= r.user || '' %></td>
+                      <td><%= r.password ? '***' : '' %></td>
+                      <td>
+                        <% if (r.genieacs_server_name) { %>
+                          <span class="badge bg-info"><%= r.genieacs_server_name %></span><br>
+                          <small class="text-muted"><%= r.genieacs_server_url %></small>
+                        <% } else { %>
+                          <span class="text-muted">-</span>
+                        <% } %>
+                      </td>
+                      <td>
+                        <button class="btn btn-sm btn-outline-secondary" onclick='openEdit(<%- JSON.stringify(r) %>)'><i class="bi bi-pencil"></i></button>
+                        <button class="btn btn-sm btn-outline-info" onclick='testRouter(<%= r.id %>)'><i class="bi bi-activity"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick='deleteRouter(<%= r.id %>)'><i class="bi bi-trash"></i></button>
+                      </td>
+                    </tr>
+                  <% }) %>
+                <% } else { %>
+                  <tr>
+                    <td colspan="11" class="text-center text-muted">Belum ada router</td>
+                  </tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <!-- Add Modal -->
+      <!-- Add Router Modal -->
       <div class="modal fade" id="addRouterModal" tabindex="-1">
         <div class="modal-dialog">
           <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Tambah NAS</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Tambah Router Mikrotik</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
               <div class="mb-3"><label class="form-label">Nama</label><input class="form-control" id="r_name"></div>
               <div class="mb-3"><label class="form-label">NAS IP</label><input class="form-control" id="r_ip" placeholder="10.0.0.10"></div>
@@ -97,11 +112,11 @@
         </div>
       </div>
 
-      <!-- Edit Modal -->
+      <!-- Edit Router Modal -->
       <div class="modal fade" id="editRouterModal" tabindex="-1">
         <div class="modal-dialog">
           <div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title">Edit NAS</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header"><h5 class="modal-title">Edit Router Mikrotik</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
             <div class="modal-body">
               <input type="hidden" id="e_id">
               <div class="mb-3"><label class="form-label">Nama</label><input class="form-control" id="e_name"></div>
@@ -159,11 +174,11 @@ async function updateRouter(){
   const res = await fetch('/admin/routers/'+id, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r=>r.json());
   if(res.success){ location.reload(); } else { alert(res.message||'Gagal update'); }
 }
-async function deleteRouter(id){ if(!confirm('Hapus NAS ini?')) return; const res=await fetch('/admin/routers/'+id+'/delete',{method:'POST'}).then(r=>r.json()); if(res.success){ location.reload(); } else { alert(res.message||'Gagal hapus'); } }
+async function deleteRouter(id){ if(!confirm('Hapus router ini?')) return; const res=await fetch('/admin/routers/'+id+'/delete',{method:'POST'}).then(r=>r.json()); if(res.success){ location.reload(); } else { alert(res.message||'Gagal hapus'); } }
 async function testRouter(id){
   const btn = event.currentTarget; const old = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-  try { const res = await fetch('/admin/routers/'+id+'/test',{method:'POST'}).then(r=>r.json()); if(res.success){ alert('Connected: '+(res.identity||'OK')+' @ '+(res.host||'')+ (res.port? (':'+res.port):'')); } else { alert('Gagal konek: '+(res.message||'Unknown')); } }
-  catch(e){ alert('Error: '+e.message); }
+  try { const res = await fetch('/admin/routers/'+id+'/test',{method:'POST'}).then(r=>r.json()); if(res.success){ alert('✅ Connected: '+(res.identity||'OK')+' @ '+(res.host||'')+ (res.port? (':'+res.port):'')); } else { alert('❌ Gagal konek: '+(res.message||'Unknown')); } }
+  catch(e){ alert('❌ Error: '+e.message); }
   finally { btn.disabled=false; btn.innerHTML = old; }
 }
 </script>

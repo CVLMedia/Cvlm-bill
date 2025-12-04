@@ -180,6 +180,43 @@ class InvoiceScheduler {
 
         logger.info('Voucher cleanup scheduler initialized - will run every 6 hours');
         
+        // Schedule automatic payment gateway status check every 15 minutes
+        // This ensures payments that are PAID in gateway but webhook failed will be processed
+        cron.schedule('*/15 * * * *', async () => {
+            try {
+                logger.info('[AUTO-CHECK] Starting automatic payment gateway status check...');
+                await this.checkAndProcessPendingPayments();
+                logger.info('[AUTO-CHECK] Automatic payment gateway status check completed');
+            } catch (error) {
+                logger.error('[AUTO-CHECK] Error in automatic payment gateway status check:', error);
+            }
+        }, {
+            scheduled: true,
+            timezone: "Asia/Jakarta"
+        });
+        
+        logger.info('Payment gateway auto-check scheduler initialized - will run every 15 minutes');
+
+        // Schedule automatic activity logs cleanup daily at 02:00 (delete logs older than 30 days)
+        cron.schedule('0 2 * * *', async () => {
+            try {
+                logger.info('Starting automatic activity logs cleanup (30 days)...');
+                const { cleanupOldLogs } = require('../utils/activityLogger');
+                const result = await cleanupOldLogs(30);
+                if (result.success) {
+                    logger.info(`Automatic activity logs cleanup completed: ${result.message}`);
+                } else {
+                    logger.error('Automatic activity logs cleanup failed:', result.message);
+                }
+            } catch (error) {
+                logger.error('Error in automatic activity logs cleanup:', error);
+            }
+        }, {
+            scheduled: true,
+            timezone: "Asia/Jakarta"
+        });
+        
+        logger.info('Activity logs cleanup scheduler initialized - will run daily at 02:00 (delete logs older than 30 days)');
 
     }
 
@@ -495,6 +532,192 @@ class InvoiceScheduler {
             return result;
         } catch (error) {
             logger.error('Error in performMonthlyReset:', error);
+            throw error;
+        }
+    }
+
+    async checkAndProcessPendingPayments() {
+        try {
+            const sqlite3 = require('sqlite3').verbose();
+            const dbPath = require('path').join(__dirname, '../data/billing.db');
+            const { getSetting } = require('./settingsManager');
+            const whatsappNotifications = require('./whatsapp-notifications');
+            
+            // Get Tripay config
+            const settings = getSetting('payment_gateway', {});
+            const tripayConfig = settings.tripay || {};
+            
+            if (!tripayConfig.enabled || !tripayConfig.api_key || !tripayConfig.private_key) {
+                logger.info('[AUTO-CHECK] Tripay not enabled or config incomplete, skipping...');
+                return { success: true, processed: 0, skipped: true };
+            }
+            
+            const baseUrl = tripayConfig.production !== false 
+                ? 'https://tripay.co.id/api' 
+                : 'https://tripay.co.id/api-sandbox';
+            
+            // Find pending Tripay transactions (created within last 24 hours)
+            const db = new sqlite3.Database(dbPath);
+            const pendingTransactions = await new Promise((resolve, reject) => {
+                const oneDayAgo = new Date();
+                oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+                const oneDayAgoStr = oneDayAgo.toISOString().replace('T', ' ').substring(0, 19);
+                
+                db.all(`
+                    SELECT pgt.id, pgt.invoice_id, pgt.order_id, pgt.token, pgt.status, pgt.amount,
+                           i.invoice_number, i.status as invoice_status
+                    FROM payment_gateway_transactions pgt
+                    JOIN invoices i ON pgt.invoice_id = i.id
+                    WHERE pgt.gateway = 'tripay'
+                      AND pgt.status = 'pending'
+                      AND pgt.token IS NOT NULL
+                      AND pgt.token != ''
+                      AND pgt.created_at >= ?
+                    ORDER BY pgt.created_at DESC
+                    LIMIT 20
+                `, [oneDayAgoStr], (err, rows) => {
+                    db.close();
+                    if (err) reject(err);
+                    else resolve(rows || []);
+                });
+            });
+            
+            if (pendingTransactions.length === 0) {
+                logger.info('[AUTO-CHECK] No pending Tripay transactions found');
+                return { success: true, processed: 0 };
+            }
+            
+            logger.info(`[AUTO-CHECK] Found ${pendingTransactions.length} pending Tripay transactions to check`);
+            
+            const fetchFn = typeof fetch === 'function' ? fetch : require('node-fetch').default;
+            let processedCount = 0;
+            let errorCount = 0;
+            
+            for (const transaction of pendingTransactions) {
+                try {
+                    // Check status from Tripay API
+                    const url = new URL(`${baseUrl}/transaction/detail`);
+                    url.searchParams.append('reference', transaction.token);
+                    
+                    const response = await fetchFn(url.toString(), {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${tripayConfig.api_key}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (!response.ok || !result.success) {
+                        logger.warn(`[AUTO-CHECK] Failed to check transaction ${transaction.token}: ${result.message || 'Unknown error'}`);
+                        errorCount++;
+                        continue;
+                    }
+                    
+                    const tripayData = result.data;
+                    
+                    // If payment is PAID in Tripay but not processed locally
+                    if (tripayData.status === 'PAID' && transaction.invoice_status === 'unpaid') {
+                        logger.info(`[AUTO-CHECK] Payment PAID found: Invoice ${transaction.invoice_number}, Processing...`);
+                        
+                        // Check if payment already exists
+                        const db2 = new sqlite3.Database(dbPath);
+                        const existingPayment = await new Promise((resolve, reject) => {
+                            db2.get(`
+                                SELECT id FROM payments 
+                                WHERE invoice_id = ? AND reference_number = ?
+                            `, [transaction.invoice_id, transaction.order_id], (err, row) => {
+                                db2.close();
+                                if (err) reject(err);
+                                else resolve(row);
+                            });
+                        });
+                        
+                        if (existingPayment) {
+                            logger.info(`[AUTO-CHECK] Payment already exists for invoice ${transaction.invoice_number}, skipping...`);
+                            continue;
+                        }
+                        
+                        // Record payment
+                        const paymentData = {
+                            invoice_id: transaction.invoice_id,
+                            amount: tripayData.amount || transaction.amount,
+                            payment_method: 'online',
+                            reference_number: transaction.order_id,
+                            notes: `Payment via Tripay - ${tripayData.payment_method || 'online'} (Auto-processed from API check)`
+                        };
+                        
+                        const paymentResult = await billingManager.recordPayment(paymentData);
+                        
+                        if (paymentResult && paymentResult.success && paymentResult.id) {
+                            // Update invoice status
+                            await billingManager.updateInvoiceStatus(transaction.invoice_id, 'paid', 'online');
+                            
+                            // Update payment gateway transaction
+                            const db3 = new sqlite3.Database(dbPath);
+                            await new Promise((resolve, reject) => {
+                                db3.run(`
+                                    UPDATE payment_gateway_transactions
+                                    SET status = 'success', 
+                                        payment_type = ?,
+                                        updated_at = CURRENT_TIMESTAMP
+                                    WHERE id = ?
+                                `, [tripayData.payment_method || 'online', transaction.id], (err) => {
+                                    db3.close();
+                                    if (err) reject(err);
+                                    else resolve();
+                                });
+                            });
+                            
+                            logger.info(`[AUTO-CHECK] ✅ Payment processed: Invoice ${transaction.invoice_number}, Payment ID ${paymentResult.id}`);
+                            
+                            // Send notification
+                            try {
+                                const notifResult = await whatsappNotifications.sendPaymentReceivedNotification(paymentResult.id);
+                                if (notifResult && notifResult.success) {
+                                    logger.info(`[AUTO-CHECK] ✅ Notification sent for invoice ${transaction.invoice_number}`);
+                                } else {
+                                    logger.warn(`[AUTO-CHECK] ⚠️  Notification failed for invoice ${transaction.invoice_number}:`, notifResult);
+                                }
+                            } catch (notifError) {
+                                logger.error(`[AUTO-CHECK] ❌ Error sending notification for invoice ${transaction.invoice_number}:`, notifError.message);
+                            }
+                            
+                            processedCount++;
+                        } else {
+                            logger.error(`[AUTO-CHECK] ❌ Failed to record payment for invoice ${transaction.invoice_number}`);
+                            errorCount++;
+                        }
+                    } else if (tripayData.status === 'EXPIRED' || tripayData.status === 'FAILED') {
+                        // Update expired/failed transactions
+                        const db4 = new sqlite3.Database(dbPath);
+                        await new Promise((resolve, reject) => {
+                            db4.run(`
+                                UPDATE payment_gateway_transactions
+                                SET status = 'failed',
+                                    updated_at = CURRENT_TIMESTAMP
+                                WHERE id = ?
+                            `, [transaction.id], (err) => {
+                                db4.close();
+                                if (err) reject(err);
+                                else resolve();
+                            });
+                        });
+                        logger.info(`[AUTO-CHECK] Updated transaction ${transaction.token} status to failed (${tripayData.status})`);
+                    }
+                    
+                } catch (error) {
+                    logger.error(`[AUTO-CHECK] Error processing transaction ${transaction.token}:`, error.message);
+                    errorCount++;
+                }
+            }
+            
+            logger.info(`[AUTO-CHECK] Completed: ${processedCount} processed, ${errorCount} errors`);
+            return { success: true, processed: processedCount, errors: errorCount };
+            
+        } catch (error) {
+            logger.error('[AUTO-CHECK] Error in checkAndProcessPendingPayments:', error);
             throw error;
         }
     }

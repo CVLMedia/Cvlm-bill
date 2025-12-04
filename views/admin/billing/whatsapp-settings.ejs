@@ -895,29 +895,25 @@
         }
     }
 
-    // Show alert function (using global function from footer)
+    // Show alert function (standalone, no recursion)
     function showAlert(message, type) {
-        // Use global showAlert function from footer
-        if (typeof window.showAlert === 'function') {
-            window.showAlert(message, type);
-        } else {
-            // Fallback if global function not available
-            const alertDiv = document.createElement('div');
-            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-            alertDiv.innerHTML = `
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            `;
-            
-            document.querySelector('.main-content').insertBefore(alertDiv, document.querySelector('.main-content').firstChild);
-            
-            // Auto dismiss after 5 seconds
-            setTimeout(() => {
-                if (alertDiv.parentNode) {
-                    alertDiv.remove();
-                }
-            }, 5000);
-        }
+        // Create alert directly without checking window.showAlert to avoid recursion
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(alertDiv);
+        
+        // Auto dismiss after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
     }
     
     // Function to update template status display
@@ -1059,15 +1055,24 @@
     }
     
     // Reset rate limit settings to default
-    function resetRateLimitSettings() {
+    async function resetRateLimitSettings() {
         if (confirm('Apakah Anda yakin ingin mereset pengaturan ke default?')) {
+            // Set default values
             document.getElementById('maxMessagesPerBatch').value = 10;
             document.getElementById('delayBetweenBatches').value = 30;
             document.getElementById('delayBetweenMessages').value = 2;
             document.getElementById('maxRetries').value = 2;
             document.getElementById('dailyMessageLimit').value = 0;
             document.getElementById('enableRateLimit').checked = true;
-            showAlert('Pengaturan telah direset ke default', 'info');
+            
+            // Save to backend
+            try {
+                await saveRateLimitSettings();
+                showAlert('Pengaturan telah direset ke default dan disimpan!', 'success');
+            } catch (error) {
+                console.error('Error saving reset settings:', error);
+                showAlert('Pengaturan telah direset, tapi gagal menyimpan ke server. Silakan simpan manual.', 'warning');
+            }
         }
     }
 

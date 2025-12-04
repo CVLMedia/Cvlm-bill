@@ -53,8 +53,8 @@
                                 <div class="d-flex gap-2 align-items-center">
                                     <label for="monthFilter" class="form-label mb-0 me-2 text-white">BULAN:</label>
                                     <select id="monthFilter" class="form-select form-select-sm" style="width: auto;">
-                                        <option value="">Semua Bulan</option>
-                                        <option value="current" selected>Bulan Berjalan</option>
+                                        <option value="" selected>Semua Bulan</option>
+                                        <option value="current">Bulan Berjalan</option>
                                         <option value="2025-01">Januari 2025</option>
                                         <option value="2025-02">Februari 2025</option>
                                         <option value="2025-03">Maret 2025</option>
@@ -408,8 +408,9 @@
                 $('#invoicesTable').DataTable().draw();
             });
 
-            // Apply current month filter by default
-            $('#monthFilter').trigger('change');
+            // Don't apply current month filter by default - show all invoices
+            // User can manually select "Bulan Berjalan" if needed
+            // $('#monthFilter').trigger('change');
 
             // Status filter functionality
             let statusFilterFunction = null;

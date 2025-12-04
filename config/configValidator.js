@@ -77,7 +77,7 @@ class ConfigValidator {
                 return {
                     success: false,
                     error: 'GenieACS belum dikonfigurasi',
-                    details: 'Tambahkan server di /admin/genieacs-servers'
+                    details: 'Tambahkan server di /admin/routers'
                 };
             }
 
@@ -439,7 +439,7 @@ class ConfigValidator {
         try {
             const serverDetails = await getGenieacsCredentials();
             if (!serverDetails || !serverDetails.url) {
-                warnings.push('GenieACS belum dikonfigurasi di menu /admin/genieacs-servers.');
+                warnings.push('GenieACS belum dikonfigurasi di menu /admin/routers.');
             } else {
                 if (serverDetails.url.includes('localhost') || serverDetails.url.includes('127.0.0.1')) {
                     warnings.push('GenieACS menggunakan alamat localhost - pastikan ini sesuai dengan setup Anda');

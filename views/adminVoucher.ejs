@@ -198,9 +198,14 @@
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <label for="voucherValidUntil" class="form-label"><i class="bi bi-calendar-event me-1"></i>Valid Sampai</label>
-                                <input type="date" class="form-control" id="voucherValidUntil" name="validUntil">
-                                <small class="text-muted">Kosongkan jika tidak ada batas waktu</small>
+                                <label for="voucherValidity" class="form-label"><i class="bi bi-clock me-1"></i>Masa Aktif (Validity)</label>
+                                <input type="text" class="form-control" id="voucherValidity" name="validity" placeholder="contoh: 10m, 30m, 1h, 1d, 7d, 1w">
+                                <small class="text-muted">Format: 10m (10 menit), 30m (30 menit), 1h (1 jam), 1d (1 hari), 7d (7 hari), 1w (1 minggu). Kosongkan jika tidak ada batas waktu.</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="voucherUptime" class="form-label"><i class="bi bi-stopwatch me-1"></i>Batas Uptime Total (UP Time)</label>
+                                <input type="text" class="form-control" id="voucherUptime" name="uptime" placeholder="contoh: 10m, 30m, 1h, 1d, 7d, 1w">
+                                <small class="text-muted">Format: 10m (10 menit), 30m (30 menit), 1h (1 jam), 1d (1 hari), 7d (7 hari), 1w (1 minggu). Kosongkan jika tidak ada batas uptime.</small>
                             </div>
                             <div class="mb-3">
                                 <label for="voucherPrice" class="form-label"><i class="bi bi-cash me-1"></i>Harga (Rp)</label>
@@ -970,7 +975,10 @@
                 });
                 
                 const result = await response.json();
-                console.log('Generate voucher response:', result);
+                // Cek apakah voucher berhasil dibuat
+                if (!result.success || !result.vouchers || result.vouchers.length === 0) {
+                    throw new Error(result.message || 'Tidak ada voucher yang berhasil dibuat');
+                }
                 
                 if (result.success && result.vouchers && result.vouchers.length > 0) {
                     // Save voucher data for printing
@@ -978,7 +986,8 @@
                         vouchers: result.vouchers,
                         server: result.server,
                         profile: result.profile,
-                        validUntil: result.validUntil,
+                        validity: result.validity,
+                        uptime: result.uptime,
                         price: result.price,
                         model: result.voucherModel || 'standard',
                         namaHotspot: result.namaHotspot,
@@ -1108,18 +1117,19 @@
 
                 } else {
                     // Tampilkan pesan error dengan animasi
+                    const errorMessage = result.message || 'Tidak ada voucher yang berhasil dibuat. Periksa koneksi ke Mikrotik.';
                     voucherResultDiv.innerHTML = `
                         <div class="alert alert-danger animate__animated animate__shakeX">
                             <div class="d-flex align-items-center">
                                 <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 2rem;"></i>
                                 <div>
                                     <h5 class="alert-heading">Gagal Membuat Voucher</h5>
-                                    <p class="mb-0">${result.message || 'Tidak ada voucher yang berhasil dibuat. Periksa koneksi ke Mikrotik.'}</p>
+                                    <p class="mb-0">${errorMessage}</p>
                                 </div>
                             </div>
                         </div>
                     `;
-                    showToast('Gagal membuat voucher: ' + (result.message || 'Terjadi kesalahan'), 'danger');
+                    showToast('Gagal membuat voucher: ' + errorMessage, 'danger');
                 }
             } catch (error) {
                 console.error('Error:', error);
